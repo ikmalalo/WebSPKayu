@@ -19,8 +19,36 @@ const statusTimeline = [
 ]
 
 export function PantauHasilPage() {
-  const isLayak = userPengajuan.status === 'LAYAK_DIDANAI'
-  const isProcessed = ['LAYAK_DIDANAI', 'TIDAK_DIDANAI', 'DIPROSES_TOPSIS'].includes(userPengajuan.status)
+  const isLayak = userPengajuan?.status === 'LAYAK_DIDANAI'
+  const isProcessed = userPengajuan && ['LAYAK_DIDANAI', 'TIDAK_DIDANAI', 'DIPROSES_TOPSIS'].includes(userPengajuan.status)
+
+  if (!userPengajuan) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Pantau Hasil Pengajuan"
+          description="Lihat status dan hasil akhir pengajuan Anda"
+        />
+
+        <Card>
+          <CardContent className="py-16 text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900">Belum Ada Pengajuan untuk Dipantau</h3>
+            <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto">
+              Anda belum melakukan pengajuan bantuan. Silakan buat pengajuan terlebih dahulu untuk memantau prosesnya.
+            </p>
+            <Button asChild className="mt-6">
+              <Link to="/pengajuan/form">
+                Mulai Pengajuan
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

@@ -9,6 +9,7 @@ import {
   Leaf,
   X,
   Menu,
+  ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { currentUser } from '@/data/mockData'
@@ -46,8 +47,9 @@ export function UserSidebar({ open, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-white border-r border-slate-200 shrink-0 transition-transform duration-300',
-          'lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-auto',
+          'group peer fixed inset-y-0 left-0 z-40 flex flex-col w-64 bg-white border-r border-slate-200 shrink-0 transition-all duration-300 ease-in-out shadow-lg',
+          // Hover-expand behavior on desktop
+          'lg:translate-x-0 lg:-translate-x-[calc(100%-12px)] lg:hover:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -109,6 +111,11 @@ export function UserSidebar({ open, onClose }: SidebarProps) {
             <LogOut className="w-4 h-4 shrink-0" />
             <span>Keluar</span>
           </button>
+        </div>
+
+        {/* Floating Hint Handle for Desktop */}
+        <div className="hidden lg:flex absolute top-1/2 -right-6 -translate-y-1/2 w-6 h-14 bg-green-600 text-white rounded-r-xl shadow-md items-center justify-center cursor-pointer group-hover:opacity-0 transition-opacity">
+          <ChevronRight className="w-4 h-4 animate-pulse" />
         </div>
       </aside>
     </>
