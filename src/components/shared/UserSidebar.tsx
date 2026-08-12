@@ -1,0 +1,132 @@
+import { NavLink, useNavigate } from 'react-router-dom'
+import {
+  LayoutDashboard,
+  FileText,
+  ClipboardList,
+  Eye,
+  User,
+  LogOut,
+  Leaf,
+  X,
+  Menu,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { currentUser } from '@/data/mockData'
+
+interface SidebarProps {
+  open: boolean
+  onClose: () => void
+}
+
+const navItems = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/pengajuan', icon: FileText, label: 'Pengajuan' },
+  { to: '/kuesioner', icon: ClipboardList, label: 'Kuesioner' },
+  { to: '/pantau-hasil', icon: Eye, label: 'Pantau Hasil' },
+  { to: '/profil', icon: User, label: 'Profil' },
+]
+
+export function UserSidebar({ open, onClose }: SidebarProps) {
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    navigate('/login')
+  }
+
+  return (
+    <>
+      {/* Overlay for mobile */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-white border-r border-slate-200 shrink-0 transition-transform duration-300',
+          'lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-auto',
+          open ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        {/* Logo */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
+              <Leaf className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <span className="text-sm font-bold text-slate-900">SPK Mustahik</span>
+              <p className="text-xs text-slate-400 leading-none">Portal Pengajuan</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="lg:hidden p-1 rounded-md text-slate-400 hover:bg-slate-100"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* User info */}
+        <div className="px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
+              {currentUser.name.charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900 truncate">{currentUser.name}</p>
+              <p className="text-xs text-slate-400 truncate">{currentUser.email}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {navItems.map(({ to, icon: Icon, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              onClick={onClose}
+              className={({ isActive }) =>
+                cn('sidebar-link', isActive ? 'sidebar-link-active' : 'sidebar-link-inactive')
+              }
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Logout */}
+        <div className="px-3 py-4 border-t border-slate-100">
+          <button
+            onClick={handleLogout}
+            className="sidebar-link sidebar-link-inactive w-full text-red-500 hover:bg-red-50 hover:text-red-600"
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span>Keluar</span>
+          </button>
+        </div>
+      </aside>
+    </>
+  )
+}
+
+// Mobile toggle button
+interface MobileMenuButtonProps {
+  onClick: () => void
+}
+
+export function MobileMenuButton({ onClick }: MobileMenuButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+    >
+      <Menu className="w-5 h-5" />
+    </button>
+  )
+}
