@@ -180,61 +180,7 @@ export const mockDataMustahik: DataMustahik[] = [
 ];
 
 // ===== MOCK PENGAJUAN =====
-export const mockPengajuan: Pengajuan[] = [
-  {
-    id: 'p1',
-    userId: 'u1',
-    mustahikId: 'dm1',
-    namaLengkap: 'Ahmad Fauzi',
-    nik: '3201010101900001',
-    status: 'LAYAK_DIDANAI',
-    tanggalPengajuan: '2024-04-10',
-    tanggalVerifikasi: '2024-04-15',
-    catatan: 'Data lengkap dan valid.',
-  },
-  {
-    id: 'p2',
-    userId: 'u2',
-    mustahikId: 'dm2',
-    namaLengkap: 'Siti Rahayu',
-    nik: '3201010202850002',
-    status: 'LOLOS_VERIFIKASI',
-    tanggalPengajuan: '2024-04-12',
-    tanggalVerifikasi: '2024-04-18',
-    catatan: 'Lolos verifikasi, menunggu proses TOPSIS.',
-  },
-  {
-    id: 'p3',
-    userId: 'u3',
-    mustahikId: 'dm3',
-    namaLengkap: 'Budi Santoso',
-    nik: '3201010303920003',
-    status: 'SEDANG_DIVERIFIKASI',
-    tanggalPengajuan: '2024-04-20',
-    catatan: '',
-  },
-  {
-    id: 'p4',
-    userId: 'u4',
-    mustahikId: 'dm4',
-    namaLengkap: 'Dewi Lestari',
-    nik: '3201010404880004',
-    status: 'MENUNGGU_VERIFIKASI',
-    tanggalPengajuan: '2024-04-22',
-    catatan: '',
-  },
-  {
-    id: 'p5',
-    userId: 'u5',
-    mustahikId: 'dm5',
-    namaLengkap: 'Eko Prasetyo',
-    nik: '3201010505950005',
-    status: 'PERLU_PERBAIKAN',
-    tanggalPengajuan: '2024-04-18',
-    tanggalVerifikasi: '2024-04-23',
-    catatan: 'Foto KTP kurang jelas, mohon upload ulang.',
-  },
-];
+export const mockPengajuan: Pengajuan[] = [];
 
 // ===== MOCK KRITERIA =====
 export const mockKriteria: Kriteria[] = [
