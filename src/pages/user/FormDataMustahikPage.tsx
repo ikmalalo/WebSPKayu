@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FormField, FormSection } from '@/components/shared/FormField'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { mockDataMustahik } from '@/data/mockData'
+import { mockDataMustahik, mockPengajuan, saveMockPengajuan } from '@/data/mockData'
 
 const prefilled = mockDataMustahik[0]
 
@@ -21,6 +21,20 @@ export function FormDataMustahikPage() {
     setLoading(true)
     setTimeout(() => {
       setLoading(false)
+      // Save temporary pengajuan data to sessionStorage mock state
+      const newSubmission = {
+        id: 'p_temp',
+        userId: 'u1',
+        namaLengkap: prefilled.namaLengkap,
+        nik: prefilled.nik,
+        status: 'BELUM_ADA_PENGAJUAN', // Will progress after kuesioner
+        tanggalPengajuan: new Date().toISOString().split('T')[0],
+      };
+      // Import saveMockPengajuan dynamically or update array directly
+      mockPengajuan.length = 0;
+      mockPengajuan.push(newSubmission);
+      saveMockPengajuan(mockPengajuan);
+
       navigate('/kuesioner')
     }, 1000)
   }

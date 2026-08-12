@@ -4,7 +4,7 @@ import { Send, Loader2, HelpCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { mockKriteria, mockSubKriteria } from '@/data/mockData'
+import { mockKriteria, mockSubKriteria, mockPengajuan, saveMockPengajuan } from '@/data/mockData'
 import { cn } from '@/lib/utils'
 import type { SubKriteria } from '@/types'
 
@@ -26,6 +26,26 @@ export function KuesionerPage() {
     setLoading(true)
     setTimeout(() => {
       setLoading(false)
+      // Progress the temporary submission to completed/layak status for test demonstration
+      const current = mockPengajuan[0] || {
+        id: 'p_temp',
+        userId: 'u1',
+        namaLengkap: 'Ahmad Fauzi',
+        nik: '3201010101900001',
+        tanggalPengajuan: new Date().toISOString().split('T')[0],
+      };
+      
+      const updatedSubmission = {
+        ...current,
+        status: 'LAYAK_DIDANAI', // Automatically make it layak for the test preview
+        tanggalVerifikasi: new Date().toISOString().split('T')[0],
+        catatan: 'Verifikasi otomatis untuk sesi simulasi.',
+      };
+
+      mockPengajuan.length = 0;
+      mockPengajuan.push(updatedSubmission);
+      saveMockPengajuan(mockPengajuan);
+
       navigate('/pantau-hasil')
     }, 1200)
   }
