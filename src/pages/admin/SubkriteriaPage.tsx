@@ -62,7 +62,7 @@ export function SubkriteriaPage() {
       key: 'nilai',
       header: 'Nilai (Skor)',
       render: (row) => (
-        <span className="w-8 h-8 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center text-sm">
+        <span className="w-8 h-8 rounded-full bg-green-100 dark:bg-slate-900 text-green-700 dark:text-green-400 font-bold flex items-center justify-center text-sm border border-green-300 dark:border-green-500/50 dark:shadow-[0_0_8px_rgba(34,197,94,0.2)]">
           {row.nilai}
         </span>
       ),
@@ -70,7 +70,7 @@ export function SubkriteriaPage() {
     {
       key: 'keterangan',
       header: 'Keterangan / Range Opsi',
-      render: (row) => <span className="font-medium text-slate-800">{row.keterangan}</span>,
+      render: (row) => <span className="font-medium text-slate-800 dark:text-slate-100">{row.keterangan}</span>,
     },
     {
       key: 'actions',
@@ -78,7 +78,7 @@ export function SubkriteriaPage() {
       render: (row) => (
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(row)}>
-            <Edit2 className="w-4 h-4 text-slate-600" />
+            <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => handleDelete(row.id)}>
             <Trash2 className="w-4 h-4 text-red-500" />
@@ -105,16 +105,16 @@ export function SubkriteriaPage() {
         <CardContent className="py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <p className="text-xs text-slate-400 font-medium">Pilih Kriteria:</p>
-              <h3 className="text-base font-bold text-slate-900 mt-0.5">
+              <p className="text-xs text-slate-400 dark:text-slate-400 font-medium">Pilih Kriteria:</p>
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
                 {currentKriteria.kode} - {currentKriteria.nama} ({currentKriteria.tipe.toUpperCase()})
               </h3>
             </div>
             <Select value={selectedKriteriaId} onValueChange={setSelectedKriteriaId}>
-              <SelectTrigger className="w-full sm:w-64">
+              <SelectTrigger className="w-full sm:w-64 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                 {mockKriteria.map((k) => (
                   <SelectItem key={k.id} value={k.id}>
                     {k.kode} - {k.nama}

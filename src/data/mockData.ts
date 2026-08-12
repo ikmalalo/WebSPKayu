@@ -179,8 +179,28 @@ export const mockDataMustahik: DataMustahik[] = [
   },
 ];
 
-// ===== MOCK PENGAJUAN =====
-export const mockPengajuan: Pengajuan[] = [];
+// ===== MOCK PENGAJUAN (Session-based storage) =====
+const getInitialPengajuan = (): Pengajuan[] => {
+  try {
+    const saved = sessionStorage.getItem('mock_pengajuan_data');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return [];
+};
+
+export const mockPengajuan: Pengajuan[] = getInitialPengajuan();
+
+export const saveMockPengajuan = (data: Pengajuan[]) => {
+  try {
+    sessionStorage.setItem('mock_pengajuan_data', JSON.stringify(data));
+  } catch (e) {
+    console.error(e);
+  }
+};
 
 // ===== MOCK KRITERIA =====
 export const mockKriteria: Kriteria[] = [

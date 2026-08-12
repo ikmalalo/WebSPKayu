@@ -29,14 +29,14 @@ export function ProfilPage() {
       />
 
       {/* Profile header */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 flex items-center gap-5">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-2xl font-bold text-green-700 shrink-0">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 flex items-center gap-5 transition-colors">
+        <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950/80 flex items-center justify-center text-2xl font-bold text-green-700 dark:text-green-300 shrink-0">
           {currentUser.name.charAt(0)}
         </div>
         <div>
-          <h2 className="text-lg font-bold text-slate-900">{currentUser.name}</h2>
-          <p className="text-sm text-slate-500">{currentUser.email}</p>
-          <p className="text-xs text-slate-400 mt-1">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{currentUser.name}</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{currentUser.email}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
             Bergabung sejak {formatDate(currentUser.createdAt)}
           </p>
         </div>

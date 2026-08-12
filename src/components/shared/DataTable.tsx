@@ -17,7 +17,7 @@ export function DataTable<T extends { id: string }>({
   onRowClick,
 }: DataTableProps<T>) {
   return (
-    <div className={cn('overflow-x-auto rounded-xl border border-slate-200 bg-white', className)}>
+    <div className={cn('overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-colors', className)}>
       <table className="data-table w-full border-collapse text-left">
         <thead>
           <tr>

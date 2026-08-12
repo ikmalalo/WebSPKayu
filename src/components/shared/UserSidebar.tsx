@@ -47,39 +47,39 @@ export function UserSidebar({ open, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'group peer fixed inset-y-0 left-0 z-40 flex flex-col w-64 bg-white border-r border-slate-200 shrink-0 transition-all duration-300 ease-in-out shadow-lg',
+          'group peer fixed inset-y-0 left-0 z-40 flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shrink-0 transition-all duration-300 ease-in-out shadow-lg',
           // Hover-expand behavior on desktop
           'lg:translate-x-0 lg:-translate-x-[calc(100%-12px)] lg:hover:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
               <Leaf className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="text-sm font-bold text-slate-900">SPK Mustahik</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">SPK Mustahik</span>
               <p className="text-xs text-slate-400 leading-none">Portal Pengajuan</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="lg:hidden p-1 rounded-md text-slate-400 hover:bg-slate-100"
+            className="lg:hidden p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* User info */}
-        <div className="px-5 py-4 border-b border-slate-100">
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
+            <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-950/80 flex items-center justify-center text-green-700 dark:text-green-300 text-sm font-bold">
               {currentUser.name.charAt(0)}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-900 truncate">{currentUser.name}</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{currentUser.name}</p>
               <p className="text-xs text-slate-400 truncate">{currentUser.email}</p>
             </div>
           </div>
@@ -103,10 +103,10 @@ export function UserSidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* Logout */}
-        <div className="px-3 py-4 border-t border-slate-100">
+        <div className="px-3 py-4 border-t border-slate-100 dark:border-slate-800">
           <button
             onClick={handleLogout}
-            className="sidebar-link sidebar-link-inactive w-full text-red-500 hover:bg-red-50 hover:text-red-600"
+            className="sidebar-link sidebar-link-inactive w-full text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 hover:text-red-600"
           >
             <LogOut className="w-4 h-4 shrink-0" />
             <span>Keluar</span>

@@ -62,13 +62,13 @@ export function ProcessTopsisPage() {
       </PageHeader>
 
       {/* Info Card */}
-      <Card className="border-green-300 bg-green-50/40">
+      <Card className="border-green-300 dark:border-green-900 bg-green-50/40 dark:bg-green-950/30">
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+            <Info className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-slate-900">Perhitungan TOPSIS Transparan</p>
-              <p className="text-xs text-slate-600 mt-0.5">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Perhitungan TOPSIS Transparan</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                 Semua tahap mulai dari pembentukan Matriks Keputusan (X), Normalisasi (R), Normalisasi Terbobot (Y), Solusi Ideal (A+ / A-), Jarak (D+ / D-), hingga Nilai Preferensi (Ci) ditampilkan secara detail di bawah ini.
               </p>
             </div>
@@ -77,11 +77,11 @@ export function ProcessTopsisPage() {
       </Card>
 
       <Tabs defaultValue="matriks" className="w-full">
-        <TabsList className="w-full grid grid-cols-2 md:grid-cols-4 h-auto">
-          <TabsTrigger value="matriks">1. Matriks Keputusan (X)</TabsTrigger>
-          <TabsTrigger value="normalisasi">2. Normalisasi (R)</TabsTrigger>
-          <TabsTrigger value="terbobot">3. Terbobot (Y)</TabsTrigger>
-          <TabsTrigger value="solusi">4. Solusi & Jarak</TabsTrigger>
+        <TabsList className="w-full grid grid-cols-2 md:grid-cols-4 h-auto bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <TabsTrigger value="matriks" className="dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-slate-100">1. Matriks Keputusan (X)</TabsTrigger>
+          <TabsTrigger value="normalisasi" className="dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-slate-100">2. Normalisasi (R)</TabsTrigger>
+          <TabsTrigger value="terbobot" className="dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-slate-100">3. Terbobot (Y)</TabsTrigger>
+          <TabsTrigger value="solusi" className="dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-slate-100">4. Solusi & Jarak</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Matriks Keputusan */}
@@ -103,9 +103,9 @@ export function ProcessTopsisPage() {
                 <tbody>
                   {mustahiks.map((m, idx) => (
                     <tr key={m.id}>
-                      <td className="font-semibold text-slate-800">{m.namaLengkap}</td>
+                      <td className="font-semibold text-slate-800 dark:text-slate-100">{m.namaLengkap}</td>
                       {decisionMatrix[idx].map((val, cIdx) => (
-                        <td key={cIdx} className="font-mono text-center">{val}</td>
+                        <td key={cIdx} className="font-mono text-center text-slate-800 dark:text-slate-200">{val}</td>
                       ))}
                     </tr>
                   ))}
@@ -134,9 +134,9 @@ export function ProcessTopsisPage() {
                 <tbody>
                   {mustahiks.map((m, idx) => (
                     <tr key={m.id}>
-                      <td className="font-semibold text-slate-800">{m.namaLengkap}</td>
+                      <td className="font-semibold text-slate-800 dark:text-slate-100">{m.namaLengkap}</td>
                       {normalizedMatrix[idx].map((val, cIdx) => (
-                        <td key={cIdx} className="font-mono text-center">{val}</td>
+                        <td key={cIdx} className="font-mono text-center text-slate-800 dark:text-slate-200">{val}</td>
                       ))}
                     </tr>
                   ))}
@@ -165,9 +165,9 @@ export function ProcessTopsisPage() {
                 <tbody>
                   {mustahiks.map((m, idx) => (
                     <tr key={m.id}>
-                      <td className="font-semibold text-slate-800">{m.namaLengkap}</td>
+                      <td className="font-semibold text-slate-800 dark:text-slate-100">{m.namaLengkap}</td>
                       {normalizedMatrix[idx].map((val, cIdx) => (
-                        <td key={cIdx} className="font-mono text-center">
+                        <td key={cIdx} className="font-mono text-center text-slate-800 dark:text-slate-200">
                           {(val * kriteria[cIdx].bobot).toFixed(4)}
                         </td>
                       ))}
@@ -187,13 +187,13 @@ export function ProcessTopsisPage() {
                 <CardTitle>Solusi Ideal (A+ & A-)</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                  <p className="font-bold text-green-800">Solusi Ideal Positif (A+)</p>
-                  <p className="font-mono text-xs text-green-700 mt-1">[0.0514, 0.1693, 0.1088, 0.0897, 0.0358]</p>
+                <div className="p-3 bg-green-50 dark:bg-slate-900 rounded-lg border border-green-200 dark:border-green-800">
+                  <p className="font-bold text-green-800 dark:text-green-400">Solusi Ideal Positif (A+)</p>
+                  <p className="font-mono text-xs text-green-700 dark:text-green-300 mt-1">[0.0514, 0.1693, 0.1088, 0.0897, 0.0358]</p>
                 </div>
-                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                  <p className="font-bold text-amber-800">Solusi Ideal Negatif (A-)</p>
-                  <p className="font-mono text-xs text-amber-700 mt-1">[0.2058, 0.0338, 0.0816, 0.0539, 0.0447]</p>
+                <div className="p-3 bg-amber-50 dark:bg-slate-900 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <p className="font-bold text-amber-800 dark:text-amber-400">Solusi Ideal Negatif (A-)</p>
+                  <p className="font-mono text-xs text-amber-700 dark:text-amber-300 mt-1">[0.2058, 0.0338, 0.0816, 0.0539, 0.0447]</p>
                 </div>
               </CardContent>
             </Card>
@@ -214,16 +214,16 @@ export function ProcessTopsisPage() {
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="font-semibold">Ahmad Fauzi</td>
-                      <td className="font-mono">0.0312</td>
-                      <td className="font-mono">0.1432</td>
-                      <td className="font-mono font-bold text-green-600">0.8210</td>
+                      <td className="font-semibold text-slate-800 dark:text-slate-100">Ahmad Fauzi</td>
+                      <td className="font-mono text-slate-800 dark:text-slate-200">0.0312</td>
+                      <td className="font-mono text-slate-800 dark:text-slate-200">0.1432</td>
+                      <td className="font-mono font-bold text-green-600 dark:text-green-400">0.8210</td>
                     </tr>
                     <tr>
-                      <td className="font-semibold">Siti Rahayu</td>
-                      <td className="font-mono">0.0451</td>
-                      <td className="font-mono">0.1298</td>
-                      <td className="font-mono font-bold text-green-600">0.7430</td>
+                      <td className="font-semibold text-slate-800 dark:text-slate-100">Siti Rahayu</td>
+                      <td className="font-mono text-slate-800 dark:text-slate-200">0.0451</td>
+                      <td className="font-mono text-slate-800 dark:text-slate-200">0.1298</td>
+                      <td className="font-mono font-bold text-green-600 dark:text-green-400">0.7430</td>
                     </tr>
                   </tbody>
                 </table>

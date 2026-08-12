@@ -46,18 +46,18 @@ export function FormDataMustahikPage() {
                     s < step
                       ? 'bg-green-600 text-white'
                       : s === step
-                      ? 'bg-green-100 text-green-700 ring-2 ring-green-400'
-                      : 'bg-slate-100 text-slate-400'
+                      ? 'bg-green-100 dark:bg-green-950/80 text-green-700 dark:text-green-300 ring-2 ring-green-400 dark:ring-green-600'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                   }`}
                 >
                   {s < step ? '✓' : s}
                 </div>
-                <span className={`text-xs font-medium hidden sm:block ${s <= step ? 'text-slate-700' : 'text-slate-400'}`}>
+                <span className={`text-xs font-medium hidden sm:block ${s <= step ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`}>
                   {label}
                 </span>
               </div>
               {i < stepLabels.length - 1 && (
-                <div className={`h-px flex-1 ${s < step ? 'bg-green-400' : 'bg-slate-200'}`} />
+                <div className={`h-px flex-1 ${s < step ? 'bg-green-400' : 'bg-slate-200 dark:bg-slate-800'}`} />
               )}
             </div>
           )
@@ -85,14 +85,14 @@ export function FormDataMustahikPage() {
                     <Input id="tempat-lahir" placeholder="Kota lahir" defaultValue={prefilled.tempatLahir} />
                   </FormField>
                   <FormField label="Tanggal Lahir" htmlFor="tgl-lahir" required>
-                    <Input id="tgl-lahir" type="date" defaultValue={prefilled.tanggalLahir} />
+                    <Input id="tgl-lahir" type="date" defaultValue={prefilled.tanggalLahir} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100" />
                   </FormField>
                   <FormField label="Jenis Kelamin" htmlFor="jk" required>
                     <Select defaultValue={prefilled.jenisKelamin}>
-                      <SelectTrigger id="jk">
+                      <SelectTrigger id="jk" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih jenis kelamin" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectItem value="L">Laki-laki</SelectItem>
                         <SelectItem value="P">Perempuan</SelectItem>
                       </SelectContent>
@@ -100,10 +100,10 @@ export function FormDataMustahikPage() {
                   </FormField>
                   <FormField label="Status Pernikahan" htmlFor="status-nikah" required>
                     <Select defaultValue={prefilled.statusPernikahan}>
-                      <SelectTrigger id="status-nikah">
+                      <SelectTrigger id="status-nikah" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih status" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectItem value="belum_menikah">Belum Menikah</SelectItem>
                         <SelectItem value="menikah">Menikah</SelectItem>
                         <SelectItem value="cerai_hidup">Cerai Hidup</SelectItem>
@@ -154,10 +154,10 @@ export function FormDataMustahikPage() {
                   </FormField>
                   <FormField label="Kepemilikan Aset" htmlFor="aset" required>
                     <Select defaultValue={prefilled.kepemilikanAset}>
-                      <SelectTrigger id="aset">
+                      <SelectTrigger id="aset" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectItem value="ada">Memiliki Aset</SelectItem>
                         <SelectItem value="tidak_ada">Tidak Memiliki Aset</SelectItem>
                       </SelectContent>
@@ -174,10 +174,10 @@ export function FormDataMustahikPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Status Kepemilikan Rumah" htmlFor="status-rumah" required>
                     <Select defaultValue={prefilled.statusRumah}>
-                      <SelectTrigger id="status-rumah">
+                      <SelectTrigger id="status-rumah" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih status rumah" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectItem value="milik_sendiri">Milik Sendiri</SelectItem>
                         <SelectItem value="sewa">Sewa / Kontrak</SelectItem>
                         <SelectItem value="menumpang">Menumpang</SelectItem>
@@ -187,10 +187,10 @@ export function FormDataMustahikPage() {
                   </FormField>
                   <FormField label="Kondisi Fisik Rumah" htmlFor="kondisi-rumah" required>
                     <Select defaultValue={prefilled.kondisiRumah}>
-                      <SelectTrigger id="kondisi-rumah">
+                      <SelectTrigger id="kondisi-rumah" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih kondisi" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectItem value="baik">Baik</SelectItem>
                         <SelectItem value="sedang">Sedang / Cukup</SelectItem>
                         <SelectItem value="buruk">Buruk / Tidak Layak</SelectItem>
@@ -201,9 +201,9 @@ export function FormDataMustahikPage() {
               </FormSection>
 
               {/* Konfirmasi */}
-              <div className="p-4 bg-green-50 rounded-xl border border-green-200">
-                <p className="text-sm font-semibold text-green-800 mb-1">Konfirmasi Data</p>
-                <p className="text-xs text-green-700">
+              <div className="p-4 bg-green-50 dark:bg-slate-900 rounded-xl border border-green-200 dark:border-green-800">
+                <p className="text-sm font-semibold text-green-800 dark:text-green-400 mb-1">Konfirmasi Data</p>
+                <p className="text-xs text-green-700 dark:text-green-500">
                   Pastikan semua data yang Anda isi sudah benar. Data akan digunakan untuk proses verifikasi dan perhitungan TOPSIS.
                 </p>
               </div>

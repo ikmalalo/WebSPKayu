@@ -20,8 +20,8 @@ export function StatsCard({
   title,
   value,
   icon: Icon,
-  iconColor = 'text-green-600',
-  iconBg = 'bg-green-50',
+  iconColor = 'text-green-600 dark:text-green-400',
+  iconBg = 'bg-green-50 dark:bg-green-950/60',
   description,
   trend,
   className,
@@ -30,10 +30,10 @@ export function StatsCard({
     <div className={cn('stats-card', className)}>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-slate-500 font-medium">{title}</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-snug">{title}</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{value}</p>
           {description && (
-            <p className="text-xs text-slate-400 mt-1">{description}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{description}</p>
           )}
           {trend && (
             <div className="flex items-center gap-1 mt-2">

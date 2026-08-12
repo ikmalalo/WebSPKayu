@@ -44,36 +44,36 @@ export function UserDashboardPage() {
       {/* Quick stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="stats-card flex items-center gap-4">
-          <div className="p-2.5 rounded-xl bg-blue-50">
-            <FileText className="w-5 h-5 text-blue-600" />
+          <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60">
+            <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <p className="text-xs text-slate-500">Status Pengajuan</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Status Pengajuan</p>
             {userPengajuan ? (
               <StatusBadge status={userPengajuan.status} className="mt-1" />
             ) : (
-              <p className="text-xs font-semibold text-slate-400 mt-1">Belum Ada Pengajuan</p>
+              <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mt-1">Belum Ada Pengajuan</p>
             )}
           </div>
         </div>
         <div className="stats-card flex items-center gap-4">
-          <div className="p-2.5 rounded-xl bg-green-50">
-            <CheckCircle className="w-5 h-5 text-green-600" />
+          <div className="p-2.5 rounded-xl bg-green-50 dark:bg-green-950/60">
+            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
           </div>
           <div>
-            <p className="text-xs text-slate-500">Verifikasi</p>
-            <p className="text-sm font-semibold text-slate-900 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Verifikasi</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mt-0.5">
               {userPengajuan?.tanggalVerifikasi ? formatDate(userPengajuan.tanggalVerifikasi) : '-'}
             </p>
           </div>
         </div>
         <div className="stats-card flex items-center gap-4">
-          <div className="p-2.5 rounded-xl bg-amber-50">
-            <Eye className="w-5 h-5 text-amber-600" />
+          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60">
+            <Eye className="w-5 h-5 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
-            <p className="text-xs text-slate-500">Tanggal Pengajuan</p>
-            <p className="text-sm font-semibold text-slate-900 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Tanggal Pengajuan</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mt-0.5">
               {userPengajuan ? formatDate(userPengajuan.tanggalPengajuan) : '-'}
             </p>
           </div>
@@ -87,7 +87,7 @@ export function UserDashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <div className="flex justify-between text-xs text-slate-500 mb-2">
+            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
               <span>Langkah {currentStep} dari 6</span>
               <span>{progressPercent}% selesai</span>
             </div>
@@ -103,13 +103,13 @@ export function UserDashboardPage() {
                     userPengajuan && step < currentStep
                       ? 'bg-green-600 text-white'
                       : userPengajuan && step === currentStep
-                      ? 'bg-green-100 text-green-700 ring-2 ring-green-400'
-                      : 'bg-slate-100 text-slate-400'
+                      ? 'bg-green-100 dark:bg-green-950/80 text-green-700 dark:text-green-300 ring-2 ring-green-400 dark:ring-green-600'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
                   }`}
                 >
                   {userPengajuan && step < currentStep ? '✓' : step}
                 </div>
-                <p className={`text-xs text-center leading-tight ${userPengajuan && step <= currentStep ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
+                <p className={`text-xs text-center leading-tight ${userPengajuan && step <= currentStep ? 'text-slate-700 dark:text-slate-200 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
                   {label}
                 </p>
               </div>
@@ -126,7 +126,7 @@ export function UserDashboardPage() {
             {userPengajuan ? (
               <StatusBadge status={userPengajuan.status} />
             ) : (
-              <span className="text-xs text-slate-400 font-medium bg-slate-100 px-2.5 py-1 rounded-full">Kosong</span>
+              <span className="text-xs text-slate-400 dark:text-slate-400 font-medium bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">Kosong</span>
             )}
           </div>
         </CardHeader>
@@ -135,35 +135,35 @@ export function UserDashboardPage() {
             <>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-slate-500">ID Pengajuan</p>
-                  <p className="font-semibold text-slate-900 font-mono text-xs mt-0.5">#{userPengajuan.id.toUpperCase()}</p>
+                  <p className="text-slate-500 dark:text-slate-400">ID Pengajuan</p>
+                  <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono text-xs mt-0.5">#{userPengajuan.id.toUpperCase()}</p>
                 </div>
                 <div>
-                  <p className="text-slate-500">Tanggal Pengajuan</p>
-                  <p className="font-semibold text-slate-900 text-xs mt-0.5">{formatDate(userPengajuan.tanggalPengajuan)}</p>
+                  <p className="text-slate-500 dark:text-slate-400">Tanggal Pengajuan</p>
+                  <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs mt-0.5">{formatDate(userPengajuan.tanggalPengajuan)}</p>
                 </div>
               </div>
 
               {userPengajuan.catatan && (
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <p className="text-xs font-medium text-slate-600 mb-1">Catatan Admin:</p>
-                  <p className="text-sm text-slate-700">{userPengajuan.catatan}</p>
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Catatan Admin:</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300">{userPengajuan.catatan}</p>
                 </div>
               )}
 
               {userPengajuan.status === 'LAYAK_DIDANAI' && (
-                <div className="p-3 bg-green-50 rounded-lg border border-green-200 flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+                <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800 flex items-start gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-sm font-semibold text-green-800">Selamat! Anda Dinyatakan Layak</p>
-                    <p className="text-xs text-green-700 mt-0.5">Pengajuan Anda telah melalui proses TOPSIS dan dinyatakan layak mendapatkan bantuan.</p>
+                    <p className="text-sm font-semibold text-green-800 dark:text-green-300">Selamat! Anda Dinyatakan Layak</p>
+                    <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">Pengajuan Anda telah melalui proses TOPSIS dan dinyatakan layak mendapatkan bantuan.</p>
                   </div>
                 </div>
               )}
             </>
           ) : (
             <div className="py-6 text-center">
-              <p className="text-sm text-slate-500">Anda belum membuat pengajuan bantuan apapun.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Anda belum membuat pengajuan bantuan apapun.</p>
               <Button asChild className="mt-4">
                 <Link to="/pengajuan/form">
                   Mulai Pengajuan Baru <ArrowRight className="w-4 h-4 ml-2" />
@@ -182,20 +182,20 @@ export function UserDashboardPage() {
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
-              { to: '/pengajuan', icon: FileText, label: 'Lihat Pengajuan', color: 'text-blue-600', bg: 'bg-blue-50' },
-              { to: '/kuesioner', icon: ClipboardList, label: 'Isi Kuesioner', color: 'text-purple-600', bg: 'bg-purple-50' },
-              { to: '/pantau-hasil', icon: Eye, label: 'Pantau Hasil', color: 'text-green-600', bg: 'bg-green-50' },
+              { to: '/pengajuan', icon: FileText, label: 'Lihat Pengajuan', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/60' },
+              { to: '/kuesioner', icon: ClipboardList, label: 'Isi Kuesioner', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/60' },
+              { to: '/pantau-hasil', icon: Eye, label: 'Pantau Hasil', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-950/60' },
             ].map(({ to, icon: Icon, label, color, bg }) => (
               <Link
                 key={to}
                 to={to}
-                className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-green-300 hover:bg-green-50/50 transition-all group"
+                className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-green-300 dark:hover:border-green-800 hover:bg-green-50/50 dark:hover:bg-slate-800/40 transition-all group"
               >
                 <div className={`p-2 rounded-lg ${bg}`}>
                   <Icon className={`w-4 h-4 ${color}`} />
                 </div>
-                <span className="text-sm font-medium text-slate-700 group-hover:text-green-700">{label}</span>
-                <ChevronRight className="w-4 h-4 text-slate-300 ml-auto group-hover:text-green-500" />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-green-700 dark:group-hover:text-green-400">{label}</span>
+                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 ml-auto group-hover:text-green-500" />
               </Link>
             ))}
           </div>

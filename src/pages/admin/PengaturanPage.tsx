@@ -28,7 +28,7 @@ export function PengaturanPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <FormField label="Nama Lembaga / Pengelola Zakat">
-            <Input defaultValue="BAZNAS Kabupaten Bogor" />
+            <Input defaultValue="BAZNAS Samarinda" />
           </FormField>
           <FormField label="Threshold Cutoff TOPSIS (Nilai Minimum Layak)">
             <Input type="number" step="0.05" defaultValue="0.60" />
@@ -52,17 +52,17 @@ export function PengaturanPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+          <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg">
             <div>
-              <p className="font-semibold text-slate-800">Verifikasi 2 Langkah (2FA) Admin</p>
-              <p className="text-xs text-slate-500">Meningkatkan keamanan akun administrator</p>
+              <p className="font-semibold text-slate-800 dark:text-slate-200">Verifikasi 2 Langkah (2FA) Admin</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Meningkatkan keamanan akun administrator</p>
             </div>
             <input type="checkbox" className="w-4 h-4 accent-green-600" defaultChecked />
           </div>
-          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+          <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg">
             <div>
-              <p className="font-semibold text-slate-800">Notifikasi Email Otomatis</p>
-              <p className="text-xs text-slate-500">Kirim status pengajuan ke email user</p>
+              <p className="font-semibold text-slate-800 dark:text-slate-200">Notifikasi Email Otomatis</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Kirim status pengajuan ke email user</p>
             </div>
             <input type="checkbox" className="w-4 h-4 accent-green-600" defaultChecked />
           </div>

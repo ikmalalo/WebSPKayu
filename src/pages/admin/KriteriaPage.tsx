@@ -67,20 +67,22 @@ export function KriteriaPage() {
     {
       key: 'kode',
       header: 'Kode',
-      render: (row) => <span className="font-mono font-bold text-green-700">{row.kode}</span>,
+      render: (row) => <span className="font-mono font-bold text-green-700 dark:text-green-400">{row.kode}</span>,
     },
     {
       key: 'nama',
       header: 'Nama Kriteria',
-      render: (row) => <span className="font-semibold text-slate-800">{row.nama}</span>,
+      render: (row) => <span className="font-semibold text-slate-800 dark:text-slate-100">{row.nama}</span>,
     },
     {
       key: 'tipe',
       header: 'Tipe',
       render: (row) => (
         <span
-          className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase ${
-            row.tipe === 'benefit' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+          className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+            row.tipe === 'benefit'
+              ? 'bg-green-50 dark:bg-slate-900 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/60 dark:shadow-[0_0_10px_rgba(34,197,94,0.25)]'
+              : 'bg-amber-50 dark:bg-slate-900 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/60 dark:shadow-[0_0_10px_rgba(245,158,11,0.25)]'
           }`}
         >
           {row.tipe}
@@ -90,12 +92,12 @@ export function KriteriaPage() {
     {
       key: 'bobot',
       header: 'Bobot (%)',
-      render: (row) => <span className="font-bold text-slate-900">{(row.bobot * 100).toFixed(0)}%</span>,
+      render: (row) => <span className="font-bold text-slate-900 dark:text-slate-100">{(row.bobot * 100).toFixed(0)}%</span>,
     },
     {
       key: 'deskripsi',
       header: 'Deskripsi',
-      render: (row) => <span className="text-slate-500 text-xs">{row.deskripsi}</span>,
+      render: (row) => <span className="text-slate-500 dark:text-slate-400 text-xs">{row.deskripsi}</span>,
     },
     {
       key: 'actions',
@@ -103,7 +105,7 @@ export function KriteriaPage() {
       render: (row) => (
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(row)}>
-            <Edit2 className="w-4 h-4 text-slate-600" />
+            <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => handleDelete(row.id)}>
             <Trash2 className="w-4 h-4 text-red-500" />
@@ -126,16 +128,16 @@ export function KriteriaPage() {
       </PageHeader>
 
       {/* Summary Bobot Alert */}
-      <Card className={isBobotValid ? 'border-green-300 bg-green-50/50' : 'border-amber-300 bg-amber-50/50'}>
+      <Card className={isBobotValid ? 'border-green-300 dark:border-green-900 bg-green-50/50 dark:bg-green-950/30' : 'border-amber-300 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/30'}>
         <CardContent className="py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className={`w-5 h-5 ${isBobotValid ? 'text-green-600' : 'text-amber-600'}`} />
+              <CheckCircle2 className={`w-5 h-5 ${isBobotValid ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`} />
               <div>
-                <p className="text-sm font-semibold text-slate-800">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                   Total Bobot Kriteria: {(totalBobot * 100).toFixed(0)}%
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {isBobotValid
                     ? 'Total bobot sudah 100%, siap untuk perhitungan TOPSIS.'
                     : 'Peringatan: Total bobot harus berjumlah tepat 100% (1.0).'}

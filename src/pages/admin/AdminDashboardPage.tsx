@@ -33,44 +33,44 @@ export function AdminDashboardPage() {
           title="Total Mustahik"
           value={mockStats.totalMustahik}
           icon={Users}
-          iconColor="text-blue-600"
-          iconBg="bg-blue-50"
+          iconColor="text-blue-600 dark:text-blue-400"
+          iconBg="bg-blue-50 dark:bg-blue-950/60"
           className="col-span-2 md:col-span-1"
         />
         <StatsCard
           title="Pengajuan Baru"
           value={mockStats.pengajuanBaru}
           icon={Leaf}
-          iconColor="text-green-600"
-          iconBg="bg-green-50"
+          iconColor="text-green-600 dark:text-green-400"
+          iconBg="bg-green-50 dark:bg-green-950/60"
         />
         <StatsCard
           title="Menunggu Verifikasi"
           value={mockStats.menungguVerifikasi}
           icon={Clock}
-          iconColor="text-amber-600"
-          iconBg="bg-amber-50"
+          iconColor="text-amber-600 dark:text-amber-400"
+          iconBg="bg-amber-50 dark:bg-amber-950/60"
         />
         <StatsCard
           title="Sudah Diverifikasi"
           value={mockStats.sudahDiverifikasi}
           icon={ClipboardCheck}
-          iconColor="text-purple-600"
-          iconBg="bg-purple-50"
+          iconColor="text-purple-600 dark:text-purple-400"
+          iconBg="bg-purple-50 dark:bg-purple-950/60"
         />
         <StatsCard
           title="Layak Didanai"
           value={mockStats.layakDidanai}
           icon={CheckCircle2}
-          iconColor="text-green-600"
-          iconBg="bg-green-50"
+          iconColor="text-green-600 dark:text-green-400"
+          iconBg="bg-green-50 dark:bg-green-950/60"
         />
         <StatsCard
           title="Tidak Didanai"
           value={mockStats.tidakDidanai}
           icon={XCircle}
-          iconColor="text-red-500"
-          iconBg="bg-red-50"
+          iconColor="text-red-500 dark:text-red-400"
+          iconBg="bg-red-50 dark:bg-red-950/60"
         />
       </div>
 
