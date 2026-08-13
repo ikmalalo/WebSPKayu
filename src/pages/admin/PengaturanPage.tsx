@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/shared/FormField'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { resetAllData } from '@/data/mockData'
 
 export function PengaturanPage() {
   const [loading, setLoading] = useState(false)
@@ -66,6 +67,24 @@ export function PengaturanPage() {
             </div>
             <input type="checkbox" className="w-4 h-4 accent-green-600" defaultChecked />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Database & Reset */}
+      <Card className="border-red-200">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Database className="w-4 h-4 text-red-600" />
+            <CardTitle className="text-red-600">Simulasi & Database</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Gunakan tombol di bawah ini untuk menghapus seluruh data simulasi yang tersimpan di cache lokal browser (localStorage) dan mengembalikannya ke data bawaan awal (default mock data).
+          </p>
+          <Button onClick={resetAllData} variant="destructive">
+            Reset Semua Data ke Default
+          </Button>
         </CardContent>
       </Card>
     </div>

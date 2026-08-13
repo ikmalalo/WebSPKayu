@@ -24,6 +24,21 @@ export function DetailVerifikasiPage() {
     setLoadingAction(action)
     setTimeout(() => {
       setLoadingAction(null)
+      const index = mockPengajuan.findIndex(p => p.id === id);
+      if (index > -1) {
+        const current = mockPengajuan[index];
+        const statusMap: Record<string, string> = {
+          lolos: 'LOLOS_VERIFIKASI',
+          perlu_perbaikan: 'PERLU_PERBAIKAN',
+          ditolak: 'DITOLAK'
+        };
+        mockPengajuan[index] = {
+          ...current,
+          status: statusMap[action] as any,
+          catatan: catatan,
+          tanggalVerifikasi: new Date().toISOString().split('T')[0]
+        };
+      }
       navigate('/admin/verifikasi')
     }, 1000)
   }

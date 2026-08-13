@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { currentUser } from '@/data/mockData'
+import logoImg from '@/assets/logo.png'
 
 interface SidebarProps {
   open: boolean
@@ -56,9 +57,7 @@ export function UserSidebar({ open, onClose }: SidebarProps) {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
-              <Leaf className="w-4 h-4 text-white" />
-            </div>
+            <img src={logoImg} alt="Logo SPK Mustahik" className="w-8 h-8 object-contain rounded-lg" />
             <div>
               <span className="text-sm font-bold text-slate-900 dark:text-slate-100">SPK Mustahik</span>
               <p className="text-xs text-slate-400 leading-none">Portal Pengajuan</p>

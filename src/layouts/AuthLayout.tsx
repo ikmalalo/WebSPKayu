@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { Leaf } from 'lucide-react'
+import logoImg from '@/assets/logo.png'
 
 export function AuthLayout() {
   return (
@@ -7,8 +7,8 @@ export function AuthLayout() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-green-600 rounded-2xl mb-4 shadow-sm">
-            <Leaf className="w-7 h-7 text-white" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 shadow-sm">
+            <img src={logoImg} alt="Logo SPK Mustahik" className="w-14 h-14 object-contain rounded-2xl" />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">SPK Mustahik</h1>
           <p className="text-sm text-slate-500 mt-1">

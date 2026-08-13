@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FormField, FormSection } from '@/components/shared/FormField'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { mockDataMustahik } from '@/data/mockData'
+import { mockDataMustahik, mockPengajuan } from '@/data/mockData'
 import type { Pengajuan } from '@/types'
 import { usePengajuan } from '@/context/PengajuanContext'
 
@@ -24,15 +24,106 @@ export function FormDataMustahikPage() {
     setLoading(true)
     setTimeout(() => {
       setLoading(false)
-      const newSubmission: Pengajuan = {
-        id: 'p_temp',
+      
+      const getVal = (id: string, defVal: string) => {
+        const el = document.getElementById(id) as HTMLInputElement | null;
+        return el ? el.value : defVal;
+      };
+
+      const nik = getVal('nik', prefilled.nik);
+      const namaLengkap = getVal('nama', prefilled.namaLengkap);
+      const tempatLahir = getVal('tempat-lahir', prefilled.tempatLahir);
+      const tanggalLahir = getVal('tgl-lahir', prefilled.tanggalLahir);
+      const noHp = getVal('no-hp', prefilled.noHp);
+      const alamat = getVal('alamat', prefilled.alamat);
+      const kelurahan = getVal('kelurahan', prefilled.kelurahan);
+      const kecamatan = getVal('kecamatan', prefilled.kecamatan);
+      const kota = getVal('kota', prefilled.kota);
+      const provinsi = getVal('provinsi', prefilled.provinsi);
+      const pekerjaan = getVal('pekerjaan', prefilled.pekerjaan);
+      const penghasilan = Number(getVal('penghasilan', String(prefilled.penghasilan)));
+      const tanggungan = Number(getVal('tanggungan', String(prefilled.jumlahTanggungan)));
+
+      const getSelectVal = (id: string, def: string) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          const valAttr = btn.getAttribute('data-value');
+          if (valAttr) return valAttr;
+          const text = btn.textContent || '';
+          if (text.includes('Laki')) return 'L';
+          if (text.includes('Perempuan')) return 'P';
+          if (text.includes('Belum Menikah')) return 'belum_menikah';
+          if (text.includes('Menikah')) return 'menikah';
+          if (text.includes('Cerai Hidup')) return 'cerai_hidup';
+          if (text.includes('Cerai Mati')) return 'cerai_mati';
+          if (text.includes('Milik Sendiri')) return 'milik_sendiri';
+          if (text.includes('Sewa')) return 'sewa';
+          if (text.includes('Menumpang')) return 'menumpang';
+          if (text.includes('Dinas')) return 'dinas';
+          if (text.includes('Sangat Baik')) return 'sangat_baik';
+          if (text.includes('Baik')) return 'baik';
+          if (text.includes('Sedang')) return 'sedang';
+          if (text.includes('Buruk')) return 'buruk';
+          if (text.includes('Sangat Buruk')) return 'sangat_buruk';
+        }
+        return def;
+      };
+
+      const jenisKelamin = getSelectVal('jk', prefilled.jenisKelamin);
+      const statusPernikahan = getSelectVal('status-nikah', prefilled.statusPernikahan);
+      const statusRumah = getSelectVal('status-rumah', prefilled.statusRumah);
+      const kondisiRumah = getSelectVal('kondisi-rumah', prefilled.kondisiRumah);
+      const kepemilikanAset = getSelectVal('aset', prefilled.kepemilikanAset);
+
+      const mustahikId = 'dm_user';
+      const newMustahik = {
+        id: mustahikId,
         userId: 'u1',
-        mustahikId: 'dm1',
-        namaLengkap: prefilled.namaLengkap,
-        nik: prefilled.nik,
+        nik,
+        namaLengkap,
+        tempatLahir,
+        tanggalLahir,
+        jenisKelamin: jenisKelamin as 'L' | 'P',
+        alamat,
+        kelurahan,
+        kecamatan,
+        kota,
+        provinsi,
+        noHp,
+        statusPernikahan: statusPernikahan as any,
+        pekerjaan,
+        penghasilan,
+        jumlahTanggungan: tanggungan,
+        statusRumah: statusRumah as any,
+        kondisiRumah: kondisiRumah as any,
+        kepemilikanAset: kepemilikanAset as any,
+      };
+
+      const existingIdx = mockDataMustahik.findIndex(m => m.id === mustahikId || m.nik === nik);
+      if (existingIdx > -1) {
+        mockDataMustahik[existingIdx] = newMustahik;
+      } else {
+        mockDataMustahik.push(newMustahik);
+      }
+
+      const pengajuanId = 'p_user';
+      const newSubmission: Pengajuan = {
+        id: pengajuanId,
+        userId: 'u1',
+        mustahikId,
+        namaLengkap,
+        nik,
         status: 'MENUNGGU_VERIFIKASI', 
         tanggalPengajuan: new Date().toISOString().split('T')[0],
       };
+
+      const existingPengajuanIdx = mockPengajuan.findIndex(p => p.id === pengajuanId);
+      if (existingPengajuanIdx > -1) {
+        mockPengajuan[existingPengajuanIdx] = newSubmission;
+      } else {
+        mockPengajuan.push(newSubmission);
+      }
+
       setPengajuan(newSubmission);
       navigate('/kuesioner')
     }, 1000)

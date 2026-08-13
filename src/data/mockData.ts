@@ -9,8 +9,96 @@ import type {
   Verifikasi,
 } from '@/types';
 
+// ===== PERSISTENT STORE HELPERS (using Proxy to localStorage) =====
+function createPersistentArray<T>(key: string, initialData: T[]): T[] {
+  const getStored = (): T[] => {
+    if (typeof window === 'undefined') return initialData;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        return initialData;
+      }
+    }
+    localStorage.setItem(key, JSON.stringify(initialData));
+    return [...initialData];
+  };
+
+  const target = getStored();
+
+  return new Proxy(target, {
+    get(target, prop, receiver) {
+      const current = getStored();
+      const value = Reflect.get(current, prop);
+      if (typeof value === 'function') {
+        return function(this: any, ...args: any[]) {
+          const result = value.apply(current, args);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(key, JSON.stringify(current));
+          }
+          target.length = 0;
+          target.push(...current);
+          return result;
+        };
+      }
+      return value;
+    },
+    set(target, prop, value, receiver) {
+      const current = getStored();
+      const result = Reflect.set(current, prop, value);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(current));
+      }
+      target.length = 0;
+      target.push(...current);
+      return result;
+    }
+  });
+}
+
+function createPersistentObject<T extends object>(key: string, initialData: T): T {
+  const getStored = (): T => {
+    if (typeof window === 'undefined') return initialData;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        return initialData;
+      }
+    }
+    localStorage.setItem(key, JSON.stringify(initialData));
+    return { ...initialData };
+  };
+
+  const target = getStored();
+
+  return new Proxy(target, {
+    get(target, prop) {
+      const current = getStored();
+      return Reflect.get(current, prop);
+    },
+    set(target, prop, value) {
+      const current = getStored();
+      const result = Reflect.set(current, prop, value);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(current));
+      }
+      return result;
+    }
+  });
+}
+
+export const resetAllData = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.clear();
+    window.location.reload();
+  }
+};
+
 // ===== MOCK USERS =====
-export const mockUsers: User[] = [
+const initialUsers: User[] = [
   {
     id: 'u1',
     name: 'Ikmal Ali',
@@ -61,12 +149,14 @@ export const mockUsers: User[] = [
   },
 ];
 
+export const mockUsers = createPersistentArray<User>('spk_users', initialUsers);
+
 // ===== CURRENT LOGGED IN USER (mock) =====
 export const currentUser: User = mockUsers[0];
 export const currentAdmin: User = mockUsers[5];
 
 // ===== MOCK DATA MUSTAHIK =====
-export const mockDataMustahik: DataMustahik[] = [
+const initialMustahik: DataMustahik[] = [
   {
     id: 'dm1',
     userId: 'u1',
@@ -179,8 +269,65 @@ export const mockDataMustahik: DataMustahik[] = [
   },
 ];
 
-// ===== MOCK PENGAJUAN (In-memory storage - resets on refresh) =====
-export const mockPengajuan: Pengajuan[] = [];
+export const mockDataMustahik = createPersistentArray<DataMustahik>('spk_data_mustahik', initialMustahik);
+
+// ===== MOCK PENGAJUAN =====
+const initialPengajuan: Pengajuan[] = [
+  {
+    id: 'p1',
+    userId: 'u1',
+    mustahikId: 'dm1',
+    namaLengkap: 'Ikmal Ali',
+    nik: '3201010101900001',
+    status: 'LOLOS_VERIFIKASI',
+    tanggalPengajuan: '2024-04-10',
+    tanggalVerifikasi: '2024-04-15',
+    catatan: 'Data lengkap dan valid. Semua dokumen sesuai.',
+  },
+  {
+    id: 'p2',
+    userId: 'u2',
+    mustahikId: 'dm2',
+    namaLengkap: 'Siti Rahayu',
+    nik: '3201010202850002',
+    status: 'LOLOS_VERIFIKASI',
+    tanggalPengajuan: '2024-04-12',
+    tanggalVerifikasi: '2024-04-18',
+    catatan: 'Data valid, lolos verifikasi lapangan.',
+  },
+  {
+    id: 'p3',
+    userId: 'u3',
+    mustahikId: 'dm3',
+    namaLengkap: 'Budi Santoso',
+    nik: '3201010303920003',
+    status: 'MENUNGGU_VERIFIKASI',
+    tanggalPengajuan: '2024-04-15',
+  },
+  {
+    id: 'p4',
+    userId: 'u4',
+    mustahikId: 'dm4',
+    namaLengkap: 'Dewi Lestari',
+    nik: '3201010404880004',
+    status: 'LOLOS_VERIFIKASI',
+    tanggalPengajuan: '2024-04-15',
+    tanggalVerifikasi: '2024-04-20',
+  },
+  {
+    id: 'p5',
+    userId: 'u5',
+    mustahikId: 'dm5',
+    namaLengkap: 'Eko Prasetyo',
+    nik: '3201010505950005',
+    status: 'PERLU_PERBAIKAN',
+    tanggalPengajuan: '2024-04-20',
+    tanggalVerifikasi: '2024-04-23',
+    catatan: 'Foto KTP kurang jelas, mohon upload ulang.',
+  },
+];
+
+export const mockPengajuan = createPersistentArray<Pengajuan>('spk_pengajuan', initialPengajuan);
 
 export const saveMockPengajuan = (data: Pengajuan[]) => {
   mockPengajuan.length = 0;
@@ -188,7 +335,7 @@ export const saveMockPengajuan = (data: Pengajuan[]) => {
 };
 
 // ===== MOCK KRITERIA =====
-export const mockKriteria: Kriteria[] = [
+const initialKriteria: Kriteria[] = [
   {
     id: 'k1',
     nama: 'Penghasilan',
@@ -231,8 +378,10 @@ export const mockKriteria: Kriteria[] = [
   },
 ];
 
+export const mockKriteria = createPersistentArray<Kriteria>('spk_kriteria', initialKriteria);
+
 // ===== MOCK SUBKRITERIA =====
-export const mockSubKriteria: SubKriteria[] = [
+const initialSubKriteria: SubKriteria[] = [
   // Penghasilan (C1) - Cost
   { id: 'sk1', kriteriaId: 'k1', namaKriteria: 'Penghasilan', nilai: 1, keterangan: '< Rp 500.000' },
   { id: 'sk2', kriteriaId: 'k1', namaKriteria: 'Penghasilan', nilai: 2, keterangan: 'Rp 500.001 - Rp 1.000.000' },
@@ -265,8 +414,10 @@ export const mockSubKriteria: SubKriteria[] = [
   { id: 'sk25', kriteriaId: 'k5', namaKriteria: 'Kepemilikan Aset', nilai: 5, keterangan: 'Tidak memiliki aset' },
 ];
 
+export const mockSubKriteria = createPersistentArray<SubKriteria>('spk_subkriteria', initialSubKriteria);
+
 // ===== MOCK TOPSIS RESULTS =====
-export const mockTopsisResults: TopsisResult[] = [
+const initialTopsisResults: TopsisResult[] = [
   {
     id: 'tr1',
     pengajuanId: 'p1',
@@ -319,8 +470,10 @@ export const mockTopsisResults: TopsisResult[] = [
   },
 ];
 
+export const mockTopsisResults = createPersistentArray<TopsisResult>('spk_topsis_results', initialTopsisResults);
+
 // ===== MOCK VERIFIKASI =====
-export const mockVerifikasi: Verifikasi[] = [
+const initialVerifikasi: Verifikasi[] = [
   {
     id: 'v1',
     pengajuanId: 'p1',
@@ -350,8 +503,10 @@ export const mockVerifikasi: Verifikasi[] = [
   },
 ];
 
+export const mockVerifikasi = createPersistentArray<Verifikasi>('spk_verifikasi', initialVerifikasi);
+
 // ===== MOCK SUMMARY STATS =====
-export const mockStats: SummaryStats = {
+const initialStats: SummaryStats = {
   totalMustahik: 5,
   pengajuanBaru: 2,
   menungguVerifikasi: 2,
@@ -359,6 +514,8 @@ export const mockStats: SummaryStats = {
   layakDidanai: 3,
   tidakDidanai: 2,
 };
+
+export const mockStats = createPersistentObject<SummaryStats>('spk_stats', initialStats);
 
 // ===== MOCK CHART DATA =====
 export const mockChartData = [
