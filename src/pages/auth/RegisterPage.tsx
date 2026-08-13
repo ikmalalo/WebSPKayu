@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useAuth } from '@/context/AuthContext'
+import axios from 'axios'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, User, Phone, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/shared/FormField'
+import { useState } from 'react'
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  const { loginSession } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -17,13 +21,46 @@ export function RegisterPage() {
     confirmPassword: '',
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setErrorMsg('')
+    
+    if (form.password !== form.confirmPassword) {
+      setErrorMsg('Konfirmasi password tidak cocok')
+      return
+    }
+
     setLoading(true)
-    setTimeout(() => {
+    try {
+      const response = await axios.post('http://localhost:5000/api/auth/register', {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        password: form.password
+      })
+
+      if (response.data?.success) {
+        // Setelah sukses register, langsung login
+        const loginResponse = await axios.post('http://localhost:5000/api/auth/login', {
+          email: form.email,
+          password: form.password
+        })
+
+        if (loginResponse.data?.success) {
+          const { token, user } = loginResponse.data.data
+          loginSession(token, user)
+          navigate('/dashboard')
+        } else {
+          navigate('/login')
+        }
+      } else {
+        setErrorMsg(response.data?.message || 'Registrasi gagal')
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message || 'Terjadi kesalahan saat registrasi')
+    } finally {
       setLoading(false)
-      navigate('/dashboard')
-    }, 1200)
+    }
   }
 
   return (
@@ -33,6 +70,11 @@ export function RegisterPage() {
         <p className="text-sm text-slate-500 mt-1">
           Daftar untuk mengajukan permohonan sebagai mustahik
         </p>
+        {errorMsg && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium">
+            {errorMsg}
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

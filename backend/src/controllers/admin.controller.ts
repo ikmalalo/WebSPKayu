@@ -5,7 +5,7 @@ import { fail, success } from '../utils/api-response';
 
 export async function listMustahik(req: Request, res: Response) {
   const q = String(req.query.q || '').trim();
-  const mustahik = await prisma.mustahik.findMany({ where: q ? { OR: [{ namaLengkap: { contains: q, mode: 'insensitive' } }, { nik: { contains: q } }] } : {}, include: { user: { select: { id: true, name: true, email: true, phone: true } }, pengajuan: { orderBy: { createdAt: 'desc' } } }, orderBy: { createdAt: 'desc' } });
+  const mustahik = await prisma.mustahik.findMany({ where: q ? { OR: [{ namaLengkap: { contains: q } }, { nik: { contains: q } }] } : {}, include: { user: { select: { id: true, name: true, email: true, phone: true } }, pengajuan: { orderBy: { createdAt: 'desc' } } }, orderBy: { createdAt: 'desc' } });
   return success(res, 'Data mustahik berhasil diambil', { mustahik });
 }
 export async function getMustahik(req: Request, res: Response) {

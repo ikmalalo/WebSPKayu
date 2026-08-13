@@ -11,9 +11,9 @@ import {
   Menu,
   ChevronRight,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { currentUser } from '@/data/mockData'
+import { useAuth } from '@/context/AuthContext'
 import logoImg from '@/assets/logo.png'
+import { cn } from '@/lib/utils'
 
 interface SidebarProps {
   open: boolean
@@ -30,10 +30,15 @@ const navItems = [
 
 export function UserSidebar({ open, onClose }: SidebarProps) {
   const navigate = useNavigate()
+  const { currentUser, logoutSession } = useAuth()
 
   const handleLogout = () => {
+    logoutSession()
     navigate('/login')
   }
+
+  const displayName = currentUser?.name || 'Ikmal Ali'
+  const displayEmail = currentUser?.email || 'user@example.com'
 
   return (
     <>
@@ -75,11 +80,11 @@ export function UserSidebar({ open, onClose }: SidebarProps) {
         <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-950/80 flex items-center justify-center text-green-700 dark:text-green-300 text-sm font-bold">
-              {currentUser.name.charAt(0)}
+              {displayName.charAt(0)}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{currentUser.name}</p>
-              <p className="text-xs text-slate-400 truncate">{currentUser.email}</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{displayName}</p>
+              <p className="text-xs text-slate-400 truncate">{displayEmail}</p>
             </div>
           </div>
         </div>

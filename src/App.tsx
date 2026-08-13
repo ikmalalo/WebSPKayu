@@ -30,11 +30,13 @@ import { LaporanPage } from '@/pages/admin/LaporanPage'
 import { PengaturanPage } from '@/pages/admin/PengaturanPage'
 
 import { PengajuanProvider } from '@/context/PengajuanContext'
+import { AuthProvider } from '@/context/AuthContext'
 
 export default function App() {
   return (
-    <PengajuanProvider>
-      <BrowserRouter basename="/WebSPKayu">
+    <AuthProvider>
+      <PengajuanProvider>
+        <BrowserRouter basename="/WebSPKayu">
         <Routes>
           {/* Auth Routes */}
           <Route element={<AuthLayout />}>
@@ -75,5 +77,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </PengajuanProvider>
+    </AuthProvider>
   )
 }

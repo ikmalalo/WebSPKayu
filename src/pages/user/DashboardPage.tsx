@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { currentUser, mockPengajuan } from '@/data/mockData'
+import { mockPengajuan } from '@/data/mockData'
 import { getProgressSteps, formatDate } from '@/lib/utils'
 
 const userPengajuan = mockPengajuan[0] // Ahmad Fauzi's submission
@@ -18,10 +18,15 @@ const progressSteps = [
   { step: 6, label: 'Hasil Akhir', icon: CheckCircle },
 ]
 
+import { useAuth } from '@/context/AuthContext'
+
 export function UserDashboardPage() {
+  const { currentUser } = useAuth()
   const userPengajuan = mockPengajuan[0]
   const currentStep = userPengajuan ? getProgressSteps(userPengajuan.status) : 0
   const progressPercent = Math.round((currentStep / 6) * 100)
+
+  const displayName = currentUser?.name || 'Ikmal Ali'
 
   return (
     <div className="space-y-6">
@@ -30,13 +35,13 @@ export function UserDashboardPage() {
         <div className="flex items-start justify-between">
           <div>
             <p className="text-green-100 text-sm">Selamat datang kembali,</p>
-            <h1 className="text-xl font-bold mt-0.5">{currentUser.name}</h1>
+            <h1 className="text-xl font-bold mt-0.5">{displayName}</h1>
             <p className="text-green-200 text-sm mt-2">
               Pantau status pengajuan mustahik Anda di sini.
             </p>
           </div>
           <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-lg font-bold">
-            {currentUser.name.charAt(0)}
+            {displayName.charAt(0)}
           </div>
         </div>
       </div>
