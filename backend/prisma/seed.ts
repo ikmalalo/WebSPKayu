@@ -1,6 +1,7 @@
 import { PrismaClient, KriteriaTipe } from '@prisma/client';
 const prisma = new PrismaClient();
-const criteria = [
+type SeedCriterion = { kode: string; nama: string; bobot: number; tipe: KriteriaTipe; values: Array<[string, number]> };
+const criteria: SeedCriterion[] = [
   { kode: 'C1', nama: 'Penghasilan', bobot: 0.30, tipe: KriteriaTipe.COST, values: [['< Rp 500.000', 1], ['Rp 500.001 - Rp 1.000.000', 2], ['Rp 1.000.001 - Rp 1.500.000', 3], ['Rp 1.500.001 - Rp 2.000.000', 4], ['> Rp 2.000.000', 5]] },
   { kode: 'C2', nama: 'Jumlah Tanggungan', bobot: 0.25, tipe: KriteriaTipe.BENEFIT, values: [['1 orang', 1], ['2 orang', 2], ['3 orang', 3], ['4 orang', 4], ['≥ 5 orang', 5]] },
   { kode: 'C3', nama: 'Kondisi Rumah', bobot: 0.20, tipe: KriteriaTipe.BENEFIT, values: [['Sangat Baik', 1], ['Baik', 2], ['Cukup', 3], ['Buruk', 4], ['Sangat Buruk', 5]] },
