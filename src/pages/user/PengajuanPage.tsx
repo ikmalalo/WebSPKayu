@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { mockPengajuan, mockDataMustahik } from '@/data/mockData'
+import { mockDataMustahik } from '@/data/mockData'
 import { formatDate, formatNIK } from '@/lib/utils'
-
-const userPengajuan = mockPengajuan[0]
-const userMustahik = mockDataMustahik[0]
+import { usePengajuan } from '@/context/PengajuanContext'
 
 export function PengajuanPage() {
+  const { pengajuan: userPengajuan } = usePengajuan();
+  const userMustahik = mockDataMustahik[0];
   const hasExisting = !!userPengajuan
 
   return (

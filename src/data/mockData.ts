@@ -13,8 +13,8 @@ import type {
 export const mockUsers: User[] = [
   {
     id: 'u1',
-    name: 'Ahmad Fauzi',
-    email: 'ahmad@example.com',
+    name: 'Ikmal Ali',
+    email: 'ikmal@example.com',
     phone: '08123456789',
     role: 'user',
     createdAt: '2024-01-15',
@@ -71,15 +71,15 @@ export const mockDataMustahik: DataMustahik[] = [
     id: 'dm1',
     userId: 'u1',
     nik: '3201010101900001',
-    namaLengkap: 'Ahmad Fauzi',
-    tempatLahir: 'Bogor',
+    namaLengkap: 'Ikmal Ali',
+    tempatLahir: 'Kalimantan',
     tanggalLahir: '1990-01-01',
     jenisKelamin: 'L',
     alamat: 'Jl. Merdeka No. 10',
-    kelurahan: 'Menteng',
-    kecamatan: 'Bogor Tengah',
-    kota: 'Bogor',
-    provinsi: 'Jawa Barat',
+    kelurahan: 'Adadeh',
+    kecamatan: 'Kalimantan Timur',
+    kota: 'Kalimantan',
+    provinsi: 'Samarinda',
     noHp: '08123456789',
     statusPernikahan: 'menikah',
     pekerjaan: 'Buruh Harian',
@@ -101,7 +101,7 @@ export const mockDataMustahik: DataMustahik[] = [
     kelurahan: 'Babakan',
     kecamatan: 'Cimahi Selatan',
     kota: 'Cimahi',
-    provinsi: 'Jawa Barat',
+    provinsi: 'Samarinda',
     noHp: '08234567890',
     statusPernikahan: 'cerai_mati',
     pekerjaan: 'Pedagang Kecil',
@@ -123,7 +123,7 @@ export const mockDataMustahik: DataMustahik[] = [
     kelurahan: 'Cicendo',
     kecamatan: 'Bandung Wetan',
     kota: 'Bandung',
-    provinsi: 'Jawa Barat',
+    provinsi: 'Samarinda',
     noHp: '08345678901',
     statusPernikahan: 'menikah',
     pekerjaan: 'Tukang Bangunan',
@@ -145,7 +145,7 @@ export const mockDataMustahik: DataMustahik[] = [
     kelurahan: 'Tarogong',
     kecamatan: 'Garut Kota',
     kota: 'Garut',
-    provinsi: 'Jawa Barat',
+    provinsi: 'Samarinda',
     noHp: '08456789012',
     statusPernikahan: 'menikah',
     pekerjaan: 'Ibu Rumah Tangga',
@@ -167,7 +167,7 @@ export const mockDataMustahik: DataMustahik[] = [
     kelurahan: 'Cihideung',
     kecamatan: 'Tasikmalaya Kota',
     kota: 'Tasikmalaya',
-    provinsi: 'Jawa Barat',
+    provinsi: 'Samarinda',
     noHp: '08567890123',
     statusPernikahan: 'belum_menikah',
     pekerjaan: 'Tidak Bekerja',
@@ -179,27 +179,12 @@ export const mockDataMustahik: DataMustahik[] = [
   },
 ];
 
-// ===== MOCK PENGAJUAN (Session-based storage) =====
-const getInitialPengajuan = (): Pengajuan[] => {
-  try {
-    const saved = sessionStorage.getItem('mock_pengajuan_data');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (e) {
-    console.error(e);
-  }
-  return [];
-};
-
-export const mockPengajuan: Pengajuan[] = getInitialPengajuan();
+// ===== MOCK PENGAJUAN (In-memory storage - resets on refresh) =====
+export const mockPengajuan: Pengajuan[] = [];
 
 export const saveMockPengajuan = (data: Pengajuan[]) => {
-  try {
-    sessionStorage.setItem('mock_pengajuan_data', JSON.stringify(data));
-  } catch (e) {
-    console.error(e);
-  }
+  mockPengajuan.length = 0;
+  mockPengajuan.push(...data);
 };
 
 // ===== MOCK KRITERIA =====
@@ -286,7 +271,7 @@ export const mockTopsisResults: TopsisResult[] = [
     id: 'tr1',
     pengajuanId: 'p1',
     mustahikId: 'dm1',
-    namaLengkap: 'Ahmad Fauzi',
+    namaLengkap: 'Ikmal Ali',
     nilaiPreferensi: 0.821,
     ranking: 1,
     status: 'LAYAK_DIDANAI',

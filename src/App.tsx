@@ -29,47 +29,51 @@ import { HasilRankingPage } from '@/pages/admin/HasilRankingPage'
 import { LaporanPage } from '@/pages/admin/LaporanPage'
 import { PengaturanPage } from '@/pages/admin/PengaturanPage'
 
+import { PengajuanProvider } from '@/context/PengajuanContext'
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Auth Routes */}
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/admin/login" element={<LoginPage />} />
-        </Route>
+    <PengajuanProvider>
+      <BrowserRouter basename="/WebSPKayu">
+        <Routes>
+          {/* Auth Routes */}
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/admin/login" element={<LoginPage />} />
+          </Route>
 
-        {/* User Routes */}
-        <Route element={<UserLayout />}>
-          <Route path="/dashboard" element={<UserDashboardPage />} />
-          <Route path="/pengajuan" element={<PengajuanPage />} />
-          <Route path="/pengajuan/form" element={<FormDataMustahikPage />} />
-          <Route path="/kuesioner" element={<KuesionerPage />} />
-          <Route path="/pantau-hasil" element={<PantauHasilPage />} />
-          <Route path="/pantau-hasil/detail" element={<DetailHasilPage />} />
-          <Route path="/profil" element={<ProfilPage />} />
-        </Route>
+          {/* User Routes */}
+          <Route element={<UserLayout />}>
+            <Route path="/dashboard" element={<UserDashboardPage />} />
+            <Route path="/pengajuan" element={<PengajuanPage />} />
+            <Route path="/pengajuan/form" element={<FormDataMustahikPage />} />
+            <Route path="/kuesioner" element={<KuesionerPage />} />
+            <Route path="/pantau-hasil" element={<PantauHasilPage />} />
+            <Route path="/pantau-hasil/detail" element={<DetailHasilPage />} />
+            <Route path="/profil" element={<ProfilPage />} />
+          </Route>
 
-        {/* Admin Routes */}
-        <Route element={<AdminLayout />}>
-          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-          <Route path="/admin/mustahik" element={<DataMustahikPage />} />
-          <Route path="/admin/mustahik/:id" element={<DetailMustahikPage />} />
-          <Route path="/admin/verifikasi" element={<VerifikasiPage />} />
-          <Route path="/admin/verifikasi/:id" element={<DetailVerifikasiPage />} />
-          <Route path="/admin/kriteria" element={<KriteriaPage />} />
-          <Route path="/admin/subkriteria" element={<SubkriteriaPage />} />
-          <Route path="/admin/topsis" element={<ProcessTopsisPage />} />
-          <Route path="/admin/ranking" element={<HasilRankingPage />} />
-          <Route path="/admin/laporan" element={<LaporanPage />} />
-          <Route path="/admin/pengaturan" element={<PengaturanPage />} />
-        </Route>
+          {/* Admin Routes */}
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin/mustahik" element={<DataMustahikPage />} />
+            <Route path="/admin/mustahik/:id" element={<DetailMustahikPage />} />
+            <Route path="/admin/verifikasi" element={<VerifikasiPage />} />
+            <Route path="/admin/verifikasi/:id" element={<DetailVerifikasiPage />} />
+            <Route path="/admin/kriteria" element={<KriteriaPage />} />
+            <Route path="/admin/subkriteria" element={<SubkriteriaPage />} />
+            <Route path="/admin/topsis" element={<ProcessTopsisPage />} />
+            <Route path="/admin/ranking" element={<HasilRankingPage />} />
+            <Route path="/admin/laporan" element={<LaporanPage />} />
+            <Route path="/admin/pengaturan" element={<PengaturanPage />} />
+          </Route>
 
-        {/* Default Redirect */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Default Redirect */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </PengajuanProvider>
   )
 }

@@ -4,12 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { mockPengajuan, mockTopsisResults } from '@/data/mockData'
+import { mockTopsisResults } from '@/data/mockData'
 import { formatDate } from '@/lib/utils'
-
-const userPengajuan = mockPengajuan[0]
-const userTopsis = mockTopsisResults[0]
-
+import { usePengajuan } from '@/context/PengajuanContext'
 const statusTimeline = [
   { label: 'Pengajuan Dibuat', date: '10 Apr 2024', done: true },
   { label: 'Menunggu Verifikasi', date: '10 Apr 2024', done: true },
@@ -19,9 +16,10 @@ const statusTimeline = [
 ]
 
 export function PantauHasilPage() {
-  const isLayak = userPengajuan?.status === 'LAYAK_DIDANAI'
-  const isProcessed = userPengajuan && ['LAYAK_DIDANAI', 'TIDAK_DIDANAI', 'DIPROSES_TOPSIS'].includes(userPengajuan.status)
-
+  const { pengajuan: userPengajuan } = usePengajuan();
+  const userTopsis = mockTopsisResults[0];
+  const isLayak = userPengajuan?.status === 'LAYAK_DIDANAI';
+  const isProcessed = userPengajuan && ['LAYAK_DIDANAI', 'TIDAK_DIDANAI', 'DIPROSES_TOPSIS'].includes(userPengajuan.status);
   if (!userPengajuan) {
     return (
       <div className="space-y-6">
