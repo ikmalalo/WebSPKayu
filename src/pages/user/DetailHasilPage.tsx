@@ -1,17 +1,65 @@
-import { ArrowLeft, Trophy, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Trophy, CheckCircle, Clock } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { mockPengajuan, mockTopsisResults, mockKriteria, mockDataMustahik } from '@/data/mockData'
+import { mockPengajuan, mockTopsisResults, mockKriteria, mockDataMustahik, currentUser } from '@/data/mockData'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
-const userPengajuan = mockPengajuan[0]
-const userTopsis = mockTopsisResults[0]
-const userMustahik = mockDataMustahik[0]
-
 export function DetailHasilPage() {
+  const userPengajuan = mockPengajuan.find(p => p.userId === currentUser.id) || mockPengajuan[0]
+  const userMustahik = mockDataMustahik.find(m => m.id === userPengajuan.mustahikId) || mockDataMustahik[0]
+  const userTopsis = mockTopsisResults.find(t => t.mustahikId === userMustahik.id) || {
+    ranking: '-',
+    nilaiPreferensi: 0,
+    status: 'MENUNGGU_PROSES'
+  }
+
+  const getScoreVector = (m: any) => {
+    // C1: Penghasilan
+    let c1 = 5;
+    if (m.penghasilan < 500000) c1 = 1;
+    else if (m.penghasilan <= 1000000) c1 = 2;
+    else if (m.penghasilan <= 1500000) c1 = 3;
+    else if (m.penghasilan <= 2000000) c1 = 4;
+    else c1 = 5;
+
+    // C2: Tanggungan
+    let c2 = 1;
+    if (m.jumlahTanggungan === 1) c2 = 1;
+    else if (m.jumlahTanggungan === 2) c2 = 2;
+    else if (m.jumlahTanggungan === 3) c2 = 3;
+    else if (m.jumlahTanggungan === 4) c2 = 4;
+    else if (m.jumlahTanggungan >= 5) c2 = 5;
+
+    // C3: Kondisi Rumah
+    let c3 = 3;
+    if (m.kondisiRumah === 'sangat_baik') c3 = 1;
+    else if (m.kondisiRumah === 'baik') c3 = 2;
+    else if (m.kondisiRumah === 'sedang' || m.kondisiRumah === 'cukup') c3 = 3;
+    else if (m.kondisiRumah === 'buruk') c3 = 4;
+    else if (m.kondisiRumah === 'sangat_buruk') c3 = 5;
+
+    // C4: Pekerjaan
+    let c4 = 5;
+    const pek = String(m.pekerjaan).toLowerCase();
+    if (pek.includes('pns') || pek.includes('bumn') || pek.includes('pemerintah')) c4 = 1;
+    else if (pek.includes('swasta') || pek.includes('karyawan')) c4 = 2;
+    else if (pek.includes('wiraswasta') || pek.includes('dagang') || pek.includes('toko')) c4 = 3;
+    else if (pek.includes('buruh') || pek.includes('harian') || pek.includes('tani') || pek.includes('bangunan')) c4 = 4;
+    else c4 = 5;
+
+    // C5: Aset
+    let c5 = 5;
+    if (m.kepemilikanAset === 'ada') c5 = 2;
+    else c5 = 5;
+
+    return [c1, c2, c3, c4, c5];
+  };
+
+  const scores = getScoreVector(userMustahik)
+
   return (
     <div className="space-y-6">
       <PageHeader title="Detail Hasil Pengajuan">
@@ -51,13 +99,27 @@ export function DetailHasilPage() {
         <CardContent>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="p-4 bg-green-50 rounded-xl text-center border border-green-200">
-              <p className="text-3xl font-bold text-green-600">{userTopsis.nilaiPreferensi.toFixed(4)}</p>
+              <p className="text-3xl font-bold text-green-600">{typeof userTopsis.nilaiPreferensi === 'number' ? userTopsis.nilaiPreferensi.toFixed(4) : '-'}</p>
               <p className="text-xs text-green-700 mt-1">Nilai Preferensi (Ci)</p>
             </div>
             <div className="p-4 bg-slate-50 rounded-xl text-center border border-slate-200">
               <div className="flex items-center justify-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <p className="text-lg font-bold text-green-600">LAYAK</p>
+                {userTopsis.status === 'LAYAK_DIDANAI' ? (
+                  <>
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <p className="text-lg font-bold text-green-600">LAYAK</p>
+                  </>
+                ) : userTopsis.status === 'TIDAK_DIDANAI' ? (
+                  <>
+                    <CheckCircle className="w-5 h-5 text-red-500" />
+                    <p className="text-lg font-bold text-red-500">TIDAK LAYAK</p>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="w-5 h-5 text-amber-500 animate-pulse" />
+                    <p className="text-lg font-bold text-amber-500">ANTREAN</p>
+                  </>
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-1">Status Kelayakan</p>
             </div>
@@ -67,7 +129,6 @@ export function DetailHasilPage() {
           <div className="space-y-3">
             <p className="text-sm font-semibold text-slate-700">Skor per Kriteria:</p>
             {mockKriteria.map((k, i) => {
-              const scores = [3, 4, 4, 4, 5]
               return (
                 <div key={k.id} className="flex items-center gap-3">
                   <div className="w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center shrink-0">
