@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum PengajuanStatus {
+  DRAFT
+  MENUNGGU_VERIFIKASI
+  SEDANG_DIVERIFIKASI
+  PERLU_PERBAIKAN
+  LOLOS_VERIFIKASI
+  DITOLAK
+  DIPROSES_TOPSIS
+  LAYAK_DIDANAI
+  TIDAK_DIDANAI
+}
+
+enum KriteriaTipe {
+  BENEFIT
+  COST
+}
+
+enum VerifikasiStatus {
+  LOLOS
+  PERLU_PERBAIKAN
+  DITOLAK
+}
+
+model User {
+  id            String       @id @default(cuid())
+  name          String
+  email         String       @unique
+  passwordHash  String
+  phone         String?
+  role          Role         @default(USER)
+  mustahik      Mustahik?
+  pengajuan     Pengajuan[]
+  verifications Verifikasi[] @relation("Verifier")
+  auditLogs     AuditLog[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Mustahik {
+  id               String      @id @default(cuid())
+  userId           String      @unique
+  nik              String      @unique
+  namaLengkap      String
+  tempatLahir      String?
+  tanggalLahir     DateTime?
+  jenisKelamin     String?
+  alamat           String?
+  kelurahan        String?
+  kecamatan        String?
+  kota             String?
+  provinsi         String?
+  noHp             String?
+  statusPernikahan String?
+  pekerjaan        String?
+  penghasilan      Decimal?    @db.Decimal(15, 2)
+  jumlahTanggungan Int?
+  statusRumah      String?
+  kondisiRumah     String?
+  kepemilikanAset  String?
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pengajuan        Pengajuan[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([namaLengkap])
+}
+
+model Pengajuan {
+  id                String             @id @default(cuid())
+  userId            String
+  mustahikId        String
+  status            PengajuanStatus    @default(DRAFT)
+  catatan           String?
+  tanggalPengajuan  DateTime           @default(now())
+  tanggalVerifikasi DateTime?
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mustahik          Mustahik           @relation(fields: [mustahikId], references: [id], onDelete: Restrict)
+  jawaban           JawabanKuesioner[]
+  verifications     Verifikasi[]
+  topsisResults     TopsisResult[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([mustahikId])
+}
+
+model Kriteria {
+  id            String             @id @default(cuid())
+  kode          String             @unique
+  nama          String             @unique
+  bobot         Decimal            @db.Decimal(8, 4)
+  tipe          KriteriaTipe
+  deskripsi     String?
+  aktif         Boolean            @default(true)
+  subKriteria   SubKriteria[]
+  jawaban       JawabanKuesioner[]
+  topsisDetails TopsisDetail[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model SubKriteria {
+  id         String             @id @default(cuid())
+  kriteriaId String
+  nama       String
+  nilai      Decimal            @db.Decimal(8, 4)
+  keterangan String?
+  kriteria   Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
+  jawaban    JawabanKuesioner[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([kriteriaId, nama])
+  @@index([kriteriaId])
+}
+
+model JawabanKuesioner {
+  id            String      @id @default(cuid())
+  pengajuanId   String
+  kriteriaId    String
+  subKriteriaId String
+  nilai         Decimal     @db.Decimal(8, 4)
+  pengajuan     Pengajuan   @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
+  kriteria      Kriteria    @relation(fields: [kriteriaId], references: [id], onDelete: Restrict)
+  subKriteria   SubKriteria @relation(fields: [subKriteriaId], references: [id], onDelete: Restrict)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([pengajuanId, kriteriaId])
+  @@index([pengajuanId])
+}
+
+model Verifikasi {
+  id          String           @id @default(cuid())
+  pengajuanId String
+  adminId     String
+  status      VerifikasiStatus
+  catatan     String?
+  pengajuan   Pengajuan        @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
+  admin       User             @relation("Verifier", fields: [adminId], references: [id], onDelete: Restrict)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([pengajuanId])
+}
+
+model TopsisResult {
+  id              String          @id @default(cuid())
+  pengajuanId     String
+  nilaiPreferensi Decimal         @db.Decimal(10, 6)
+  ranking         Int
+  status          PengajuanStatus
+  tanggalProses   DateTime        @default(now())
+  pengajuan       Pengajuan       @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
+  details         TopsisDetail[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([pengajuanId])
+  @@index([tanggalProses, ranking])
+}
+
+model TopsisDetail {
+  id               String       @id @default(cuid())
+  topsisResultId   String
+  kriteriaId       String
+  nilaiAwal        Decimal      @db.Decimal(10, 6)
+  nilaiNormalisasi Decimal      @db.Decimal(12, 8)
+  nilaiTerbobot    Decimal      @db.Decimal(12, 8)
+  topsisResult     TopsisResult @relation(fields: [topsisResultId], references: [id], onDelete: Cascade)
+  kriteria         Kriteria     @relation(fields: [kriteriaId], references: [id], onDelete: Restrict)
+
+  @@unique([topsisResultId, kriteriaId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+}
