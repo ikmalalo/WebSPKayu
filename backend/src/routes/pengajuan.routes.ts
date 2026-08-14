@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { createPengajuan, getMyPengajuan, getPengajuanById } from '../controllers/pengajuan.controller';
+import { createPengajuan, getMyPengajuan, getPengajuanById, updateMustahikData } from '../controllers/pengajuan.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { asyncHandler } from '../utils/async-handler';
 export const pengajuanRouter = Router();
 pengajuanRouter.use(authenticate);
 pengajuanRouter.post('/', asyncHandler(createPengajuan));
+pengajuanRouter.patch('/mustahik', asyncHandler(updateMustahikData));
 pengajuanRouter.get('/me', asyncHandler(getMyPengajuan));
 pengajuanRouter.get('/:id', asyncHandler(getPengajuanById));

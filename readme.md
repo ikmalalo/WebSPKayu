@@ -80,16 +80,16 @@ REGISTER / LOGIN
 LOGIN BERHASIL?
 ├── TIDAK → Kembali ke LOGIN
 └── YA
-    ↓
+    ↓
 DASHBOARD USER
-    ↓
-    ├── DAFTAR / PENGAJUAN MUSTAHIK
-    │
-    ├── VERIFIKASI / KUESIONER
-    │
-    ├── PANTAU HASIL PENGAJUAN
-    │
-    └── PROFIL
+    ↓
+    ├── DAFTAR / PENGAJUAN MUSTAHIK
+    │
+    ├── VERIFIKASI / KUESIONER
+    │
+    ├── PANTAU HASIL PENGAJUAN
+    │
+    └── PROFIL
 
 ---
 
@@ -124,18 +124,18 @@ ADMIN LOGIN
 LOGIN BERHASIL?
 ├── TIDAK → Kembali ke LOGIN
 └── YA
-    ↓
+    ↓
 ADMIN DASHBOARD
-    ↓
-    ├── HOME
-    ├── PENCARIAN
-    ├── VERIFIKASI
-    ├── PENGELOLAAN DATA
-    ├── KRITERIA TOPSIS
-    ├── PROSES TOPSIS
-    ├── HASIL RANKING
-    ├── LAPORAN
-    └── PENGATURAN
+    ↓
+    ├── HOME
+    ├── PENCARIAN
+    ├── VERIFIKASI
+    ├── PENGELOLAAN DATA
+    ├── KRITERIA TOPSIS
+    ├── PROSES TOPSIS
+    ├── HASIL RANKING
+    ├── LAPORAN
+    └── PENGATURAN
 
 ---
 
@@ -151,14 +151,14 @@ Melakukan validasi
 ↓
 Data valid?
 ├── TIDAK
-│   ↓
-│   Status = PERLU PERBAIKAN / DITOLAK
+│   ↓
+│   Status = PERLU PERBAIKAN / DITOLAK
 │
 └── YA
-    ↓
-    Status = LOLOS VERIFIKASI
-    ↓
-    Masuk proses TOPSIS
+    ↓
+    Status = LOLOS VERIFIKASI
+    ↓
+    Masuk proses TOPSIS
 
 ---
 
@@ -274,8 +274,17 @@ Gunakan status:
 
 ## Database
 
-- PostgreSQL
+- MySQL
 - Prisma ORM
+- Laragon (local development)
+
+Development Database:
+
+- Database development menggunakan MySQL lokal melalui Laragon.
+- Prisma ORM digunakan untuk koneksi, schema, migration, dan pengelolaan database.
+- Postman bukan bagian dari sistem dan hanya digunakan sebagai tool testing API jika diperlukan.
+- Gunakan database MySQL lokal untuk development.
+- Jangan menggunakan PostgreSQL untuk project ini.
 
 ---
 
@@ -622,4 +631,4 @@ Jangan mengganti tech stack tanpa alasan.
 
 Jangan membuat keputusan metodologi TOPSIS yang belum diberikan oleh pemilik project.
 
-Selalu prioritaskan isi README ini sebagai sumber utama requirement project.
+Selalu prioritaskan isi README ini sebagai sumber utama requirement

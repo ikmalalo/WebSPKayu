@@ -34,3 +34,14 @@ export async function getPengajuanById(req: Request, res: Response) {
   if (req.auth!.role !== 'ADMIN' && pengajuan.userId !== req.auth!.userId) return fail(res, 'Anda tidak memiliki akses ke pengajuan ini', 403);
   return success(res, 'Detail pengajuan berhasil diambil', { pengajuan });
 }
+export async function updateMustahikData(req: Request, res: Response) {
+  const userId = req.auth!.userId;
+  const raw = (req.body.mustahik || req.body) as Record<string, unknown>;
+  const data = toMustahikData(raw);
+  const mustahik = await prisma.mustahik.upsert({
+    where: { userId },
+    create: { ...data, userId, nik: String(raw.nik || ''), namaLengkap: String(raw.namaLengkap || '') } as any,
+    update: data as any,
+  });
+  return success(res, 'Data mustahik berhasil diperbarui', { mustahik });
+}

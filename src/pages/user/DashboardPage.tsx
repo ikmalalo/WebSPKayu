@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { mockPengajuan } from '@/data/mockData'
 import { getProgressSteps, formatDate } from '@/lib/utils'
 
-const userPengajuan = mockPengajuan[0] // Ahmad Fauzi's submission
+// Data steps progress kuesioner/verifikasi
 
 const progressSteps = [
   { step: 1, label: 'Pengajuan', icon: FileText },
@@ -19,10 +19,15 @@ const progressSteps = [
 ]
 
 import { useAuth } from '@/context/AuthContext'
+import { usePengajuan } from '@/context/PengajuanContext'
 
 export function UserDashboardPage() {
   const { currentUser } = useAuth()
-  const userPengajuan = mockPengajuan[0]
+  const { pengajuan: contextPengajuan } = usePengajuan()
+  
+  // Mencocokkan data pengajuan dengan user yang sedang aktif login secara dinamis
+  const userPengajuan = contextPengajuan || mockPengajuan.find(p => p.userId === currentUser?.id);
+  
   const currentStep = userPengajuan ? getProgressSteps(userPengajuan.status) : 0
   const progressPercent = Math.round((currentStep / 6) * 100)
 

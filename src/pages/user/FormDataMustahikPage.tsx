@@ -1,142 +1,183 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Save, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react'
+import { Save, ChevronRight, ChevronLeft, Loader2, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FormField, FormSection } from '@/components/shared/FormField'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { mockDataMustahik, mockPengajuan } from '@/data/mockData'
-import type { Pengajuan } from '@/types'
 import { usePengajuan } from '@/context/PengajuanContext'
+import { useAuth } from '@/context/AuthContext'
+import axios from 'axios'
+import type { Pengajuan } from '@/types'
 
-const prefilled = mockDataMustahik[0]
+const API_URL = 'http://localhost:5000/api'
+
+interface FormData {
+  nik: string
+  namaLengkap: string
+  tempatLahir: string
+  tanggalLahir: string
+  jenisKelamin: string
+  statusPernikahan: string
+  noHp: string
+  alamat: string
+  kelurahan: string
+  kecamatan: string
+  kota: string
+  provinsi: string
+  pekerjaan: string
+  penghasilan: string
+  jumlahTanggungan: string
+  statusRumah: string
+  kondisiRumah: string
+  kepemilikanAset: string
+}
+
+const emptyForm: FormData = {
+  nik: '', namaLengkap: '', tempatLahir: '', tanggalLahir: '',
+  jenisKelamin: '', statusPernikahan: '', noHp: '',
+  alamat: '', kelurahan: '', kecamatan: '', kota: '', provinsi: '',
+  pekerjaan: '', penghasilan: '', jumlahTanggungan: '',
+  statusRumah: '', kondisiRumah: '', kepemilikanAset: '',
+}
+
+function adaptPengajuan(p: any): Pengajuan {
+  return {
+    id: p.id,
+    userId: p.userId,
+    mustahikId: p.mustahikId,
+    namaLengkap: p.mustahik?.namaLengkap || '',
+    nik: p.mustahik?.nik || '',
+    status: p.status,
+    tanggalPengajuan: p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+  }
+}
 
 export function FormDataMustahikPage() {
   const navigate = useNavigate()
-  const { setPengajuan } = usePengajuan()
+  const { pengajuan, setPengajuan } = usePengajuan()
+  const { token } = useAuth()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [form, setForm] = useState<FormData>(emptyForm)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const totalSteps = 3
 
-  const handleSubmit = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      
-      const getVal = (id: string, defVal: string) => {
-        const el = document.getElementById(id) as HTMLInputElement | null;
-        return el ? el.value : defVal;
-      };
+  const authHeaders = { Authorization: `Bearer ${token}` }
 
-      const nik = getVal('nik', prefilled.nik);
-      const namaLengkap = getVal('nama', prefilled.namaLengkap);
-      const tempatLahir = getVal('tempat-lahir', prefilled.tempatLahir);
-      const tanggalLahir = getVal('tgl-lahir', prefilled.tanggalLahir);
-      const noHp = getVal('no-hp', prefilled.noHp);
-      const alamat = getVal('alamat', prefilled.alamat);
-      const kelurahan = getVal('kelurahan', prefilled.kelurahan);
-      const kecamatan = getVal('kecamatan', prefilled.kecamatan);
-      const kota = getVal('kota', prefilled.kota);
-      const provinsi = getVal('provinsi', prefilled.provinsi);
-      const pekerjaan = getVal('pekerjaan', prefilled.pekerjaan);
-      const penghasilan = Number(getVal('penghasilan', String(prefilled.penghasilan)));
-      const tanggungan = Number(getVal('tanggungan', String(prefilled.jumlahTanggungan)));
-
-      const getSelectVal = (id: string, def: string) => {
-        const btn = document.getElementById(id);
-        if (btn) {
-          const valAttr = btn.getAttribute('data-value');
-          if (valAttr) return valAttr;
-          const text = btn.textContent || '';
-          if (text.includes('Laki')) return 'L';
-          if (text.includes('Perempuan')) return 'P';
-          if (text.includes('Belum Menikah')) return 'belum_menikah';
-          if (text.includes('Menikah')) return 'menikah';
-          if (text.includes('Cerai Hidup')) return 'cerai_hidup';
-          if (text.includes('Cerai Mati')) return 'cerai_mati';
-          if (text.includes('Milik Sendiri')) return 'milik_sendiri';
-          if (text.includes('Sewa')) return 'sewa';
-          if (text.includes('Menumpang')) return 'menumpang';
-          if (text.includes('Dinas')) return 'dinas';
-          if (text.includes('Sangat Baik')) return 'sangat_baik';
-          if (text.includes('Baik')) return 'baik';
-          if (text.includes('Sedang')) return 'sedang';
-          if (text.includes('Buruk')) return 'buruk';
-          if (text.includes('Sangat Buruk')) return 'sangat_buruk';
+  useEffect(() => {
+    const loadData = async () => {
+      if (!token) {
+        setInitialLoading(false)
+        return
+      }
+      try {
+        // Load profile to get existing mustahik data
+        const profileRes = await axios.get(`${API_URL}/user/profile`, { headers: authHeaders })
+        const mustahik = profileRes.data?.data?.user?.mustahik
+        if (mustahik) {
+          setForm({
+            nik: mustahik.nik || '',
+            namaLengkap: mustahik.namaLengkap || '',
+            tempatLahir: mustahik.tempatLahir || '',
+            tanggalLahir: mustahik.tanggalLahir
+              ? new Date(mustahik.tanggalLahir).toISOString().split('T')[0]
+              : '',
+            jenisKelamin: mustahik.jenisKelamin || '',
+            statusPernikahan: mustahik.statusPernikahan || '',
+            noHp: mustahik.noHp || '',
+            alamat: mustahik.alamat || '',
+            kelurahan: mustahik.kelurahan || '',
+            kecamatan: mustahik.kecamatan || '',
+            kota: mustahik.kota || '',
+            provinsi: mustahik.provinsi || '',
+            pekerjaan: mustahik.pekerjaan || '',
+            penghasilan: mustahik.penghasilan != null ? String(mustahik.penghasilan) : '',
+            jumlahTanggungan: mustahik.jumlahTanggungan != null ? String(mustahik.jumlahTanggungan) : '',
+            statusRumah: mustahik.statusRumah || '',
+            kondisiRumah: mustahik.kondisiRumah || '',
+            kepemilikanAset: mustahik.kepemilikanAset || '',
+          })
         }
-        return def;
-      };
 
-      const jenisKelamin = getSelectVal('jk', prefilled.jenisKelamin);
-      const statusPernikahan = getSelectVal('status-nikah', prefilled.statusPernikahan);
-      const statusRumah = getSelectVal('status-rumah', prefilled.statusRumah);
-      const kondisiRumah = getSelectVal('kondisi-rumah', prefilled.kondisiRumah);
-      const kepemilikanAset = getSelectVal('aset', prefilled.kepemilikanAset);
-
-      const mustahikId = 'dm_user';
-      const newMustahik = {
-        id: mustahikId,
-        userId: 'u1',
-        nik,
-        namaLengkap,
-        tempatLahir,
-        tanggalLahir,
-        jenisKelamin: jenisKelamin as 'L' | 'P',
-        alamat,
-        kelurahan,
-        kecamatan,
-        kota,
-        provinsi,
-        noHp,
-        statusPernikahan: statusPernikahan as any,
-        pekerjaan,
-        penghasilan,
-        jumlahTanggungan: tanggungan,
-        statusRumah: statusRumah as any,
-        kondisiRumah: kondisiRumah as any,
-        kepemilikanAset: kepemilikanAset as any,
-      };
-
-      const existingIdx = mockDataMustahik.findIndex(m => m.id === mustahikId || m.nik === nik);
-      if (existingIdx > -1) {
-        mockDataMustahik[existingIdx] = newMustahik;
-      } else {
-        mockDataMustahik.push(newMustahik);
+        // Check if user already has a pengajuan
+        const pengajuanRes = await axios.get(`${API_URL}/pengajuan/me`, { headers: authHeaders })
+        const list: any[] = pengajuanRes.data?.data?.pengajuan || []
+        if (list.length > 0) {
+          setIsEditMode(true)
+          const adapted = adaptPengajuan(list[0])
+          if (!pengajuan || pengajuan.id !== adapted.id) {
+            setPengajuan(adapted)
+          }
+        }
+      } catch (e) {
+        console.error('Gagal memuat data:', e)
+      } finally {
+        setInitialLoading(false)
       }
+    }
+    loadData()
+  }, [token])
 
-      const pengajuanId = 'p_user';
-      const newSubmission: Pengajuan = {
-        id: pengajuanId,
-        userId: 'u1',
-        mustahikId,
-        namaLengkap,
-        nik,
-        status: 'MENUNGGU_VERIFIKASI', 
-        tanggalPengajuan: new Date().toISOString().split('T')[0],
-      };
+  const set = (field: keyof FormData, value: string) =>
+    setForm(prev => ({ ...prev, [field]: value }))
 
-      const existingPengajuanIdx = mockPengajuan.findIndex(p => p.id === pengajuanId);
-      if (existingPengajuanIdx > -1) {
-        mockPengajuan[existingPengajuanIdx] = newSubmission;
+  const handleSubmit = async () => {
+    if (!form.nik || !form.namaLengkap) {
+      setError('NIK dan nama lengkap wajib diisi')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      if (isEditMode) {
+        // Update mustahik data only (pengajuan sudah ada)
+        await axios.patch(`${API_URL}/pengajuan/mustahik`, form, { headers: authHeaders })
+        navigate('/kuesioner')
       } else {
-        mockPengajuan.push(newSubmission);
+        // Buat pengajuan baru (sekaligus buat/update mustahik)
+        const res = await axios.post(`${API_URL}/pengajuan`, form, { headers: authHeaders })
+        const p = res.data?.data?.pengajuan
+        if (p) {
+          setPengajuan(adaptPengajuan(p))
+        }
+        navigate('/kuesioner')
       }
-
-      setPengajuan(newSubmission);
-      navigate('/kuesioner')
-    }, 1000)
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Gagal menyimpan data. Silakan coba lagi.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const stepLabels = ['Data Pribadi', 'Data Ekonomi', 'Kondisi Tempat Tinggal']
 
+  if (initialLoading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+        <span className="ml-2 text-sm text-slate-500">Memuat data...</span>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Form Data Mustahik"
-        description="Lengkapi data diri Anda untuk pengajuan"
+        title={isEditMode ? 'Edit Data Mustahik' : 'Form Data Mustahik'}
+        description={isEditMode ? 'Perbarui data diri Anda' : 'Lengkapi data diri Anda untuk pengajuan'}
       />
+
+      {error && (
+        <div className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl">
+          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+        </div>
+      )}
 
       {/* Step indicator */}
       <div className="flex items-center gap-2">
@@ -180,19 +221,41 @@ export function FormDataMustahikPage() {
               <FormSection title="Identitas Diri">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="NIK" htmlFor="nik" required hint="16 digit nomor KTP">
-                    <Input id="nik" placeholder="3201xxxxxxxx" defaultValue={prefilled.nik} maxLength={16} />
+                    <Input
+                      id="nik"
+                      placeholder="3201xxxxxxxx"
+                      maxLength={16}
+                      value={form.nik}
+                      onChange={e => set('nik', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Nama Lengkap" htmlFor="nama" required>
-                    <Input id="nama" placeholder="Sesuai KTP" defaultValue={prefilled.namaLengkap} />
+                    <Input
+                      id="nama"
+                      placeholder="Sesuai KTP"
+                      value={form.namaLengkap}
+                      onChange={e => set('namaLengkap', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Tempat Lahir" htmlFor="tempat-lahir" required>
-                    <Input id="tempat-lahir" placeholder="Kota lahir" defaultValue={prefilled.tempatLahir} />
+                    <Input
+                      id="tempat-lahir"
+                      placeholder="Kota lahir"
+                      value={form.tempatLahir}
+                      onChange={e => set('tempatLahir', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Tanggal Lahir" htmlFor="tgl-lahir" required>
-                    <Input id="tgl-lahir" type="date" defaultValue={prefilled.tanggalLahir} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100" />
+                    <Input
+                      id="tgl-lahir"
+                      type="date"
+                      className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      value={form.tanggalLahir}
+                      onChange={e => set('tanggalLahir', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Jenis Kelamin" htmlFor="jk" required>
-                    <Select defaultValue={prefilled.jenisKelamin}>
+                    <Select value={form.jenisKelamin} onValueChange={v => set('jenisKelamin', v)}>
                       <SelectTrigger id="jk" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih jenis kelamin" />
                       </SelectTrigger>
@@ -203,7 +266,7 @@ export function FormDataMustahikPage() {
                     </Select>
                   </FormField>
                   <FormField label="Status Pernikahan" htmlFor="status-nikah" required>
-                    <Select defaultValue={prefilled.statusPernikahan}>
+                    <Select value={form.statusPernikahan} onValueChange={v => set('statusPernikahan', v)}>
                       <SelectTrigger id="status-nikah" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih status" />
                       </SelectTrigger>
@@ -216,7 +279,13 @@ export function FormDataMustahikPage() {
                     </Select>
                   </FormField>
                   <FormField label="Nomor HP" htmlFor="no-hp" required>
-                    <Input id="no-hp" type="tel" placeholder="08xxxxxxxxxx" defaultValue={prefilled.noHp} />
+                    <Input
+                      id="no-hp"
+                      type="tel"
+                      placeholder="08xxxxxxxxxx"
+                      value={form.noHp}
+                      onChange={e => set('noHp', e.target.value)}
+                    />
                   </FormField>
                 </div>
               </FormSection>
@@ -224,19 +293,44 @@ export function FormDataMustahikPage() {
               <FormSection title="Alamat">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Alamat Lengkap" htmlFor="alamat" required className="sm:col-span-2">
-                    <Input id="alamat" placeholder="Jalan, nomor, RT/RW" defaultValue={prefilled.alamat} />
+                    <Input
+                      id="alamat"
+                      placeholder="Jalan, nomor, RT/RW"
+                      value={form.alamat}
+                      onChange={e => set('alamat', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Kelurahan" htmlFor="kelurahan" required>
-                    <Input id="kelurahan" placeholder="Kelurahan" defaultValue={prefilled.kelurahan} />
+                    <Input
+                      id="kelurahan"
+                      placeholder="Kelurahan"
+                      value={form.kelurahan}
+                      onChange={e => set('kelurahan', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Kecamatan" htmlFor="kecamatan" required>
-                    <Input id="kecamatan" placeholder="Kecamatan" defaultValue={prefilled.kecamatan} />
+                    <Input
+                      id="kecamatan"
+                      placeholder="Kecamatan"
+                      value={form.kecamatan}
+                      onChange={e => set('kecamatan', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Kota/Kabupaten" htmlFor="kota" required>
-                    <Input id="kota" placeholder="Kota / Kabupaten" defaultValue={prefilled.kota} />
+                    <Input
+                      id="kota"
+                      placeholder="Kota / Kabupaten"
+                      value={form.kota}
+                      onChange={e => set('kota', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Provinsi" htmlFor="provinsi" required>
-                    <Input id="provinsi" placeholder="Provinsi" defaultValue={prefilled.provinsi} />
+                    <Input
+                      id="provinsi"
+                      placeholder="Provinsi"
+                      value={form.provinsi}
+                      onChange={e => set('provinsi', e.target.value)}
+                    />
                   </FormField>
                 </div>
               </FormSection>
@@ -248,16 +342,34 @@ export function FormDataMustahikPage() {
               <FormSection title="Data Ekonomi">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Pekerjaan" htmlFor="pekerjaan" required>
-                    <Input id="pekerjaan" placeholder="Jenis pekerjaan" defaultValue={prefilled.pekerjaan} />
+                    <Input
+                      id="pekerjaan"
+                      placeholder="Jenis pekerjaan"
+                      value={form.pekerjaan}
+                      onChange={e => set('pekerjaan', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Penghasilan per Bulan" htmlFor="penghasilan" required hint="Dalam rupiah">
-                    <Input id="penghasilan" type="number" placeholder="1500000" defaultValue={prefilled.penghasilan} />
+                    <Input
+                      id="penghasilan"
+                      type="number"
+                      placeholder="1500000"
+                      value={form.penghasilan}
+                      onChange={e => set('penghasilan', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Jumlah Tanggungan" htmlFor="tanggungan" required hint="Jumlah anggota keluarga yang ditanggung">
-                    <Input id="tanggungan" type="number" min={0} max={20} defaultValue={prefilled.jumlahTanggungan} />
+                    <Input
+                      id="tanggungan"
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={form.jumlahTanggungan}
+                      onChange={e => set('jumlahTanggungan', e.target.value)}
+                    />
                   </FormField>
                   <FormField label="Kepemilikan Aset" htmlFor="aset" required>
-                    <Select defaultValue={prefilled.kepemilikanAset}>
+                    <Select value={form.kepemilikanAset} onValueChange={v => set('kepemilikanAset', v)}>
                       <SelectTrigger id="aset" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih" />
                       </SelectTrigger>
@@ -277,7 +389,7 @@ export function FormDataMustahikPage() {
               <FormSection title="Kondisi Tempat Tinggal">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Status Kepemilikan Rumah" htmlFor="status-rumah" required>
-                    <Select defaultValue={prefilled.statusRumah}>
+                    <Select value={form.statusRumah} onValueChange={v => set('statusRumah', v)}>
                       <SelectTrigger id="status-rumah" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih status rumah" />
                       </SelectTrigger>
@@ -290,7 +402,7 @@ export function FormDataMustahikPage() {
                     </Select>
                   </FormField>
                   <FormField label="Kondisi Fisik Rumah" htmlFor="kondisi-rumah" required>
-                    <Select defaultValue={prefilled.kondisiRumah}>
+                    <Select value={form.kondisiRumah} onValueChange={v => set('kondisiRumah', v)}>
                       <SelectTrigger id="kondisi-rumah" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
                         <SelectValue placeholder="Pilih kondisi" />
                       </SelectTrigger>
@@ -341,7 +453,7 @@ export function FormDataMustahikPage() {
             ) : (
               <>
                 <Save className="w-4 h-4 mr-2" />
-                Simpan & Lanjutkan
+                {isEditMode ? 'Simpan Perubahan' : 'Simpan & Lanjutkan'}
               </>
             )}
           </Button>
