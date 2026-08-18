@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useState,
 } from 'react'
 
@@ -87,10 +86,17 @@ export function ProcessTopsisPage() {
     setError,
   ] = useState('')
 
+  // ==========================================================
+  // LOAD
+  // ==========================================================
+
   const load =
     async () => {
       try {
-        setLoading(true)
+        setLoading(
+          true
+        )
+
         setError('')
 
         const [
@@ -106,63 +112,74 @@ export function ProcessTopsisPage() {
           criteriaData
         )
 
-        /*
-         * Ambil hasil TOPSIS terbaru.
-         */
-        if (
-          resultData.length
+        // --------------------------------------------------
+        // Ambil hasil terbaru untuk setiap pengajuan.
+        //
+        // JANGAN filter berdasarkan tanggalProses terbaru.
+        // --------------------------------------------------
+
+        const latestByPengajuan =
+          new Map<
+            string,
+            AdminTopsisResult
+          >()
+
+        for (
+          const item of resultData
         ) {
-          const latest =
-            resultData.reduce(
-              (
-                max,
-                item
-              ) =>
-                new Date(
-                  item.tanggalProses
-                ) >
-                new Date(
-                  max
-                )
-                  ? item.tanggalProses
-                  : max,
-              resultData[0]
-                .tanggalProses
+          const existing =
+            latestByPengajuan.get(
+              item.pengajuanId
             )
 
-          setResults(
-            resultData
-              .filter(
-                (item) =>
-                  new Date(
-                    item.tanggalProses
-                  ).getTime() ===
-                  new Date(
-                    latest
-                  ).getTime()
-              )
-              .sort(
-                (
-                  a,
-                  b
-                ) =>
-                  a.ranking -
-                  b.ranking
-              )
-          )
-        } else {
-          setResults([])
+          if (
+            !existing ||
+            new Date(
+              item.tanggalProses
+            ).getTime() >
+              new Date(
+                existing.tanggalProses
+              ).getTime()
+          ) {
+            latestByPengajuan.set(
+              item.pengajuanId,
+              item
+            )
+          }
         }
-      } catch (err: any) {
-        console.error(err)
+
+        const latestResults =
+          Array.from(
+            latestByPengajuan.values()
+          ).sort(
+            (
+              a,
+              b
+            ) =>
+              a.ranking -
+              b.ranking
+          )
+
+        setResults(
+          latestResults
+        )
+      } catch (
+        err: any
+      ) {
+        console.error(
+          'GET TOPSIS PAGE ERROR:',
+          err
+        )
 
         setError(
           err.response
             ?.data?.message ||
-          'Gagal mengambil data TOPSIS.'
+            'Gagal mengambil data TOPSIS.'
         )
       } finally {
-        setLoading(false)
+        setLoading(
+          false
+        )
       }
     }
 
@@ -170,41 +187,27 @@ export function ProcessTopsisPage() {
     load()
   }, [])
 
-  /*
-   * ==========================================================
-   * MATRICES DARI HASIL DATABASE
-   * ==========================================================
-   */
+  // ==========================================================
+  // HELPERS
+  // ==========================================================
 
-  const matrixRows =
-    results.map(
-      (result) => ({
-        result,
-        details:
-          result.details ||
-          [],
-      })
+  const getDetail = (
+    result: AdminTopsisResult,
+    kriteriaId: string
+  ) =>
+    result.details?.find(
+      (detail) =>
+        detail.kriteriaId ===
+        kriteriaId
     )
 
-  const getDetail =
-    (
-      result: AdminTopsisResult,
-      kriteriaId: string
-    ) =>
-      result.details?.find(
-        (detail) =>
-          detail.kriteriaId ===
-          kriteriaId
-      )
+  // ==========================================================
+  // MATRIX
+  // ==========================================================
 
-  /*
-   * Weighted matrix.
-   */
   const weightedMatrix =
-    matrixRows.map(
-      ({
-        result,
-      }) =>
+    results.map(
+      (result) =>
         kriteria.map(
           (criterion) =>
             Number(
@@ -212,15 +215,16 @@ export function ProcessTopsisPage() {
                 result,
                 criterion.id
               )
-                ?.nilaiTerbobot ||
+                ?.nilaiTerbobot ??
                 0
             )
         )
     )
 
-  /*
-   * A+ / A-
-   */
+  // ==========================================================
+  // IDEAL POSITIVE
+  // ==========================================================
+
   const idealPositive =
     kriteria.map(
       (
@@ -234,7 +238,7 @@ export function ProcessTopsisPage() {
           )
 
         if (
-          !values.length
+          values.length === 0
         ) {
           return 0
         }
@@ -250,6 +254,10 @@ export function ProcessTopsisPage() {
       }
     )
 
+  // ==========================================================
+  // IDEAL NEGATIVE
+  // ==========================================================
+
   const idealNegative =
     kriteria.map(
       (
@@ -263,7 +271,7 @@ export function ProcessTopsisPage() {
           )
 
         if (
-          !values.length
+          values.length === 0
         ) {
           return 0
         }
@@ -279,23 +287,22 @@ export function ProcessTopsisPage() {
       }
     )
 
-  /*
-   * D+ dan D-
-   */
+  // ==========================================================
+  // DISTANCES
+  // ==========================================================
+
   const distances =
     results.map(
       (result) => {
         const weighted =
           kriteria.map(
-            (
-              criterion
-            ) =>
+            (criterion) =>
               Number(
                 getDetail(
                   result,
                   criterion.id
                 )
-                  ?.nilaiTerbobot ||
+                  ?.nilaiTerbobot ??
                   0
               )
           )
@@ -358,16 +365,17 @@ export function ProcessTopsisPage() {
       }
     )
 
-  /*
-   * ==========================================================
-   * PROCESS
-   * ==========================================================
-   */
+  // ==========================================================
+  // PROCESS TOPSIS
+  // ==========================================================
 
   const handleProcess =
     async () => {
       try {
-        setProcessing(true)
+        setProcessing(
+          true
+        )
+
         setError('')
 
         await processAdminTopsis(
@@ -379,18 +387,29 @@ export function ProcessTopsisPage() {
         navigate(
           '/admin/ranking'
         )
-      } catch (err: any) {
-        console.error(err)
+      } catch (
+        err: any
+      ) {
+        console.error(
+          'PROCESS TOPSIS PAGE ERROR:',
+          err
+        )
 
         setError(
           err.response
             ?.data?.message ||
-          'Gagal menjalankan TOPSIS.'
+            'Gagal menjalankan TOPSIS.'
         )
       } finally {
-        setProcessing(false)
+        setProcessing(
+          false
+        )
       }
     }
+
+  // ==========================================================
+  // LOADING
+  // ==========================================================
 
   if (loading) {
     return (
@@ -399,6 +418,10 @@ export function ProcessTopsisPage() {
       </div>
     )
   }
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
   return (
     <div className="space-y-6">
@@ -417,11 +440,12 @@ export function ProcessTopsisPage() {
               threshold
             }
             onChange={(
-              e
+              event
             ) =>
               setThreshold(
                 Number(
-                  e.target.value
+                  event.target
+                    .value
                 )
               )
             }
@@ -453,6 +477,10 @@ export function ProcessTopsisPage() {
         </div>
       )}
 
+      {/* ======================================================
+          INFO
+      ====================================================== */}
+
       <Card className="border-green-300 bg-green-50/40">
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
@@ -464,10 +492,16 @@ export function ProcessTopsisPage() {
               </p>
 
               <p className="text-xs text-slate-600 mt-1">
-                Sistem mengambil pengajuan
-                dengan status DIPROSES_TOPSIS
-                dan jawaban kuesioner lengkap.
-                Threshold kelayakan saat ini:{' '}
+                Sistem menghitung seluruh
+                pengajuan yang sudah lolos
+                verifikasi dan memiliki
+                jawaban kuesioner lengkap.
+                Semua alternatif dihitung
+                dalam satu matriks TOPSIS.
+              </p>
+
+              <p className="text-xs text-slate-600 mt-1">
+                Threshold kelayakan:{' '}
                 <strong>
                   {threshold}
                 </strong>
@@ -476,6 +510,10 @@ export function ProcessTopsisPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ======================================================
+          TABS
+      ====================================================== */}
 
       <Tabs
         defaultValue="matriks"
@@ -500,7 +538,7 @@ export function ProcessTopsisPage() {
         </TabsList>
 
         {/* ====================================================
-            X
+            MATRKS X
         ==================================================== */}
 
         <TabsContent value="matriks">
@@ -512,80 +550,89 @@ export function ProcessTopsisPage() {
             </CardHeader>
 
             <CardContent className="overflow-x-auto">
-              <table className="data-table w-full">
-                <thead>
-                  <tr>
-                    <th>Mustahik</th>
+              {results.length ===
+              0 ? (
+                <div className="py-10 text-center text-slate-500">
+                  Belum ada hasil TOPSIS.
+                </div>
+              ) : (
+                <table className="data-table w-full">
+                  <thead>
+                    <tr>
+                      <th>
+                        Mustahik
+                      </th>
 
-                    {kriteria.map(
+                      {kriteria.map(
+                        (
+                          item
+                        ) => (
+                          <th
+                            key={
+                              item.id
+                            }
+                          >
+                            {
+                              item.kode
+                            }
+                          </th>
+                        )
+                      )}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {results.map(
                       (
-                        item
+                        result
                       ) => (
-                        <th
+                        <tr
                           key={
-                            item.id
+                            result.id
                           }
                         >
-                          {
-                            item.kode
-                          }
-                        </th>
+                          <td className="font-semibold">
+                            {
+                              result
+                                .pengajuan
+                                ?.mustahik
+                                ?.namaLengkap
+                            }
+                          </td>
+
+                          {kriteria.map(
+                            (
+                              criterion
+                            ) => (
+                              <td
+                                key={
+                                  criterion.id
+                                }
+                                className="text-center font-mono"
+                              >
+                                {Number(
+                                  getDetail(
+                                    result,
+                                    criterion.id
+                                  )
+                                    ?.nilaiAwal ??
+                                    0
+                                )}
+                              </td>
+                            )
+                          )}
+                        </tr>
                       )
                     )}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {results.map(
-                    (
-                      result
-                    ) => (
-                      <tr
-                        key={
-                          result.id
-                        }
-                      >
-                        <td className="font-semibold">
-                          {
-                            result
-                              .pengajuan
-                              ?.mustahik
-                              ?.namaLengkap
-                          }
-                        </td>
-
-                        {kriteria.map(
-                          (
-                            criterion
-                          ) => (
-                            <td
-                              key={
-                                criterion.id
-                              }
-                              className="text-center font-mono"
-                            >
-                              {Number(
-                                getDetail(
-                                  result,
-                                  criterion.id
-                                )
-                                  ?.nilaiAwal ||
-                                  0
-                              )}
-                            </td>
-                          )
-                        )}
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* ====================================================
-            R
+            NORMALISASI
         ==================================================== */}
 
         <TabsContent value="normalisasi">
@@ -597,309 +644,372 @@ export function ProcessTopsisPage() {
             </CardHeader>
 
             <CardContent className="overflow-x-auto">
-              <table className="data-table w-full">
-                <thead>
-                  <tr>
-                    <th>Mustahik</th>
+              {results.length ===
+              0 ? (
+                <div className="py-10 text-center text-slate-500">
+                  Belum ada data.
+                </div>
+              ) : (
+                <table className="data-table w-full">
+                  <thead>
+                    <tr>
+                      <th>
+                        Mustahik
+                      </th>
 
-                    {kriteria.map(
+                      {kriteria.map(
+                        (
+                          item
+                        ) => (
+                          <th
+                            key={
+                              item.id
+                            }
+                          >
+                            {
+                              item.kode
+                            }
+                          </th>
+                        )
+                      )}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {results.map(
                       (
-                        item
+                        result
                       ) => (
-                        <th
+                        <tr
                           key={
-                            item.id
+                            result.id
                           }
                         >
-                          {
-                            item.kode
-                          }
-                        </th>
+                          <td className="font-semibold">
+                            {
+                              result
+                                .pengajuan
+                                ?.mustahik
+                                ?.namaLengkap
+                            }
+                          </td>
+
+                          {kriteria.map(
+                            (
+                              criterion
+                            ) => (
+                              <td
+                                key={
+                                  criterion.id
+                                }
+                                className="text-center font-mono"
+                              >
+                                {Number(
+                                  getDetail(
+                                    result,
+                                    criterion.id
+                                  )
+                                    ?.nilaiNormalisasi ??
+                                    0
+                                ).toFixed(
+                                  4
+                                )}
+                              </td>
+                            )
+                          )}
+                        </tr>
                       )
                     )}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {results.map(
-                    (
-                      result
-                    ) => (
-                      <tr
-                        key={
-                          result.id
-                        }
-                      >
-                        <td className="font-semibold">
-                          {
-                            result
-                              .pengajuan
-                              ?.mustahik
-                              ?.namaLengkap
-                          }
-                        </td>
-
-                        {kriteria.map(
-                          (
-                            criterion
-                          ) => (
-                            <td
-                              key={
-                                criterion.id
-                              }
-                              className="text-center font-mono"
-                            >
-                              {Number(
-                                getDetail(
-                                  result,
-                                  criterion.id
-                                )
-                                  ?.nilaiNormalisasi ||
-                                  0
-                              ).toFixed(
-                                4
-                              )}
-                            </td>
-                          )
-                        )}
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* ====================================================
-            Y
+            TERBOBOT
         ==================================================== */}
 
         <TabsContent value="terbobot">
           <Card>
             <CardHeader>
               <CardTitle>
-                Matriks Normalisasi Terbobot (Y)
+                Matriks Terbobot (Y)
               </CardTitle>
             </CardHeader>
 
             <CardContent className="overflow-x-auto">
-              <table className="data-table w-full">
-                <thead>
-                  <tr>
-                    <th>Mustahik</th>
+              {results.length ===
+              0 ? (
+                <div className="py-10 text-center text-slate-500">
+                  Belum ada data.
+                </div>
+              ) : (
+                <table className="data-table w-full">
+                  <thead>
+                    <tr>
+                      <th>
+                        Mustahik
+                      </th>
 
-                    {kriteria.map(
+                      {kriteria.map(
+                        (
+                          item
+                        ) => (
+                          <th
+                            key={
+                              item.id
+                            }
+                          >
+                            {
+                              item.kode
+                            }
+                          </th>
+                        )
+                      )}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {results.map(
                       (
-                        item
+                        result
                       ) => (
-                        <th
+                        <tr
                           key={
-                            item.id
+                            result.id
                           }
                         >
-                          {
-                            item.kode
-                          }{' '}
-                          (
-                          {Number(
-                            item.bobot
-                          ) *
-                            100}
-                          %)
-                        </th>
+                          <td className="font-semibold">
+                            {
+                              result
+                                .pengajuan
+                                ?.mustahik
+                                ?.namaLengkap
+                            }
+                          </td>
+
+                          {kriteria.map(
+                            (
+                              criterion
+                            ) => (
+                              <td
+                                key={
+                                  criterion.id
+                                }
+                                className="text-center font-mono"
+                              >
+                                {Number(
+                                  getDetail(
+                                    result,
+                                    criterion.id
+                                  )
+                                    ?.nilaiTerbobot ??
+                                    0
+                                ).toFixed(
+                                  4
+                                )}
+                              </td>
+                            )
+                          )}
+                        </tr>
                       )
                     )}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {results.map(
-                    (
-                      result
-                    ) => (
-                      <tr
-                        key={
-                          result.id
-                        }
-                      >
-                        <td className="font-semibold">
-                          {
-                            result
-                              .pengajuan
-                              ?.mustahik
-                              ?.namaLengkap
-                          }
-                        </td>
-
-                        {kriteria.map(
-                          (
-                            criterion
-                          ) => (
-                            <td
-                              key={
-                                criterion.id
-                              }
-                              className="text-center font-mono"
-                            >
-                              {Number(
-                                getDetail(
-                                  result,
-                                  criterion.id
-                                )
-                                  ?.nilaiTerbobot ||
-                                  0
-                              ).toFixed(
-                                4
-                              )}
-                            </td>
-                          )
-                        )}
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* ====================================================
-            IDEAL
+            A+ A- JARAK
         ==================================================== */}
 
         <TabsContent value="solusi">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  Solusi Ideal
-                </CardTitle>
-              </CardHeader>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Solusi Ideal dan Jarak
+              </CardTitle>
+            </CardHeader>
 
-              <CardContent className="space-y-3">
-                <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                  <p className="font-bold text-green-700">
-                    A+ Positif
-                  </p>
-
-                  <p className="font-mono text-xs mt-2">
-                    [
-                    {idealPositive
-                      .map(
-                        (
-                          value
-                        ) =>
-                          value.toFixed(
-                            4
-                          )
-                      )
-                      .join(
-                        ', '
-                      )}
-                    ]
-                  </p>
+            <CardContent className="overflow-x-auto">
+              {results.length ===
+              0 ? (
+                <div className="py-10 text-center text-slate-500">
+                  Belum ada data.
                 </div>
+              ) : (
+                <>
+                  <table className="data-table w-full">
+                    <thead>
+                      <tr>
+                        <th>
+                          Mustahik
+                        </th>
 
-                <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
-                  <p className="font-bold text-amber-700">
-                    A- Negatif
-                  </p>
+                        <th>
+                          D+
+                        </th>
 
-                  <p className="font-mono text-xs mt-2">
-                    [
-                    {idealNegative
-                      .map(
-                        (
-                          value
-                        ) =>
-                          value.toFixed(
-                            4
-                          )
-                      )
-                      .join(
-                        ', '
-                      )}
-                    ]
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                        <th>
+                          D-
+                        </th>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  Jarak & Nilai Ci
-                </CardTitle>
-              </CardHeader>
+                        <th>
+                          Ci
+                        </th>
 
-              <CardContent className="overflow-x-auto">
-                <table className="data-table w-full">
-                  <thead>
-                    <tr>
-                      <th>Nama</th>
-                      <th>D+</th>
-                      <th>D-</th>
-                      <th>Ci</th>
-                    </tr>
-                  </thead>
+                        <th>
+                          Ranking
+                        </th>
+                      </tr>
+                    </thead>
 
-                  <tbody>
-                    {distances
-                      .sort(
-                        (
-                          a,
-                          b
-                        ) =>
-                          b.preference -
-                          a.preference
-                      )
-                      .map(
-                        (
-                          row
-                        ) => (
-                          <tr
-                            key={
-                              row
-                                .result
-                                .id
-                            }
-                          >
-                            <td className="font-semibold">
-                              {
-                                row
+                    <tbody>
+                      {distances
+                        .sort(
+                          (
+                            a,
+                            b
+                          ) =>
+                            a.result
+                              .ranking -
+                            b.result
+                              .ranking
+                        )
+                        .map(
+                          (
+                            item
+                          ) => (
+                            <tr
+                              key={
+                                item
                                   .result
-                                  .pengajuan
-                                  ?.mustahik
-                                  ?.namaLengkap
+                                  .id
                               }
-                            </td>
+                            >
+                              <td className="font-semibold">
+                                {
+                                  item
+                                    .result
+                                    .pengajuan
+                                    ?.mustahik
+                                    ?.namaLengkap
+                                }
+                              </td>
 
-                            <td className="font-mono">
-                              {row.dPlus.toFixed(
+                              <td className="font-mono">
+                                {item.dPlus.toFixed(
+                                  4
+                                )}
+                              </td>
+
+                              <td className="font-mono">
+                                {item.dMinus.toFixed(
+                                  4
+                                )}
+                              </td>
+
+                              <td className="font-mono font-bold text-green-700">
+                                {item.preference.toFixed(
+                                  4
+                                )}
+                              </td>
+
+                              <td className="font-bold">
+                                #
+                                {
+                                  item
+                                    .result
+                                    .ranking
+                                }
+                              </td>
+                            </tr>
+                          )
+                        )}
+                    </tbody>
+                  </table>
+
+                  <div className="mt-5 p-4 rounded-lg bg-slate-50 border">
+                    <p className="text-sm font-semibold">
+                      Solusi Ideal Positif (A+)
+                    </p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
+                      {kriteria.map(
+                        (
+                          criterion,
+                          index
+                        ) => (
+                          <div
+                            key={
+                              criterion.id
+                            }
+                            className="text-center"
+                          >
+                            <p className="text-xs text-slate-500">
+                              {
+                                criterion.kode
+                              }
+                            </p>
+
+                            <p className="font-mono font-bold">
+                              {Number(
+                                idealPositive[
+                                  index
+                                ]
+                              ).toFixed(
                                 4
                               )}
-                            </td>
-
-                            <td className="font-mono">
-                              {row.dMinus.toFixed(
-                                4
-                              )}
-                            </td>
-
-                            <td className="font-mono font-bold text-green-600">
-                              {row.preference.toFixed(
-                                4
-                              )}
-                            </td>
-                          </tr>
+                            </p>
+                          </div>
                         )
                       )}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          </div>
+                    </div>
+
+                    <p className="text-sm font-semibold mt-5">
+                      Solusi Ideal Negatif (A-)
+                    </p>
+
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
+                      {kriteria.map(
+                        (
+                          criterion,
+                          index
+                        ) => (
+                          <div
+                            key={
+                              criterion.id
+                            }
+                            className="text-center"
+                          >
+                            <p className="text-xs text-slate-500">
+                              {
+                                criterion.kode
+                              }
+                            </p>
+
+                            <p className="font-mono font-bold">
+                              {Number(
+                                idealNegative[
+                                  index
+                                ]
+                              ).toFixed(
+                                4
+                              )}
+                            </p>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

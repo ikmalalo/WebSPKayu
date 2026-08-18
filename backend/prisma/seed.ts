@@ -86,30 +86,37 @@ const criteria: SeedCriterion[] = [
   },
 
   {
-    kode: 'C5',
-    nama: 'Kepemilikan Aset',
-    bobot: 0.10,
-    tipe: KriteriaTipe.COST,
-    values: [
-      ['Memiliki banyak aset', 1],
-      [
-        'Memiliki beberapa aset',
-        2,
-      ],
-      [
-        'Memiliki sedikit aset',
-        3,
-      ],
-      [
-        'Hampir tidak memiliki aset',
-        4,
-      ],
-      [
-        'Tidak memiliki aset',
-        5,
-      ],
+  kode: 'C5',
+  nama: 'Kepemilikan Aset',
+  bobot: 0.10,
+  tipe: KriteriaTipe.BENEFIT,
+  values: [
+    [
+      'Memiliki banyak aset',
+      1,
     ],
-  },
+
+    [
+      'Memiliki beberapa aset',
+      2,
+    ],
+
+    [
+      'Memiliki sedikit aset',
+      3,
+    ],
+
+    [
+      'Hampir tidak memiliki aset',
+      4,
+    ],
+
+    [
+      'Tidak memiliki aset',
+      5,
+    ],
+  ],
+},
 ]
 
 async function seedKriteria() {
