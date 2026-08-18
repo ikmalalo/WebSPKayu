@@ -1,13 +1,20 @@
 import {
-  ArrowLeft,
-  Trophy,
-  CheckCircle,
-  Clock,
-} from 'lucide-react'
+  useEffect,
+  useState,
+} from 'react'
 
 import {
   Link,
 } from 'react-router-dom'
+
+import {
+  ArrowLeft,
+  Trophy,
+  CheckCircle,
+  Clock,
+  Loader2,
+  HelpCircle,
+} from 'lucide-react'
 
 import {
   Card,
@@ -29,15 +36,7 @@ import {
 } from '@/components/shared/PageHeader'
 
 import {
-  mockPengajuan,
-  mockTopsisResults,
-  mockKriteria,
-  mockDataMustahik,
-} from '@/data/mockData'
-
-import {
   formatDate,
-  formatCurrency,
 } from '@/lib/utils'
 
 import {
@@ -48,6 +47,55 @@ import {
   usePengajuan,
 } from '@/context/PengajuanContext'
 
+import axios from 'axios'
+
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000/api'
+
+interface AnswerDetail {
+  id: string
+  kriteriaId: string
+  subKriteriaId: string
+  nilai: number | string
+  kriteria?: {
+    id: string
+    kode: string
+    nama: string
+    tipe: 'BENEFIT' | 'COST'
+  }
+  subKriteria?: {
+    id: string
+    nama: string
+    nilai: number | string
+    keterangan?: string | null
+  }
+}
+
+interface TopsisDetail {
+  id: string
+  nilaiAwal: number | string
+  nilaiNormalisasi:
+    | number
+    | string
+  nilaiTerbobot:
+    | number
+    | string
+}
+
+interface TopsisResultDetail {
+  id: string
+  nilaiPreferensi:
+    | number
+    | string
+  ranking: number
+  status:
+    | 'LAYAK_DIDANAI'
+    | 'TIDAK_DIDANAI'
+  tanggalProses: string
+  details?: TopsisDetail[]
+}
+
 export function DetailHasilPage() {
   const {
     currentUser,
@@ -56,31 +104,149 @@ export function DetailHasilPage() {
   const {
     pengajuan:
       contextPengajuan,
+    setPengajuan,
   } = usePengajuan()
 
-  /*
-   * Cari pengajuan milik user.
-   */
-  const userPengajuan =
-    contextPengajuan &&
-    currentUser &&
-    contextPengajuan.userId ===
-      currentUser.id
-      ? contextPengajuan
-      : currentUser
-        ? mockPengajuan.find(
-            (p) =>
-              p.userId ===
-              currentUser.id
-          )
-        : null
+  const [
+    detail,
+    setDetail,
+  ] = useState<any>(null)
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true)
+
+  const [
+    error,
+    setError,
+  ] = useState<string | null>(
+    null
+  )
 
   /*
-   * Kalau belum ada pengajuan,
-   * jangan mencoba mengakses
-   * userPengajuan.mustahikId.
+   * ==========================================================
+   * LOAD DETAIL PENGAJUAN
+   * ==========================================================
    */
-  if (!userPengajuan) {
+
+  useEffect(() => {
+    const load =
+      async () => {
+        if (
+          !contextPengajuan?.id ||
+          !currentUser ||
+          !localStorage.getItem(
+            'spk_token'
+          )
+        ) {
+          setLoading(false)
+          return
+        }
+
+        try {
+          const response =
+            await axios.get(
+              `${API_URL}/pengajuan/${contextPengajuan.id}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem(
+                    'spk_token'
+                  )}`,
+                },
+              }
+            )
+
+          const result =
+            response.data
+              ?.data?.pengajuan
+
+          if (
+            !result ||
+            result.userId !==
+              currentUser.id
+          ) {
+            setError(
+              'Data pengajuan tidak ditemukan.'
+            )
+            return
+          }
+
+          setDetail(
+            result
+          )
+
+          /*
+           * Sinkronkan status ke context.
+           */
+          setPengajuan({
+            ...contextPengajuan,
+            status:
+              result.status,
+            tanggalVerifikasi:
+              result.tanggalVerifikasi
+                ? new Date(
+                    result.tanggalVerifikasi
+                  )
+                    .toISOString()
+                    .split(
+                      'T'
+                    )[0]
+                : undefined,
+            catatan:
+              result.catatan ||
+              undefined,
+          })
+        } catch (err: any) {
+          console.error(
+            'Gagal mengambil detail pengajuan:',
+            err
+          )
+
+          setError(
+            err.response
+              ?.data?.message ||
+            'Gagal mengambil detail pengajuan.'
+          )
+        } finally {
+          setLoading(false)
+        }
+      }
+
+    load()
+  }, [
+    contextPengajuan?.id,
+    currentUser?.id,
+  ])
+
+  /*
+   * ==========================================================
+   * LOADING
+   * ==========================================================
+   */
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+
+        <span className="ml-2 text-sm text-slate-500">
+          Memuat hasil pengajuan...
+        </span>
+      </div>
+    )
+  }
+
+  /*
+   * ==========================================================
+   * ERROR / NO DATA
+   * ==========================================================
+   */
+
+  if (
+    error ||
+    !detail
+  ) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -100,25 +266,17 @@ export function DetailHasilPage() {
 
         <Card>
           <CardContent className="py-16 text-center">
-            <Clock className="w-10 h-10 mx-auto text-slate-300 mb-4" />
+            <HelpCircle className="w-10 h-10 mx-auto text-slate-300 mb-4" />
 
             <h3 className="text-lg font-semibold text-slate-900">
-              Belum Ada Pengajuan
+              {error ||
+                'Belum Ada Pengajuan'}
             </h3>
 
             <p className="text-sm text-slate-500 mt-2">
-              Anda belum memiliki data
-              pengajuan yang dapat ditampilkan.
+              Silakan lakukan pengajuan
+              terlebih dahulu.
             </p>
-
-            <Button
-              asChild
-              className="mt-5"
-            >
-              <Link to="/pengajuan/form">
-                Mulai Pengajuan
-              </Link>
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -126,223 +284,76 @@ export function DetailHasilPage() {
   }
 
   /*
-   * Cari data mustahik.
+   * ==========================================================
+   * DATA
+   * ==========================================================
    */
-  const userMustahik =
-    mockDataMustahik.find(
-      (m) =>
-        m.id ===
-        userPengajuan.mustahikId
-    ) || null
+
+  const mustahik =
+    detail.mustahik
+
+  const answers:
+    AnswerDetail[] =
+    detail.jawaban || []
+
+  const topsisResults:
+    TopsisResultDetail[] =
+    detail.topsisResults || []
 
   /*
-   * Kalau data mustahik belum ada,
-   * tetap tampilkan halaman dengan
-   * data dasar pengajuan.
+   * Backend mengurutkan TOPSIS
+   * berdasarkan tanggal proses terbaru.
    */
-  const mustahikData =
-    userMustahik || {
-      id:
-        userPengajuan.mustahikId,
-      userId:
-        userPengajuan.userId,
-      nik:
-        userPengajuan.nik,
-      namaLengkap:
-        userPengajuan.namaLengkap,
-      tempatLahir: '-',
-      tanggalLahir: '',
-      jenisKelamin: 'L' as const,
-      alamat: '-',
-      kelurahan: '-',
-      kecamatan: '-',
-      kota: '-',
-      provinsi: '-',
-      noHp: '',
-      statusPernikahan:
-        'belum_menikah' as const,
-      pekerjaan: '-',
-      penghasilan: 0,
-      jumlahTanggungan: 0,
-      statusRumah:
-        'menumpang' as const,
-      kondisiRumah:
-        'sedang' as const,
-      kepemilikanAset:
-        'tidak_ada' as const,
-    }
+  const topsis =
+    topsisResults[0] ||
+    null
 
   /*
-   * Cari hasil TOPSIS berdasarkan
-   * mustahik/pengajuan.
+   * Helper mencari jawaban
+   * berdasarkan nama/kode kriteria.
    */
-  const userTopsis =
-    mockTopsisResults.find(
-      (result) =>
-        result.mustahikId ===
-        userPengajuan.mustahikId
-    ) || null
-
-  const getScoreVector = (
-    m: typeof mustahikData
-  ) => {
-    // C1: Penghasilan
-    let c1 = 5
-
-    if (m.penghasilan < 500000) {
-      c1 = 1
-    } else if (
-      m.penghasilan <=
-      1000000
-    ) {
-      c1 = 2
-    } else if (
-      m.penghasilan <=
-      1500000
-    ) {
-      c1 = 3
-    } else if (
-      m.penghasilan <=
-      2000000
-    ) {
-      c1 = 4
-    } else {
-      c1 = 5
+  const getAnswer =
+    (
+      keyword: string
+    ) => {
+      return answers.find(
+        (answer) =>
+          answer.kriteria
+            ?.kode ===
+            keyword ||
+          answer.kriteria
+            ?.nama
+            ?.toLowerCase() ===
+            keyword.toLowerCase()
+      )
     }
 
-    // C2: Tanggungan
-    let c2 = 1
+  const c1 =
+    getAnswer('C1')
 
-    if (
-      m.jumlahTanggungan ===
-      1
-    ) {
-      c2 = 1
-    } else if (
-      m.jumlahTanggungan ===
-      2
-    ) {
-      c2 = 2
-    } else if (
-      m.jumlahTanggungan ===
-      3
-    ) {
-      c2 = 3
-    } else if (
-      m.jumlahTanggungan ===
-      4
-    ) {
-      c2 = 4
-    } else if (
-      m.jumlahTanggungan >=
-      5
-    ) {
-      c2 = 5
-    }
+  const c2 =
+    getAnswer('C2')
 
-    // C3: Kondisi Rumah
-    let c3 = 3
+  const c3 =
+    getAnswer('C3')
 
-    if (
-      m.kondisiRumah ===
-      'baik'
-    ) {
-      c3 = 2
-    } else if (
-      m.kondisiRumah ===
-      'sedang'
-    ) {
-      c3 = 3
-    } else if (
-      m.kondisiRumah ===
-      'buruk'
-    ) {
-      c3 = 4
-    }
+  const c4 =
+    getAnswer('C4')
 
-    // C4: Pekerjaan
-    let c4 = 5
+  const c5 =
+    getAnswer('C5')
 
-    const pekerjaan =
-      String(
-        m.pekerjaan || ''
-      ).toLowerCase()
-
-    if (
-      pekerjaan.includes(
-        'pns'
-      ) ||
-      pekerjaan.includes(
-        'bumn'
-      ) ||
-      pekerjaan.includes(
-        'pemerintah'
-      )
-    ) {
-      c4 = 1
-    } else if (
-      pekerjaan.includes(
-        'swasta'
-      ) ||
-      pekerjaan.includes(
-        'karyawan'
-      )
-    ) {
-      c4 = 2
-    } else if (
-      pekerjaan.includes(
-        'wiraswasta'
-      ) ||
-      pekerjaan.includes(
-        'dagang'
-      ) ||
-      pekerjaan.includes(
-        'toko'
-      )
-    ) {
-      c4 = 3
-    } else if (
-      pekerjaan.includes(
-        'buruh'
-      ) ||
-      pekerjaan.includes(
-        'harian'
-      ) ||
-      pekerjaan.includes(
-        'tani'
-      ) ||
-      pekerjaan.includes(
-        'bangunan'
-      )
-    ) {
-      c4 = 4
-    }
-
-    // C5: Aset
-    const c5 =
-      m.kepemilikanAset ===
-      'ada'
-        ? 2
-        : 5
-
-    return [
-      c1,
-      c2,
-      c3,
-      c4,
-      c5,
-    ]
-  }
-
-  const scores =
-    getScoreVector(
-      mustahikData
-    )
+  /*
+   * ==========================================================
+   * RENDER
+   * ==========================================================
+   */
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Detail Hasil Pengajuan"
+        description="Hasil kuesioner dan penilaian SPK TOPSIS"
       >
         <Button
           asChild
@@ -367,26 +378,28 @@ export function DetailHasilPage() {
             <div>
               <StatusBadge
                 status={
-                  userPengajuan.status
+                  detail.status
                 }
               />
 
               <h2 className="text-xl font-bold text-slate-900 mt-2">
                 {
-                  mustahikData.namaLengkap
+                  mustahik?.namaLengkap
                 }
               </h2>
 
               <p className="text-sm text-slate-500">
                 Pengajuan #
-                {userPengajuan.id.toUpperCase()}
+                {String(
+                  detail.id
+                ).toUpperCase()}
               </p>
             </div>
 
             <div className="ml-auto text-right">
               <p className="text-4xl font-bold text-green-600">
                 #
-                {userTopsis?.ranking ??
+                {topsis?.ranking ??
                   '-'}
               </p>
 
@@ -398,7 +411,10 @@ export function DetailHasilPage() {
         </CardContent>
       </Card>
 
-      {/* TOPSIS */}
+      {/* =====================================================
+          TOPSIS
+      ====================================================== */}
+
       <Card>
         <CardHeader>
           <CardTitle>
@@ -407,112 +423,153 @@ export function DetailHasilPage() {
         </CardHeader>
 
         <CardContent>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="p-4 bg-green-50 rounded-xl text-center border border-green-200">
-              <p className="text-3xl font-bold text-green-600">
-                {userTopsis
-                  ? userTopsis.nilaiPreferensi.toFixed(
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* CI */}
+            <div className="p-6 bg-green-50 rounded-xl text-center border border-green-200">
+              <p className="text-4xl font-bold text-green-600">
+                {topsis
+                  ? Number(
+                      topsis.nilaiPreferensi
+                    ).toFixed(
                       4
                     )
                   : '-'}
               </p>
 
-              <p className="text-xs text-green-700 mt-1">
+              <p className="text-sm text-green-700 mt-2">
                 Nilai Preferensi (Ci)
               </p>
             </div>
 
-            <div className="p-4 bg-slate-50 rounded-xl text-center border border-slate-200">
+            {/* STATUS */}
+            <div className="p-6 bg-slate-50 rounded-xl text-center border border-slate-200">
               <div className="flex items-center justify-center gap-2">
-                {userTopsis?.status ===
+                {topsis?.status ===
                 'LAYAK_DIDANAI' ? (
                   <>
-                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <CheckCircle className="w-6 h-6 text-green-600" />
 
-                    <p className="text-lg font-bold text-green-600">
+                    <p className="text-xl font-bold text-green-600">
                       LAYAK
                     </p>
                   </>
-                ) : userTopsis?.status ===
+                ) : topsis?.status ===
                   'TIDAK_DIDANAI' ? (
                   <>
-                    <CheckCircle className="w-5 h-5 text-red-500" />
+                    <CheckCircle className="w-6 h-6 text-red-500" />
 
-                    <p className="text-lg font-bold text-red-500">
+                    <p className="text-xl font-bold text-red-500">
                       TIDAK LAYAK
                     </p>
                   </>
                 ) : (
                   <>
-                    <Clock className="w-5 h-5 text-amber-500 animate-pulse" />
+                    <Clock className="w-6 h-6 text-amber-500" />
 
-                    <p className="text-lg font-bold text-amber-500">
+                    <p className="text-xl font-bold text-amber-500">
                       ANTREAN
                     </p>
                   </>
                 )}
               </div>
 
-              <p className="text-xs text-slate-500 mt-1">
-                Status Kelayakan
+              <p className="text-sm text-slate-500 mt-2">
+                {topsis
+                  ? 'Status Kelayakan'
+                  : 'Menunggu proses TOPSIS oleh admin'}
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* KRITERIA */}
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-slate-700">
-              Skor per Kriteria:
-            </p>
+      {/* =====================================================
+          HASIL KUESIONER
+      ====================================================== */}
 
-            {mockKriteria.map(
-              (k, i) => (
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Hasil Kuesioner
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent>
+          <div className="space-y-4">
+            {[
+              {
+                code: 'C1',
+                title:
+                  'Penghasilan',
+                answer: c1,
+              },
+              {
+                code: 'C2',
+                title:
+                  'Jumlah Tanggungan',
+                answer: c2,
+              },
+              {
+                code: 'C3',
+                title:
+                  'Kondisi Rumah',
+                answer: c3,
+              },
+              {
+                code: 'C4',
+                title:
+                  'Status Pekerjaan',
+                answer: c4,
+              },
+              {
+                code: 'C5',
+                title:
+                  'Kepemilikan Aset',
+                answer: c5,
+              },
+            ].map(
+              ({
+                code,
+                title,
+                answer,
+              }) => (
                 <div
-                  key={k.id}
-                  className="flex items-center gap-3"
+                  key={code}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-slate-200"
                 >
-                  <div className="w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center shrink-0">
-                    {i + 1}
+                  <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">
+                    {code}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between mb-1">
-                      <span className="text-xs font-medium text-slate-700 truncate">
-                        {k.nama}
-                      </span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-800">
+                      {title}
+                    </p>
 
-                      <span className="text-xs font-bold text-slate-600 ml-2">
-                        {
-                          scores[i]
-                        }
-                        /5
-                      </span>
-                    </div>
-
-                    <div className="h-1.5 bg-slate-100 rounded-full">
-                      <div
-                        className="h-full bg-green-500 rounded-full"
-                        style={{
-                          width: `${
-                            (scores[i] /
-                              5) *
-                            100
-                          }%`,
-                        }}
-                      />
-                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {answer
+                        ?.subKriteria
+                        ?.keterangan ||
+                        answer
+                          ?.subKriteria
+                          ?.nama ||
+                        'Belum dijawab'}
+                    </p>
                   </div>
 
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
-                      k.tipe ===
-                      'benefit'
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-amber-50 text-amber-700'
-                    }`}
-                  >
-                    {k.tipe}
-                  </span>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-green-600">
+                      {answer
+                        ? Number(
+                            answer.nilai
+                          )
+                        : '-'}
+                    </p>
+
+                    <p className="text-[10px] text-slate-400">
+                      Nilai
+                    </p>
+                  </div>
                 </div>
               )
             )}
@@ -520,7 +577,10 @@ export function DetailHasilPage() {
         </CardContent>
       </Card>
 
-      {/* RINGKASAN */}
+      {/* =====================================================
+          RINGKASAN DATA PENGAJUAN
+      ====================================================== */}
+
       <Card>
         <CardHeader>
           <CardTitle>
@@ -529,87 +589,157 @@ export function DetailHasilPage() {
         </CardHeader>
 
         <CardContent>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            {[
-              {
-                label:
-                  'Nama Lengkap',
-                value:
-                  mustahikData.namaLengkap,
-              },
-              {
-                label:
-                  'Penghasilan',
-                value:
-                  formatCurrency(
-                    mustahikData.penghasilan
-                  ),
-              },
-              {
-                label:
-                  'Jumlah Tanggungan',
-                value: `${mustahikData.jumlahTanggungan} orang`,
-              },
-              {
-                label:
-                  'Pekerjaan',
-                value:
-                  mustahikData.pekerjaan,
-              },
-              {
-                label:
-                  'Kondisi Rumah',
-                value:
-                  mustahikData.kondisiRumah.replace(
-                    '_',
-                    ' '
-                  ),
-              },
-              {
-                label:
-                  'Status Rumah',
-                value:
-                  mustahikData.statusRumah.replace(
-                    '_',
-                    ' '
-                  ),
-              },
-              {
-                label:
-                  'Tanggal Pengajuan',
-                value:
-                  formatDate(
-                    userPengajuan.tanggalPengajuan
-                  ),
-              },
-              {
-                label:
-                  'Tanggal Verifikasi',
-                value:
-                  userPengajuan.tanggalVerifikasi
-                    ? formatDate(
-                        userPengajuan.tanggalVerifikasi
-                      )
-                    : '-',
-              },
-            ].map(
-              ({
-                label,
-                value,
-              }) => (
-                <div
-                  key={label}
-                >
-                  <p className="text-xs text-slate-400">
-                    {label}
-                  </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-xs text-slate-400">
+                Nama Lengkap
+              </p>
 
-                  <p className="font-medium text-slate-800 mt-0.5 capitalize">
-                    {value}
-                  </p>
-                </div>
-              )
-            )}
+              <p className="font-medium text-slate-800 mt-0.5">
+                {mustahik
+                  ?.namaLengkap ||
+                  '-'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-400">
+                NIK
+              </p>
+
+              <p className="font-medium text-slate-800 mt-0.5">
+                {mustahik?.nik ||
+                  '-'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-400">
+                Penghasilan
+              </p>
+
+              <p className="font-medium text-slate-800 mt-0.5">
+                {c1
+                  ? `${
+                      c1.subKriteria
+                        ?.keterangan ||
+                      '-'
+                    } (Nilai ${
+                      Number(
+                        c1.nilai
+                      )
+                    })`
+                  : '-'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-400">
+                Jumlah Tanggungan
+              </p>
+
+              <p className="font-medium text-slate-800 mt-0.5">
+                {c2
+                  ? `${
+                      c2.subKriteria
+                        ?.keterangan ||
+                      '-'
+                    } (Nilai ${
+                      Number(
+                        c2.nilai
+                      )
+                    })`
+                  : '-'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-400">
+                Kondisi Rumah
+              </p>
+
+              <p className="font-medium text-slate-800 mt-0.5">
+                {c3
+                  ? `${
+                      c3.subKriteria
+                        ?.keterangan ||
+                      '-'
+                    } (Nilai ${
+                      Number(
+                        c3.nilai
+                      )
+                    })`
+                  : '-'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-400">
+                Status Pekerjaan
+              </p>
+
+              <p className="font-medium text-slate-800 mt-0.5">
+                {c4
+                  ? `${
+                      c4.subKriteria
+                        ?.keterangan ||
+                      '-'
+                    } (Nilai ${
+                      Number(
+                        c4.nilai
+                      )
+                    })`
+                  : '-'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-400">
+                Kepemilikan Aset
+              </p>
+
+              <p className="font-medium text-slate-800 mt-0.5">
+                {c5
+                  ? `${
+                      c5.subKriteria
+                        ?.keterangan ||
+                      '-'
+                    } (Nilai ${
+                      Number(
+                        c5.nilai
+                      )
+                    })`
+                  : '-'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-400">
+                Tanggal Pengajuan
+              </p>
+
+              <p className="font-medium text-slate-800 mt-0.5">
+                {detail.createdAt
+                  ? formatDate(
+                      detail.createdAt
+                    )
+                  : '-'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-400">
+                Tanggal Verifikasi
+              </p>
+
+              <p className="font-medium text-slate-800 mt-0.5">
+                {detail.tanggalVerifikasi
+                  ? formatDate(
+                      detail.tanggalVerifikasi
+                    )
+                  : '-'}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
