@@ -1,11 +1,12 @@
 // ===== AUTH TYPES =====
 export interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  role: 'user' | 'admin';
-  createdAt: string;
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  role: 'USER' | 'ADMIN'
+  createdAt: string
+  updatedAt?: string
 }
 
 // ===== STATUS TYPES =====

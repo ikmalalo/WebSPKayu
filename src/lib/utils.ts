@@ -1,6 +1,6 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-import type { StatusPengajuan } from "@/types"
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+import type { StatusPengajuan } from '@/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -14,20 +14,59 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-export function formatDate(dateStr: string): string {
+/**
+ * Mengubah value menjadi Date yang valid.
+ * Kalau value kosong / invalid, return null.
+ */
+function parseValidDate(
+  value: string | Date | null | undefined
+): Date | null {
+  if (!value) {
+    return null
+  }
+
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date
+}
+
+export function formatDate(
+  dateStr: string | Date | null | undefined
+): string {
+  const date = parseValidDate(dateStr)
+
+  if (!date) {
+    return '-'
+  }
+
   return new Intl.DateTimeFormat('id-ID', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(new Date(dateStr))
+  }).format(date)
 }
 
-export function formatDateShort(dateStr: string): string {
+export function formatDateShort(
+  dateStr: string | Date | null | undefined
+): string {
+  const date = parseValidDate(dateStr)
+
+  if (!date) {
+    return '-'
+  }
+
   return new Intl.DateTimeFormat('id-ID', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(dateStr))
+  }).format(date)
 }
 
 export function getStatusLabel(status: StatusPengajuan): string {
@@ -42,13 +81,28 @@ export function getStatusLabel(status: StatusPengajuan): string {
     LAYAK_DIDANAI: 'Layak Didanai',
     TIDAK_DIDANAI: 'Tidak Didanai',
   }
+
   return labels[status] || status
 }
 
-export type StatusColor = 'gray' | 'yellow' | 'blue' | 'orange' | 'green' | 'red' | 'purple' | 'emerald' | 'rose'
+export type StatusColor =
+  | 'gray'
+  | 'yellow'
+  | 'blue'
+  | 'orange'
+  | 'green'
+  | 'red'
+  | 'purple'
+  | 'emerald'
+  | 'rose'
 
-export function getStatusColor(status: StatusPengajuan): StatusColor {
-  const colors: Record<StatusPengajuan, StatusColor> = {
+export function getStatusColor(
+  status: StatusPengajuan
+): StatusColor {
+  const colors: Record<
+    StatusPengajuan,
+    StatusColor
+  > = {
     DRAFT: 'gray',
     MENUNGGU_VERIFIKASI: 'yellow',
     SEDANG_DIVERIFIKASI: 'blue',
@@ -59,11 +113,17 @@ export function getStatusColor(status: StatusPengajuan): StatusColor {
     LAYAK_DIDANAI: 'emerald',
     TIDAK_DIDANAI: 'rose',
   }
+
   return colors[status] || 'gray'
 }
 
-export function getProgressSteps(status: StatusPengajuan): number {
-  const steps: Record<StatusPengajuan, number> = {
+export function getProgressSteps(
+  status: StatusPengajuan
+): number {
+  const steps: Record<
+    StatusPengajuan,
+    number
+  > = {
     DRAFT: 1,
     MENUNGGU_VERIFIKASI: 2,
     SEDANG_DIVERIFIKASI: 3,
@@ -74,42 +134,59 @@ export function getProgressSteps(status: StatusPengajuan): number {
     LAYAK_DIDANAI: 6,
     TIDAK_DIDANAI: 6,
   }
+
   return steps[status] || 1
 }
 
 export function formatNIK(nik: string): string {
-  return nik.replace(/(\d{6})(\d{6})(\d{4})/, '$1 $2 $3')
+  return nik.replace(
+    /(\d{6})(\d{6})(\d{4})/,
+    '$1 $2 $3'
+  )
 }
 
-export function getJenisKelaminLabel(jk: 'L' | 'P'): string {
-  return jk === 'L' ? 'Laki-laki' : 'Perempuan'
+export function getJenisKelaminLabel(
+  jk: 'L' | 'P'
+): string {
+  return jk === 'L'
+    ? 'Laki-laki'
+    : 'Perempuan'
 }
 
-export function getStatusPernikahanLabel(status: string): string {
+export function getStatusPernikahanLabel(
+  status: string
+): string {
   const labels: Record<string, string> = {
     belum_menikah: 'Belum Menikah',
     menikah: 'Menikah',
     cerai_hidup: 'Cerai Hidup',
     cerai_mati: 'Cerai Mati',
   }
+
   return labels[status] || status
 }
 
-export function getKondisiRumahLabel(kondisi: string): string {
+export function getKondisiRumahLabel(
+  kondisi: string
+): string {
   const labels: Record<string, string> = {
     baik: 'Baik',
     sedang: 'Sedang',
     buruk: 'Buruk',
   }
+
   return labels[kondisi] || kondisi
 }
 
-export function getStatusRumahLabel(status: string): string {
+export function getStatusRumahLabel(
+  status: string
+): string {
   const labels: Record<string, string> = {
     milik_sendiri: 'Milik Sendiri',
     sewa: 'Sewa / Kontrak',
     menumpang: 'Menumpang',
     dinas: 'Rumah Dinas',
   }
+
   return labels[status] || status
 }
