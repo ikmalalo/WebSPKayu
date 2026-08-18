@@ -643,7 +643,6 @@ export function PengajuanPage() {
 
   }, [
     token,
-    setPengajuan,
   ])
 
 

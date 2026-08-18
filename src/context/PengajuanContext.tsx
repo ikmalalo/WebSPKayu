@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useState,
   type ReactNode,
@@ -19,16 +20,6 @@ const PengajuanContext =
     PengajuanContextType | undefined
   >(undefined)
 
-/*
- * PENTING:
- *
- * Jangan gunakan "spk_pengajuan".
- * Key tersebut digunakan mockData.ts
- * sebagai ARRAY.
- *
- * Context menggunakan key berbeda
- * supaya tidak saling merusak.
- */
 const STORAGE_KEY =
   'spk_current_pengajuan'
 
@@ -40,70 +31,74 @@ export function PengajuanProvider({
   const [
     pengajuan,
     setPengajuanState,
-  ] = useState<Pengajuan | null>(() => {
-    try {
-      const saved =
-        localStorage.getItem(
-          STORAGE_KEY
+  ] =
+    useState<Pengajuan | null>(() => {
+      try {
+        const saved =
+          localStorage.getItem(
+            STORAGE_KEY
+          )
+
+        if (!saved) {
+          return null
+        }
+
+        const parsed =
+          JSON.parse(saved)
+
+        if (
+          !parsed ||
+          Array.isArray(parsed) ||
+          typeof parsed !== 'object'
+        ) {
+          localStorage.removeItem(
+            STORAGE_KEY
+          )
+
+          return null
+        }
+
+        return parsed as Pengajuan
+      } catch (error) {
+        console.error(
+          'Gagal membaca pengajuan dari localStorage:',
+          error
         )
 
-      if (!saved) {
-        return null
-      }
-
-      const parsed =
-        JSON.parse(saved)
-
-      /*
-       * Pastikan data yang dibaca benar-benar
-       * sebuah object pengajuan.
-       *
-       * Kalau ternyata array / data rusak,
-       * jangan dipakai.
-       */
-      if (
-        !parsed ||
-        Array.isArray(parsed) ||
-        typeof parsed !== 'object'
-      ) {
         localStorage.removeItem(
           STORAGE_KEY
         )
 
         return null
       }
+    })
 
-      return parsed as Pengajuan
-    } catch (error) {
-      console.error(
-        'Gagal membaca pengajuan dari localStorage:',
-        error
-      )
+  // ==========================================================
+  // SET PENGAJUAN
+  // ==========================================================
 
-      localStorage.removeItem(
-        STORAGE_KEY
-      )
+  const setPengajuan =
+    useCallback(
+      (
+        value: Pengajuan | null
+      ) => {
+        setPengajuanState(
+          value
+        )
 
-      return null
-    }
-  })
-
-  const setPengajuan = (
-    value: Pengajuan | null
-  ) => {
-    setPengajuanState(value)
-
-    if (value) {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(value)
-      )
-    } else {
-      localStorage.removeItem(
-        STORAGE_KEY
-      )
-    }
-  }
+        if (value) {
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(value)
+          )
+        } else {
+          localStorage.removeItem(
+            STORAGE_KEY
+          )
+        }
+      },
+      []
+    )
 
   return (
     <PengajuanContext.Provider
@@ -119,7 +114,9 @@ export function PengajuanProvider({
 
 export function usePengajuan() {
   const context =
-    useContext(PengajuanContext)
+    useContext(
+      PengajuanContext
+    )
 
   if (!context) {
     throw new Error(
