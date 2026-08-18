@@ -5,17 +5,23 @@ import {
 } from 'react'
 
 import {
+  Search,
+  Eye,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react'
+
+import {
   useNavigate,
 } from 'react-router-dom'
 
 import {
-  Search,
-  Eye,
-  Loader2,
-} from 'lucide-react'
+  Button,
+} from '@/components/ui/button'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import {
+  Input,
+} from '@/components/ui/input'
 
 import {
   Select,
@@ -25,31 +31,26 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-import { StatusBadge } from '@/components/shared/StatusBadge'
-import { PageHeader } from '@/components/shared/PageHeader'
-import { DataTable } from '@/components/shared/DataTable'
+import {
+  StatusBadge,
+} from '@/components/shared/StatusBadge'
+
+import {
+  PageHeader,
+} from '@/components/shared/PageHeader'
+
+import {
+  DataTable,
+} from '@/components/shared/DataTable'
 
 import {
   getAdminMustahik,
   type AdminMustahik,
 } from '@/lib/adminApi'
 
-import {
-  formatDateShort,
-} from '@/lib/utils'
-
 import type {
   Column,
 } from '@/types'
-
-interface Row {
-  id: string
-  mustahikId: string
-  namaLengkap: string
-  nik: string
-  tanggalPengajuan: string
-  status: string
-}
 
 export function DataMustahikPage() {
   const navigate =
@@ -63,16 +64,6 @@ export function DataMustahikPage() {
   >([])
 
   const [
-    loading,
-    setLoading,
-  ] = useState(true)
-
-  const [
-    error,
-    setError,
-  ] = useState('')
-
-  const [
     search,
     setSearch,
   ] = useState('')
@@ -82,23 +73,40 @@ export function DataMustahikPage() {
     setStatusFilter,
   ] = useState('all')
 
-  const loadData =
+  const [
+    loading,
+    setLoading,
+  ] = useState(true)
+
+  const [
+    error,
+    setError,
+  ] = useState('')
+
+  const load =
     async () => {
       try {
         setLoading(true)
         setError('')
 
         const result =
-          await getAdminMustahik()
+          await getAdminMustahik(
+            search
+          )
 
-        setData(result)
-      } catch (err: any) {
-        console.error(err)
+        setData(
+          result.mustahik
+        )
+      } catch (error: any) {
+        console.error(
+          'GET MUSTAHIK ERROR:',
+          error
+        )
 
         setError(
-          err.response
+          error.response
             ?.data?.message ||
-          'Gagal mengambil data mustahik.'
+            'Terjadi kesalahan pada server'
         )
       } finally {
         setLoading(false)
@@ -106,104 +114,84 @@ export function DataMustahikPage() {
     }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    const timer =
+      setTimeout(
+        load,
+        300
+      )
 
-  const rows =
-    useMemo<Row[]>(
-      () =>
-        data.map(
-          (mustahik) => {
-            const latest =
-              mustahik.pengajuan?.[0]
-
-            return {
-              id:
-                latest?.id ||
-                mustahik.id,
-
-              mustahikId:
-                mustahik.id,
-
-              namaLengkap:
-                mustahik.namaLengkap,
-
-              nik:
-                mustahik.nik,
-
-              tanggalPengajuan:
-                latest?.tanggalPengajuan ||
-                mustahik
-                  .pengajuan?.[0]
-                  ?.createdAt ||
-                mustahik
-                  .pengajuan?.[0]
-                  ?.tanggalPengajuan ||
-                mustahik.id,
-
-              status:
-                latest?.status ||
-                'DRAFT',
-            }
-          }
-        ),
-      [data]
-    )
+    return () =>
+      clearTimeout(timer)
+  }, [search])
 
   const filtered =
-    rows.filter(
-      (row) => {
-        const q =
-          search
-            .toLowerCase()
-            .trim()
-
-        const matchSearch =
-          !q ||
-          row.namaLengkap
-            .toLowerCase()
-            .includes(q) ||
-          row.nik.includes(q)
-
-        const matchStatus =
-          statusFilter ===
-            'all' ||
-          row.status ===
-            statusFilter
-
-        return (
-          matchSearch &&
-          matchStatus
-        )
+    useMemo(() => {
+      if (
+        statusFilter ===
+        'all'
+      ) {
+        return data
       }
-    )
+
+      return data.filter(
+        (item) =>
+          item
+            .pengajuan?.[0]
+            ?.status ===
+          statusFilter
+      )
+    }, [
+      data,
+      statusFilter,
+    ])
 
   const columns:
-    Column<Row>[] = [
+    Column<AdminMustahik>[] =
+    [
       {
         key: 'id',
+
         header: 'ID',
-        render: (row) => (
+
+        render: (
+          row
+        ) => (
           <span className="font-mono text-xs text-slate-500">
-            #{row.id.toUpperCase()}
+            #
+            {row.id.slice(
+              0,
+              8
+            )}
           </span>
         ),
       },
 
       {
-        key: 'namaLengkap',
-        header: 'Nama Lengkap',
-        render: (row) => (
-          <span className="font-medium text-slate-800 dark:text-slate-100">
-            {row.namaLengkap}
+        key:
+          'namaLengkap',
+
+        header:
+          'Nama Lengkap',
+
+        render: (
+          row
+        ) => (
+          <span className="font-medium">
+            {
+              row.namaLengkap
+            }
           </span>
         ),
       },
 
       {
         key: 'nik',
+
         header: 'NIK',
-        render: (row) => (
+
+        render: (
+          row
+        ) => (
           <span className="font-mono text-xs">
             {row.nik}
           </span>
@@ -211,66 +199,169 @@ export function DataMustahikPage() {
       },
 
       {
-        key: 'tanggalPengajuan',
-        header: 'Tanggal',
-        render: (row) => (
-          <span>
-            {row.tanggalPengajuan &&
-            !row.tanggalPengajuan.match(
-              /^[a-z0-9]{20,}$/i
-            )
-              ? formatDateShort(
-                  row.tanggalPengajuan
-                )
-              : '-'}
-          </span>
-        ),
+        key:
+          'tanggalPengajuan',
+
+        header:
+          'Tanggal',
+
+        render: (
+          row
+        ) => {
+          const date =
+            row
+              .pengajuan?.[0]
+              ?.tanggalPengajuan
+
+          if (!date) {
+            return '-'
+          }
+
+          return new Date(
+            date
+          ).toLocaleDateString(
+            'id-ID'
+          )
+        },
       },
 
       {
         key: 'status',
-        header: 'Status',
-        render: (row) => (
-          <StatusBadge
-            status={
-              row.status as any
-            }
-          />
-        ),
+
+        header:
+          'Status',
+
+        render: (
+          row
+        ) => {
+          const status =
+            row
+              .pengajuan?.[0]
+              ?.status ||
+            'DRAFT'
+
+          return (
+            <StatusBadge
+              status={
+                status as any
+              }
+            />
+          )
+        },
       },
 
       {
-        key: 'actions',
+        key:
+          'actions',
+
         header: 'Aksi',
-        render: (row) => (
+
+        render: (
+          row
+        ) => (
           <Button
             variant="ghost"
             size="sm"
-            onClick={(e) => {
-              e.stopPropagation()
+            onClick={(
+              event
+            ) => {
+              event.stopPropagation()
 
               navigate(
-                `/admin/mustahik/${row.mustahikId}`
+                `/admin/mustahik/${row.id}`
               )
             }}
             className="text-green-600 hover:text-green-700 hover:bg-green-50"
           >
             <Eye className="w-4 h-4 mr-1" />
+
             Detail
           </Button>
         ),
       },
     ]
 
+  const statuses = [
+    {
+      value: 'all',
+      label:
+        'Semua Status',
+    },
+
+    {
+      value:
+        'DRAFT',
+      label: 'Draft',
+    },
+
+    {
+      value:
+        'MENUNGGU_VERIFIKASI',
+      label:
+        'Menunggu Verifikasi',
+    },
+
+    {
+      value:
+        'SEDANG_DIVERIFIKASI',
+      label:
+        'Sedang Diverifikasi',
+    },
+
+    {
+      value:
+        'LOLOS_VERIFIKASI',
+      label:
+        'Lolos Verifikasi',
+    },
+
+    {
+      value:
+        'PERLU_PERBAIKAN',
+      label:
+        'Perlu Perbaikan',
+    },
+
+    {
+      value:
+        'DITOLAK',
+      label: 'Ditolak',
+    },
+
+    {
+      value:
+        'LAYAK_DIDANAI',
+      label:
+        'Layak Didanai',
+    },
+
+    {
+      value:
+        'TIDAK_DIDANAI',
+      label:
+        'Tidak Didanai',
+    },
+  ]
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Data Mustahik"
-        description={`${filtered.length} dari ${rows.length} mustahik`}
-      />
+        description={`${filtered.length} mustahik dari database`}
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={load}
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+
+          Refresh
+        </Button>
+      </PageHeader>
 
       {error && (
-        <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -282,10 +373,14 @@ export function DataMustahikPage() {
           <Input
             placeholder="Cari nama atau NIK..."
             className="pl-9"
-            value={search}
-            onChange={(e) =>
+            value={
+              search
+            }
+            onChange={(
+              event
+            ) =>
               setSearch(
-                e.target.value
+                event.target.value
               )
             }
           />
@@ -304,41 +399,22 @@ export function DataMustahikPage() {
           </SelectTrigger>
 
           <SelectContent>
-            <SelectItem value="all">
-              Semua Status
-            </SelectItem>
-
-            <SelectItem value="DRAFT">
-              Draft
-            </SelectItem>
-
-            <SelectItem value="MENUNGGU_VERIFIKASI">
-              Menunggu Verifikasi
-            </SelectItem>
-
-            <SelectItem value="SEDANG_DIVERIFIKASI">
-              Sedang Diverifikasi
-            </SelectItem>
-
-            <SelectItem value="PERLU_PERBAIKAN">
-              Perlu Perbaikan
-            </SelectItem>
-
-            <SelectItem value="DITOLAK">
-              Ditolak
-            </SelectItem>
-
-            <SelectItem value="DIPROSES_TOPSIS">
-              Diproses TOPSIS
-            </SelectItem>
-
-            <SelectItem value="LAYAK_DIDANAI">
-              Layak Didanai
-            </SelectItem>
-
-            <SelectItem value="TIDAK_DIDANAI">
-              Tidak Didanai
-            </SelectItem>
+            {statuses.map(
+              (item) => (
+                <SelectItem
+                  key={
+                    item.value
+                  }
+                  value={
+                    item.value
+                  }
+                >
+                  {
+                    item.label
+                  }
+                </SelectItem>
+              )
+            )}
           </SelectContent>
         </Select>
       </div>
@@ -349,12 +425,18 @@ export function DataMustahikPage() {
         </div>
       ) : (
         <DataTable
-          columns={columns}
-          data={filtered}
-          emptyMessage="Tidak ada data yang sesuai"
-          onRowClick={(row) =>
+          columns={
+            columns
+          }
+          data={
+            filtered
+          }
+          emptyMessage="Belum ada data mustahik di database"
+          onRowClick={(
+            row
+          ) =>
             navigate(
-              `/admin/mustahik/${row.mustahikId}`
+              `/admin/mustahik/${row.id}`
             )
           }
         />

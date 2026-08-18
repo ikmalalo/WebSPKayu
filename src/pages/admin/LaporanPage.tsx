@@ -1,111 +1,625 @@
-import { useState } from 'react'
-import { FileSpreadsheet, Download, Printer, Filter } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { PageHeader } from '@/components/shared/PageHeader'
-import { DataTable } from '@/components/shared/DataTable'
-import { mockTopsisResults } from '@/data/mockData'
-import { formatDateShort } from '@/lib/utils'
-import type { Column, TopsisResult } from '@/types'
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
+
+import {
+  Download,
+  Printer,
+  Filter,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react'
+
+import {
+  Card,
+  CardContent,
+} from '@/components/ui/card'
+
+import {
+  Button,
+} from '@/components/ui/button'
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+import {
+  PageHeader,
+} from '@/components/shared/PageHeader'
+
+import {
+  DataTable,
+} from '@/components/shared/DataTable'
+
+import {
+  getAdminTopsisResults,
+  type AdminTopsisResult,
+} from '@/lib/adminApi'
+
+import type {
+  Column,
+} from '@/types'
 
 export function LaporanPage() {
-  const [periode, setPeriode] = useState('2024')
-  const [status, setStatus] = useState('all')
+  const [
+    results,
+    setResults,
+  ] = useState<
+    AdminTopsisResult[]
+  >([])
 
-  const filtered = mockTopsisResults.filter((r) => {
-    if (status === 'layak') return r.status === 'LAYAK_DIDANAI'
-    if (status === 'tidak_layak') return r.status === 'TIDAK_DIDANAI'
-    return true
-  })
+  const [
+    year,
+    setYear,
+  ] = useState('all')
 
-  const columns: Column<TopsisResult>[] = [
-    { key: 'ranking', header: 'Rank', render: (row) => <span className="font-bold text-slate-800 dark:text-slate-200">#{row.ranking}</span> },
-    { key: 'namaLengkap', header: 'Nama Mustahik', render: (row) => <span className="font-semibold text-slate-800 dark:text-slate-100">{row.namaLengkap}</span> },
-    { key: 'nilaiPreferensi', header: 'Nilai TOPSIS', render: (row) => <span className="font-mono font-bold text-green-700 dark:text-green-400">{row.nilaiPreferensi.toFixed(4)}</span> },
-    {
-      key: 'status',
-      header: 'Keputusan',
-      render: (row) => (
-        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${row.status === 'LAYAK_DIDANAI' ? 'bg-green-100 dark:bg-slate-900 text-green-800 dark:text-green-400 border border-green-300 dark:border-green-500/50' : 'bg-red-50 dark:bg-slate-900 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/50'}`}>
-          {row.status.replace('_', ' ')}
-        </span>
-      ),
-    },
-    { key: 'tanggalProses', header: 'Tgl Keputusan', render: (row) => <span className="text-slate-700 dark:text-slate-300">{formatDateShort(row.tanggalProses)}</span> },
-  ]
+  const [
+    status,
+    setStatus,
+  ] = useState('all')
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true)
+
+  const [
+    error,
+    setError,
+  ] = useState('')
+
+  const load =
+    async () => {
+      try {
+        setLoading(true)
+        setError('')
+
+        const result =
+          await getAdminTopsisResults()
+
+        setResults(
+          result.results
+        )
+      } catch (error: any) {
+        console.error(
+          'GET LAPORAN ERROR:',
+          error
+        )
+
+        setError(
+          error.response
+            ?.data?.message ||
+            'Gagal mengambil laporan TOPSIS'
+        )
+      } finally {
+        setLoading(false)
+      }
+    }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const years =
+    useMemo(() => {
+      const set =
+        new Set<string>()
+
+      results.forEach(
+        (item) => {
+          const date =
+            new Date(
+              item.tanggalProses
+            )
+
+          if (
+            !Number.isNaN(
+              date.getTime()
+            )
+          ) {
+            set.add(
+              String(
+                date.getFullYear()
+              )
+            )
+          }
+        }
+      )
+
+      return Array.from(
+        set
+      ).sort(
+        (
+          a,
+          b
+        ) =>
+          Number(b) -
+          Number(a)
+      )
+    }, [results])
+
+  const filtered =
+    useMemo(() => {
+      return results
+        .filter(
+          (item) => {
+            if (
+              year ===
+              'all'
+            ) {
+              return true
+            }
+
+            return (
+              new Date(
+                item.tanggalProses
+              ).getFullYear() ===
+              Number(year)
+            )
+          }
+        )
+        .filter(
+          (item) => {
+            if (
+              status ===
+              'all'
+            ) {
+              return true
+            }
+
+            return (
+              item.status ===
+              status
+            )
+          }
+        )
+        .sort(
+          (
+            a,
+            b
+          ) =>
+            a.ranking -
+            b.ranking
+        )
+    }, [
+      results,
+      year,
+      status,
+    ])
+
+  const layak =
+    filtered.filter(
+      (item) =>
+        item.status ===
+        'LAYAK_DIDANAI'
+    ).length
+
+  const tidak =
+    filtered.filter(
+      (item) =>
+        item.status ===
+        'TIDAK_DIDANAI'
+    ).length
+
+  const formatDate =
+    (
+      value: string
+    ) => {
+      const date =
+        new Date(value)
+
+      if (
+        Number.isNaN(
+          date.getTime()
+        )
+      ) {
+        return '-'
+      }
+
+      return date.toLocaleDateString(
+        'id-ID',
+        {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }
+      )
+    }
+
+  const exportCSV =
+    () => {
+      const header = [
+        'Ranking',
+        'Nama Mustahik',
+        'NIK',
+        'Nilai TOPSIS',
+        'Keputusan',
+        'Tanggal Proses',
+      ]
+
+      const rows =
+        filtered.map(
+          (item) => [
+            item.ranking,
+            item
+              .pengajuan
+              .mustahik
+              .namaLengkap,
+            item
+              .pengajuan
+              .mustahik
+              .nik,
+            Number(
+              item.nilaiPreferensi
+            ).toFixed(
+              4
+            ),
+            item.status,
+            formatDate(
+              item.tanggalProses
+            ),
+          ]
+        )
+
+      const csv = [
+        header,
+        ...rows,
+      ]
+        .map(
+          (row) =>
+            row
+              .map(
+                (value) =>
+                  `"${String(
+                    value
+                  ).replace(
+                    /"/g,
+                    '""'
+                  )}"`
+              )
+              .join(',')
+        )
+        .join('\n')
+
+      const blob =
+        new Blob(
+          [csv],
+          {
+            type:
+              'text/csv;charset=utf-8;',
+          }
+        )
+
+      const url =
+        URL.createObjectURL(
+          blob
+        )
+
+      const link =
+        document.createElement(
+          'a'
+        )
+
+      link.href =
+        url
+
+      link.download =
+        `laporan-topsis-${year}.csv`
+
+      document.body.appendChild(
+        link
+      )
+
+      link.click()
+
+      link.remove()
+
+      URL.revokeObjectURL(
+        url
+      )
+    }
+
+  const columns:
+    Column<AdminTopsisResult>[] =
+    [
+      {
+        key:
+          'ranking',
+
+        header:
+          'Rank',
+
+        render: (
+          row
+        ) => (
+          <span className="font-bold">
+            #
+            {
+              row.ranking
+            }
+          </span>
+        ),
+      },
+
+      {
+        key:
+          'namaLengkap',
+
+        header:
+          'Nama Mustahik',
+
+        render: (
+          row
+        ) => (
+          <span className="font-semibold">
+            {
+              row
+                .pengajuan
+                .mustahik
+                .namaLengkap
+            }
+          </span>
+        ),
+      },
+
+      {
+        key:
+          'nilaiPreferensi',
+
+        header:
+          'Nilai TOPSIS',
+
+        render: (
+          row
+        ) => (
+          <span className="font-mono font-bold text-green-700">
+            {Number(
+              row.nilaiPreferensi
+            ).toFixed(
+              4
+            )}
+          </span>
+        ),
+      },
+
+      {
+        key: 'status',
+
+        header:
+          'Keputusan',
+
+        render: (
+          row
+        ) => (
+          <span
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+              row.status ===
+              'LAYAK_DIDANAI'
+                ? 'bg-green-100 text-green-700 border border-green-300'
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}
+          >
+            {row.status ===
+            'LAYAK_DIDANAI'
+              ? 'LAYAK DIDANAI'
+              : 'TIDAK DIDANAI'}
+          </span>
+        ),
+      },
+
+      {
+        key:
+          'tanggalProses',
+
+        header:
+          'Tgl Keputusan',
+
+        render: (
+          row
+        ) =>
+          formatDate(
+            row.tanggalProses
+          ),
+      },
+    ]
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Laporan & Rekapitulasi" description="Cetak dan ekspor laporan kelayakan mustahik">
+      <PageHeader
+        title="Laporan & Rekapitulasi"
+        description="Cetak dan ekspor laporan kelayakan mustahik berdasarkan hasil TOPSIS"
+      >
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => window.print()} className="dark:bg-slate-900 dark:text-slate-100 dark:border-slate-800">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              window.print()
+            }
+          >
             <Printer className="w-4 h-4 mr-2" />
+
             Cetak PDF
           </Button>
-          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+
+          <Button
+            size="sm"
+            onClick={
+              exportCSV
+            }
+            disabled={
+              filtered.length ===
+              0
+            }
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
             <Download className="w-4 h-4 mr-2" />
+
             Export Excel
           </Button>
         </div>
       </PageHeader>
 
-      {/* Filter Section */}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex justify-between items-center">
+          <span>
+            {error}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={
+              load
+            }
+          >
+            <RefreshCw className="w-4 h-4 mr-1" />
+
+            Coba Lagi
+          </Button>
+        </div>
+      )}
+
       <Card>
         <CardContent className="py-4 flex flex-col sm:flex-row gap-4">
           <div className="flex items-center gap-2 flex-1">
-            <Filter className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Filter Laporan:</span>
+            <Filter className="w-4 h-4 text-slate-400" />
+
+            <span className="text-sm font-semibold">
+              Filter Laporan:
+            </span>
           </div>
-          <Select value={periode} onValueChange={setPeriode}>
-            <SelectTrigger className="w-full sm:w-40 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700">
+
+          <Select
+            value={year}
+            onValueChange={
+              setYear
+            }
+          >
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
-              <SelectItem value="2024">Tahun 2024</SelectItem>
-              <SelectItem value="2023">Tahun 2023</SelectItem>
+
+            <SelectContent>
+              <SelectItem value="all">
+                Semua Tahun
+              </SelectItem>
+
+              {years.map(
+                (item) => (
+                  <SelectItem
+                    key={
+                      item
+                    }
+                    value={
+                      item
+                    }
+                  >
+                    Tahun{' '}
+                    {
+                      item
+                    }
+                  </SelectItem>
+                )
+              )}
             </SelectContent>
           </Select>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-full sm:w-44 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700">
+
+          <Select
+            value={status}
+            onValueChange={
+              setStatus
+            }
+          >
+            <SelectTrigger className="w-full sm:w-44">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
-              <SelectItem value="all">Semua Status</SelectItem>
-              <SelectItem value="layak">Layak Didanai</SelectItem>
-              <SelectItem value="tidak_layak">Tidak Didanai</SelectItem>
+
+            <SelectContent>
+              <SelectItem value="all">
+                Semua Status
+              </SelectItem>
+
+              <SelectItem value="LAYAK_DIDANAI">
+                Layak Didanai
+              </SelectItem>
+
+              <SelectItem value="TIDAK_DIDANAI">
+                Tidak Didanai
+              </SelectItem>
             </SelectContent>
           </Select>
         </CardContent>
       </Card>
 
-      {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="py-4 text-center">
-            <p className="text-xs text-slate-500 dark:text-slate-400">Total Dievaluasi</p>
-            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{mockTopsisResults.length} Mustahik</p>
-          </CardContent>
-        </Card>
-        <Card className="border-green-200 dark:border-green-900 bg-green-50/30 dark:bg-green-950/20">
-          <CardContent className="py-4 text-center">
-            <p className="text-xs text-green-700 dark:text-green-400 font-medium">Lolos & Layak Didanai</p>
-            <p className="text-2xl font-bold text-green-700 dark:text-green-400 mt-1">
-              {mockTopsisResults.filter((r) => r.status === 'LAYAK_DIDANAI').length} Mustahik
+            <p className="text-xs text-slate-500">
+              Total Dievaluasi
+            </p>
+
+            <p className="text-2xl font-bold mt-1">
+              {
+                filtered.length
+              }{' '}
+              Mustahik
             </p>
           </CardContent>
         </Card>
-        <Card className="border-red-200 dark:border-red-900 bg-red-50/30 dark:bg-red-950/20">
+
+        <Card className="border-green-200 bg-green-50/30">
           <CardContent className="py-4 text-center">
-            <p className="text-xs text-red-700 dark:text-red-400 font-medium">Tidak Didanai</p>
-            <p className="text-2xl font-bold text-red-700 dark:text-red-400 mt-1">
-              {mockTopsisResults.filter((r) => r.status === 'TIDAK_DIDANAI').length} Mustahik
+            <p className="text-xs text-green-700 font-medium">
+              Lolos & Layak Didanai
+            </p>
+
+            <p className="text-2xl font-bold text-green-700 mt-1">
+              {layak}{' '}
+              Mustahik
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-red-200 bg-red-50/30">
+          <CardContent className="py-4 text-center">
+            <p className="text-xs text-red-700 font-medium">
+              Tidak Didanai
+            </p>
+
+            <p className="text-2xl font-bold text-red-700 mt-1">
+              {tidak}{' '}
+              Mustahik
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <DataTable columns={columns} data={filtered} />
+      <Card>
+        <CardContent className="p-0 overflow-x-auto">
+          {loading ? (
+            <div className="py-16 flex justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+            </div>
+          ) : (
+            <DataTable
+              columns={
+                columns
+              }
+              data={
+                filtered
+              }
+              emptyMessage="Belum ada hasil TOPSIS di database"
+            />
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
