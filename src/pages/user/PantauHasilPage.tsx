@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useMemo,
   useState,
 } from 'react'
 
@@ -53,16 +52,7 @@ import type {
   StatusPengajuan,
 } from '@/types'
 
-import axios from 'axios'
-
-
-// ============================================================
-// API
-// ============================================================
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  'http://localhost:5000/api'
+import api from '@/lib/api'
 
 
 // ============================================================
@@ -142,6 +132,8 @@ interface PengajuanDatabase {
     nik: string
   }
 
+  jawaban?: unknown[]
+
   topsisResults?:
     TopsisResult[]
 
@@ -165,20 +157,34 @@ interface PengajuanDatabase {
 
 
 // ============================================================
-// HELPERS
+// HELPER DATE
 // ============================================================
 
-function getAuthHeaders() {
-  const token =
-    localStorage.getItem(
-      'spk_token'
-    )
+function safeFormatDate(
+  value:
+    | string
+    | null
+    | undefined
+) {
+  if (!value) {
+    return '-'
+  }
 
-  return {
-    Authorization:
-      token
-        ? `Bearer ${token}`
-        : '',
+  try {
+    const date =
+      new Date(value)
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+      return '-'
+    }
+
+    return formatDate(value)
+  } catch {
+    return '-'
   }
 }
 
@@ -203,6 +209,7 @@ function isVerificationFinished(
   status: StatusPengajuan
 ) {
   return [
+    'LOLOS_VERIFIKASI',
     'PERLU_PERBAIKAN',
     'DITOLAK',
     'DIPROSES_TOPSIS',
@@ -229,6 +236,10 @@ function isTopsisStarted(
 
 export function PantauHasilPage() {
 
+  // ==========================================================
+  // SEMUA HOOK HARUS BERADA DI ATAS
+  // ==========================================================
+
   const {
     currentUser,
   } = useAuth()
@@ -241,10 +252,6 @@ export function PantauHasilPage() {
   } = usePengajuan()
 
 
-  // ==========================================================
-  // STATE
-  // ==========================================================
-
   const [
     detail,
     setDetail,
@@ -253,11 +260,13 @@ export function PantauHasilPage() {
       null
     )
 
+
   const [
     loading,
     setLoading,
   ] =
     useState(true)
+
 
   const [
     error,
@@ -269,25 +278,25 @@ export function PantauHasilPage() {
 
 
   // ==========================================================
-  // LOAD DATA DATABASE
+  // LOAD DATA DARI DATABASE
   // ==========================================================
 
   useEffect(() => {
 
     let mounted = true
 
+
     const load =
       async () => {
 
-        const token =
-          localStorage.getItem(
-            'spk_token'
-          )
+        // ----------------------------------------------------
+        // Pastikan user sudah login
+        // ----------------------------------------------------
 
         if (
-          !token ||
           !currentUser
         ) {
+
           if (mounted) {
             setLoading(false)
           }
@@ -304,17 +313,13 @@ export function PantauHasilPage() {
           }
 
 
-          // ==================================================
-          // 1. AMBIL SEMUA PENGAJUAN USER
-          // ==================================================
+          // --------------------------------------------------
+          // Ambil seluruh pengajuan user
+          // --------------------------------------------------
 
           const listResponse =
-            await axios.get(
-              `${API_URL}/pengajuan/me`,
-              {
-                headers:
-                  getAuthHeaders(),
-              }
+            await api.get(
+              '/pengajuan/me'
             )
 
 
@@ -332,30 +337,41 @@ export function PantauHasilPage() {
               : []
 
 
-          // ==================================================
-          // 2. CARI PENGAJUAN YANG AKAN DIPANTAU
-          // ==================================================
-          //
-          // Prioritas:
-          //
-          // 1. Pengajuan yang sedang tersimpan di Context
-          // 2. Kalau tidak ada, ambil pengajuan terbaru
-          //
-          // ==================================================
+          // --------------------------------------------------
+          // Cari pengajuan yang aktif di Context
+          // --------------------------------------------------
 
-          let selected =
+          let selected:
+            | any
+            | null =
+            null
+
+
+          if (
             contextPengajuan?.id
-              ? list.find(
-                  (
-                    item: any
-                  ) =>
-                    item.id ===
-                    contextPengajuan.id
-                )
-              : null
+          ) {
+
+            selected =
+              list.find(
+                (
+                  item: any
+                ) =>
+                  item.id ===
+                  contextPengajuan.id
+              ) ||
+              null
+          }
 
 
-          if (!selected) {
+          // --------------------------------------------------
+          // Kalau Context tidak punya pengajuan,
+          // gunakan pengajuan terbaru.
+          // --------------------------------------------------
+
+          if (
+            !selected &&
+            list.length > 0
+          ) {
 
             const sorted =
               [...list].sort(
@@ -385,17 +401,19 @@ export function PantauHasilPage() {
                 }
               )
 
+
             selected =
-              sorted[0] ||
-              null
+              sorted[0]
           }
 
 
-          // ==================================================
-          // TIDAK ADA PENGAJUAN
-          // ==================================================
+          // --------------------------------------------------
+          // Tidak ada pengajuan
+          // --------------------------------------------------
 
-          if (!selected?.id) {
+          if (
+            !selected?.id
+          ) {
 
             if (mounted) {
               setDetail(null)
@@ -406,29 +424,13 @@ export function PantauHasilPage() {
           }
 
 
-          // ==================================================
-          // 3. AMBIL DETAIL TERBARU
-          // ==================================================
-          //
-          // Ini penting supaya:
-          //
-          // Admin mengubah status
-          //       ↓
-          // User refresh / buka Pantau Hasil
-          //       ↓
-          // Data langsung dari database
-          //
-          // Bukan dari mockData.
-          //
-          // ==================================================
+          // --------------------------------------------------
+          // Ambil DETAIL terbaru dari database
+          // --------------------------------------------------
 
           const detailResponse =
-            await axios.get(
-              `${API_URL}/pengajuan/${selected.id}`,
-              {
-                headers:
-                  getAuthHeaders(),
-              }
+            await api.get(
+              `/pengajuan/${selected.id}`
             )
 
 
@@ -446,14 +448,15 @@ export function PantauHasilPage() {
           }
 
 
-          // ==================================================
-          // VALIDASI USER
-          // ==================================================
+          // --------------------------------------------------
+          // Pastikan pengajuan milik user login
+          // --------------------------------------------------
 
           if (
             latest.userId !==
             currentUser.id
           ) {
+
             throw new Error(
               'Anda tidak memiliki akses ke pengajuan ini.'
             )
@@ -465,18 +468,18 @@ export function PantauHasilPage() {
           }
 
 
-          // ==================================================
-          // SIMPAN DATA TERBARU
-          // ==================================================
+          // --------------------------------------------------
+          // Simpan data terbaru
+          // --------------------------------------------------
 
           setDetail(
             latest
           )
 
 
-          // ==================================================
-          // SINKRONKAN CONTEXT
-          // ==================================================
+          // --------------------------------------------------
+          // Sinkronkan Context
+          // --------------------------------------------------
 
           setPengajuan({
             id:
@@ -490,16 +493,24 @@ export function PantauHasilPage() {
 
             namaLengkap:
               latest
-                .mustahik
+                ?.mustahik
                 ?.namaLengkap ||
-              selected.namaLengkap ||
+              selected
+                ?.mustahik
+                ?.namaLengkap ||
+              selected
+                ?.namaLengkap ||
               '',
 
             nik:
               latest
-                .mustahik
+                ?.mustahik
                 ?.nik ||
-              selected.nik ||
+              selected
+                ?.mustahik
+                ?.nik ||
+              selected
+                ?.nik ||
               '',
 
             status:
@@ -562,6 +573,7 @@ export function PantauHasilPage() {
   }, [
     currentUser?.id,
     contextPengajuan?.id,
+    setPengajuan,
   ])
 
 
@@ -583,7 +595,12 @@ export function PantauHasilPage() {
 
           <CardContent className="py-16">
 
-            <div className="flex flex-col items-center justify-center">
+            <div className="
+              flex
+              flex-col
+              items-center
+              justify-center
+            ">
 
               <Loader2
                 className="
@@ -629,7 +646,12 @@ export function PantauHasilPage() {
 
         <Card>
 
-          <CardContent className="py-16 text-center">
+          <CardContent
+            className="
+              py-16
+              text-center
+            "
+          >
 
             <div className="
               w-16
@@ -653,6 +675,7 @@ export function PantauHasilPage() {
 
             </div>
 
+
             <h3 className="
               text-lg
               font-semibold
@@ -661,6 +684,7 @@ export function PantauHasilPage() {
               Gagal Memuat Data
             </h3>
 
+
             <p className="
               text-sm
               text-red-500
@@ -668,6 +692,7 @@ export function PantauHasilPage() {
             ">
               {error}
             </p>
+
 
             <Button
               className="mt-6"
@@ -703,7 +728,12 @@ export function PantauHasilPage() {
 
         <Card>
 
-          <CardContent className="py-16 text-center">
+          <CardContent
+            className="
+              py-16
+              text-center
+            "
+          >
 
             <div className="
               w-16
@@ -727,6 +757,7 @@ export function PantauHasilPage() {
 
             </div>
 
+
             <h3 className="
               text-lg
               font-semibold
@@ -734,6 +765,7 @@ export function PantauHasilPage() {
             ">
               Belum Ada Pengajuan
             </h3>
+
 
             <p className="
               text-sm
@@ -747,6 +779,7 @@ export function PantauHasilPage() {
               Silakan buat pengajuan
               terlebih dahulu.
             </p>
+
 
             <Button
               asChild
@@ -769,15 +802,11 @@ export function PantauHasilPage() {
 
 
   // ==========================================================
-  // DATA
+  // DATA PENGAJUAN
   // ==========================================================
 
   const status =
     detail.status
-
-
-  const mustahik =
-    detail.mustahik
 
 
   const topsisResults =
@@ -788,13 +817,19 @@ export function PantauHasilPage() {
       : []
 
 
-  // Karena backend mengurutkan
-  // tanggalProses DESC,
-  // index 0 adalah hasil terbaru.
+  // Backend sudah mengurutkan
+  // tanggalProses DESC.
+  //
+  // Jadi index 0 = hasil TOPSIS terbaru.
+
   const topsis =
     topsisResults[0] ||
     null
 
+
+  // ==========================================================
+  // STATUS
+  // ==========================================================
 
   const finalStatus =
     isFinalStatus(
@@ -835,7 +870,7 @@ export function PantauHasilPage() {
 
 
   // ==========================================================
-  // HASIL TOPSIS
+  // NILAI TOPSIS
   // ==========================================================
 
   const nilaiPreferensi =
@@ -846,145 +881,138 @@ export function PantauHasilPage() {
       : null
 
 
+  const nilaiPreferensiValid =
+    nilaiPreferensi !== null &&
+    Number.isFinite(
+      nilaiPreferensi
+    )
+
+
   // ==========================================================
   // TIMELINE
   // ==========================================================
   //
-  // Database saat ini mempunyai:
+  // PENTING:
   //
-  // tanggalPengajuan
-  // tanggalVerifikasi
-  // topsisResults[].tanggalProses
+  // Ini BUKAN useMemo.
   //
-  // Jadi timeline dibuat berdasarkan
-  // data yang benar-benar tersedia.
+  // Semua Hook sudah selesai
+  // sebelum conditional return.
+  //
+  // Jadi tidak akan terjadi:
+  //
+  // Render 1 = 4 hooks
+  // Render 2 = 5 hooks
   //
   // ==========================================================
 
-  const timeline =
-    useMemo(() => {
+  const timeline = [
+    {
+      label:
+        'Pengajuan Dibuat',
 
-      const result = [
-        {
-          label:
-            'Pengajuan Dibuat',
+      date:
+        detail.tanggalPengajuan,
 
-          date:
-            detail.tanggalPengajuan,
+      completed:
+        true,
 
-          completed:
-            true,
+      current:
+        status ===
+        'DRAFT',
 
-          current:
-            status ===
-              'DRAFT',
+      type:
+        'normal',
+    },
 
-          type:
-            'normal',
-        },
+    {
+      label:
+        'Menunggu Verifikasi',
 
-        {
-          label:
-            'Menunggu Verifikasi',
+      date:
+        detail.tanggalPengajuan,
 
-          date:
-            detail.tanggalPengajuan,
+      completed:
+        status !==
+        'DRAFT',
 
-          completed:
-            status !==
-            'DRAFT',
+      current:
+        status ===
+          'MENUNGGU_VERIFIKASI' ||
+        status ===
+          'SEDANG_DIVERIFIKASI',
 
-          current:
-            status ===
-              'MENUNGGU_VERIFIKASI' ||
-            status ===
-              'SEDANG_DIVERIFIKASI',
+      type:
+        'normal',
+    },
 
-          type:
-            'normal',
-        },
+    {
+      label:
+        'Verifikasi Selesai',
 
-        {
-          label:
-            'Verifikasi Selesai',
+      date:
+        detail.tanggalVerifikasi,
 
-          date:
-            detail.tanggalVerifikasi,
+      completed:
+        verificationFinished,
 
-          completed:
-            verificationFinished,
+      current:
+        isPerluPerbaikan ||
+        isDitolak,
 
-          current:
-            isPerluPerbaikan ||
-            isDitolak,
+      type:
+        isPerluPerbaikan
+          ? 'warning'
+          : isDitolak
+          ? 'danger'
+          : 'normal',
+    },
 
-          type:
-            isPerluPerbaikan
-              ? 'warning'
-              : isDitolak
-              ? 'danger'
-              : 'normal',
-        },
+    {
+      label:
+        'Proses TOPSIS',
 
-        {
-          label:
-            'Proses TOPSIS',
+      date:
+        topsis
+          ?.tanggalProses ||
+        null,
 
-          date:
-            topsis
+      completed:
+        finalStatus,
+
+      current:
+        status ===
+        'DIPROSES_TOPSIS',
+
+      type:
+        'topsis',
+    },
+
+    {
+      label:
+        'Hasil Akhir',
+
+      date:
+        finalStatus
+          ? topsis
               ?.tanggalProses ||
-            null,
+            null
+          : null,
 
-          completed:
-            finalStatus,
+      completed:
+        finalStatus,
 
-          current:
-            status ===
-            'DIPROSES_TOPSIS',
+      current:
+        false,
 
-          type:
-            'topsis',
-        },
-
-        {
-          label:
-            'Hasil Akhir',
-
-          date:
-            finalStatus
-              ? topsis
-                  ?.tanggalProses
-              : null,
-
-          completed:
-            finalStatus,
-
-          current:
-            false,
-
-          type:
-            isLayak
-              ? 'success'
-              : isTidakLayak
-              ? 'danger'
-              : 'normal',
-        },
-      ]
-
-      return result
-
-    }, [
-      detail.tanggalPengajuan,
-      detail.tanggalVerifikasi,
-      status,
-      topsis?.tanggalProses,
-      finalStatus,
-      verificationFinished,
-      isPerluPerbaikan,
-      isDitolak,
-      isLayak,
-      isTidakLayak,
-    ])
+      type:
+        isLayak
+          ? 'success'
+          : isTidakLayak
+          ? 'danger'
+          : 'normal',
+    },
+  ]
 
 
   // ==========================================================
@@ -1001,15 +1029,22 @@ export function PantauHasilPage() {
     />
   )
 
+
   let statusIconClass =
     'bg-slate-100'
+
 
   let statusTitle =
     'Pengajuan Anda Sedang Diproses'
 
+
   let statusDescription =
     'Pengajuan Anda sedang dalam tahap proses. Silakan pantau secara berkala.'
 
+
+  // ----------------------------------------------------------
+  // LAYAK DIDANAI
+  // ----------------------------------------------------------
 
   if (isLayak) {
 
@@ -1034,6 +1069,10 @@ export function PantauHasilPage() {
   }
 
 
+  // ----------------------------------------------------------
+  // TIDAK DIDANAI
+  // ----------------------------------------------------------
+
   if (isTidakLayak) {
 
     statusIcon = (
@@ -1056,6 +1095,10 @@ export function PantauHasilPage() {
       'Pengajuan Anda telah selesai diproses menggunakan metode TOPSIS dan hasil akhirnya belum memenuhi batas kelayakan pendanaan.'
   }
 
+
+  // ----------------------------------------------------------
+  // DITOLAK
+  // ----------------------------------------------------------
 
   if (isDitolak) {
 
@@ -1081,7 +1124,13 @@ export function PantauHasilPage() {
   }
 
 
-  if (isPerluPerbaikan) {
+  // ----------------------------------------------------------
+  // PERLU PERBAIKAN
+  // ----------------------------------------------------------
+
+  if (
+    isPerluPerbaikan
+  ) {
 
     statusIcon = (
       <AlertCircle
@@ -1104,6 +1153,10 @@ export function PantauHasilPage() {
       'Pengajuan Anda memerlukan perbaikan berdasarkan hasil verifikasi admin.'
   }
 
+
+  // ----------------------------------------------------------
+  // DIPROSES TOPSIS
+  // ----------------------------------------------------------
 
   if (
     status ===
@@ -1149,7 +1202,7 @@ export function PantauHasilPage() {
 
 
       {/* ======================================================
-          STATUS
+          STATUS PENGAJUAN
       ======================================================= */}
 
       <Card
@@ -1163,9 +1216,15 @@ export function PantauHasilPage() {
         }
       >
 
-        <CardContent className="pt-6">
+        <CardContent
+          className="pt-6"
+        >
 
-          <div className="flex items-start gap-4">
+          <div className="
+            flex
+            items-start
+            gap-4
+          ">
 
             <div
               className={`
@@ -1187,6 +1246,7 @@ export function PantauHasilPage() {
                 className="mb-2"
               />
 
+
               <h2 className="
                 text-lg
                 font-bold
@@ -1194,6 +1254,7 @@ export function PantauHasilPage() {
               ">
                 {statusTitle}
               </h2>
+
 
               <p className="
                 text-sm
@@ -1213,7 +1274,7 @@ export function PantauHasilPage() {
 
 
       {/* ======================================================
-          TOPSIS RESULT
+          HASIL TOPSIS
       ======================================================= */}
 
       {topsisStage && (
@@ -1272,10 +1333,13 @@ export function PantauHasilPage() {
                   font-bold
                   text-amber-600
                 ">
-                  #
-                  {topsis?.ranking ??
-                    '-'}
+
+                  {topsis
+                    ? `#${topsis.ranking}`
+                    : '-'}
+
                 </div>
+
 
                 <p className="
                   text-xs
@@ -1308,14 +1372,14 @@ export function PantauHasilPage() {
                   text-green-600
                 ">
 
-                  {nilaiPreferensi !==
-                  null
-                    ? nilaiPreferensi.toFixed(
+                  {nilaiPreferensiValid
+                    ? nilaiPreferensi!.toFixed(
                         3
                       )
                     : '-'}
 
                 </div>
+
 
                 <p className="
                   text-xs
@@ -1364,15 +1428,18 @@ export function PantauHasilPage() {
 
                 </div>
 
+
                 <p className="
                   text-xs
                   text-slate-500
                   mt-1
                   font-medium
                 ">
+
                   {topsis
                     ? 'Status Kelayakan'
                     : 'Menunggu proses TOPSIS oleh admin'}
+
                 </p>
 
               </div>
@@ -1380,9 +1447,9 @@ export function PantauHasilPage() {
             </div>
 
 
-            {/* ============================================
-                TANGGAL PROSES
-            ============================================= */}
+            {/* ==============================================
+                TANGGAL PROSES TOPSIS
+            =============================================== */}
 
             {topsis?.tanggalProses && (
 
@@ -1393,13 +1460,17 @@ export function PantauHasilPage() {
                 text-center
               ">
                 Proses TOPSIS dilakukan pada{' '}
-                {formatDate(
+                {safeFormatDate(
                   topsis.tanggalProses
                 )}
               </p>
 
             )}
 
+
+            {/* ==============================================
+                BELUM ADA HASIL TOPSIS
+            =============================================== */}
 
             {!topsis &&
               status ===
@@ -1427,7 +1498,7 @@ export function PantauHasilPage() {
 
 
       {/* ======================================================
-          TIMELINE
+          RIWAYAT STATUS
       ======================================================= */}
 
       <Card>
@@ -1456,18 +1527,34 @@ export function PantauHasilPage() {
                   timeline.length -
                     1
 
+
                 const dotClass =
                   item.current
-                    ? 'border-purple-500 bg-purple-500'
+                    ? `
+                      border-purple-500
+                      bg-purple-500
+                    `
                     : item.completed
                     ? item.type ===
                       'danger'
-                      ? 'border-red-500 bg-red-500'
+                      ? `
+                        border-red-500
+                        bg-red-500
+                      `
                       : item.type ===
                         'warning'
-                      ? 'border-orange-500 bg-orange-500'
-                      : 'border-green-500 bg-green-500'
-                    : 'border-slate-300 bg-white'
+                      ? `
+                        border-orange-500
+                        bg-orange-500
+                      `
+                      : `
+                        border-green-500
+                        bg-green-500
+                      `
+                    : `
+                      border-slate-300
+                      bg-white
+                    `
 
 
                 const lineClass =
@@ -1487,9 +1574,9 @@ export function PantauHasilPage() {
                     "
                   >
 
-                    {/* ======================================
+                    {/* ====================================
                         DOT
-                    ======================================= */}
+                    ===================================== */}
 
                     <div className="
                       flex
@@ -1508,6 +1595,7 @@ export function PantauHasilPage() {
                         `}
                       />
 
+
                       {!isLast && (
 
                         <div
@@ -1523,9 +1611,9 @@ export function PantauHasilPage() {
                     </div>
 
 
-                    {/* ======================================
+                    {/* ====================================
                         TEXT
-                    ======================================= */}
+                    ===================================== */}
 
                     <div className="pb-6">
 
@@ -1541,9 +1629,12 @@ export function PantauHasilPage() {
                           }
                         `}
                       >
+
                         {item.label}
 
+
                         {item.current && (
+
                           <span className="
                             ml-2
                             text-xs
@@ -1551,7 +1642,9 @@ export function PantauHasilPage() {
                           ">
                             • Sedang diproses
                           </span>
+
                         )}
+
                       </p>
 
 
@@ -1560,13 +1653,15 @@ export function PantauHasilPage() {
                         text-slate-400
                         mt-0.5
                       ">
+
                         {item.date
-                          ? formatDate(
+                          ? safeFormatDate(
                               item.date
                             )
                           : item.current
                           ? 'Sedang diproses'
                           : '-'}
+
                       </p>
 
                     </div>
@@ -1584,7 +1679,7 @@ export function PantauHasilPage() {
 
 
       {/* ======================================================
-          DETAIL
+          DETAIL LENGKAP
       ======================================================= */}
 
       <Button
