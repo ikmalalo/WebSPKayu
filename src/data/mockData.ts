@@ -7,104 +7,459 @@ import type {
   TopsisResult,
   SummaryStats,
   Verifikasi,
-} from '@/types';
+} from '@/types'
 
-// ===== PERSISTENT STORE HELPERS (using Proxy to localStorage) =====
-function createPersistentArray<T>(key: string, initialData: T[]): T[] {
+// ============================================================
+// PERSISTENT STORE HELPERS
+// ============================================================
+
+/**
+ * Persistent array yang tersimpan di localStorage.
+ *
+ * Perbaikan penting:
+ * - Memastikan data yang dibaca selalu ARRAY.
+ * - Jika localStorage berisi OBJECT dari versi lama,
+ *   object tersebut akan dimigrasikan menjadi array.
+ * - Jika JSON rusak, data dikembalikan ke initialData.
+ * - Mendukung .find(), .filter(), .map(), .push(),
+ *   .splice(), .findIndex(), dll.
+ */
+function createPersistentArray<T>(
+  key: string,
+  initialData: T[]
+): T[] {
   const getStored = (): T[] => {
-    if (typeof window === 'undefined') return initialData;
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
-        return initialData;
-      }
+    // SSR / non-browser
+    if (
+      typeof window === 'undefined'
+    ) {
+      return [...initialData]
     }
-    localStorage.setItem(key, JSON.stringify(initialData));
-    return [...initialData];
-  };
 
-  const target = getStored();
+    const stored =
+      localStorage.getItem(key)
 
-  return new Proxy(target, {
-    get(target, prop, receiver) {
-      const current = getStored();
-      const value = Reflect.get(current, prop);
-      if (typeof value === 'function') {
-        return function(this: any, ...args: any[]) {
-          const result = value.apply(current, args);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(key, JSON.stringify(current));
-          }
-          target.length = 0;
-          target.push(...current);
-          return result;
-        };
-      }
-      return value;
-    },
-    set(target, prop, value, receiver) {
-      const current = getStored();
-      const result = Reflect.set(current, prop, value);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(key, JSON.stringify(current));
-      }
-      target.length = 0;
-      target.push(...current);
-      return result;
+    // ========================================================
+    // BELUM ADA DATA
+    // ========================================================
+
+    if (!stored) {
+      const freshData = [
+        ...initialData,
+      ]
+
+      localStorage.setItem(
+        key,
+        JSON.stringify(freshData)
+      )
+
+      return freshData
     }
-  });
-}
 
-function createPersistentObject<T extends object>(key: string, initialData: T): T {
-  const getStored = (): T => {
-    if (typeof window === 'undefined') return initialData;
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
-        return initialData;
+    try {
+      const parsed =
+        JSON.parse(stored)
+
+      // ======================================================
+      // DATA NORMAL: SUDAH ARRAY
+      // ======================================================
+
+      if (
+        Array.isArray(parsed)
+      ) {
+        return parsed as T[]
       }
-    }
-    localStorage.setItem(key, JSON.stringify(initialData));
-    return { ...initialData };
-  };
 
-  const target = getStored();
+      // ======================================================
+      // MIGRASI DATA LAMA
+      //
+      // Versi lama bisa saja menyimpan:
+      //
+      // spk_pengajuan = {
+      //   id: "...",
+      //   userId: "...",
+      //   ...
+      // }
+      //
+      // Padahal seharusnya:
+      //
+      // spk_pengajuan = [
+      //   {...},
+      //   {...}
+      // ]
+      // ======================================================
 
-  return new Proxy(target, {
-    get(target, prop) {
-      const current = getStored();
-      return Reflect.get(current, prop);
-    },
-    set(target, prop, value) {
-      const current = getStored();
-      const result = Reflect.set(current, prop, value);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(key, JSON.stringify(current));
+      if (
+        parsed !== null &&
+        typeof parsed ===
+          'object'
+      ) {
+        const oldObject =
+          parsed as Partial<T>
+
+        /*
+         * Kalau object mempunyai ID,
+         * anggap sebagai data lama yang
+         * masih valid dan masukkan ke array.
+         */
+        if (
+          'id' in oldObject &&
+          oldObject.id
+        ) {
+          const migratedData = [
+            ...initialData,
+            parsed as T,
+          ]
+
+          /*
+           * Hindari duplicate berdasarkan ID.
+           */
+          const uniqueData =
+            migratedData.filter(
+              (
+                item,
+                index,
+                array
+              ) => {
+                const itemId =
+                  (
+                    item as {
+                      id?: unknown
+                    }
+                  )?.id
+
+                if (
+                  itemId ===
+                  undefined
+                ) {
+                  return true
+                }
+
+                return (
+                  array.findIndex(
+                    (
+                      compareItem
+                    ) => {
+                      const compareId =
+                        (
+                          compareItem as {
+                            id?: unknown
+                          }
+                        )?.id
+
+                      return (
+                        compareId ===
+                        itemId
+                      )
+                    }
+                  ) === index
+                )
+              }
+            )
+
+          localStorage.setItem(
+            key,
+            JSON.stringify(
+              uniqueData
+            )
+          )
+
+          return uniqueData
+        }
       }
-      return result;
-    }
-  });
-}
 
-export const resetAllData = () => {
-  if (typeof window !== 'undefined') {
-    localStorage.clear();
-    window.location.reload();
+      // ======================================================
+      // DATA TIDAK VALID
+      // ======================================================
+
+      const resetData = [
+        ...initialData,
+      ]
+
+      localStorage.setItem(
+        key,
+        JSON.stringify(
+          resetData
+        )
+      )
+
+      return resetData
+    } catch (error) {
+      console.error(
+        `Gagal membaca ${key} dari localStorage:`,
+        error
+      )
+
+      const resetData = [
+        ...initialData,
+      ]
+
+      localStorage.setItem(
+        key,
+        JSON.stringify(
+          resetData
+        )
+      )
+
+      return resetData
+    }
   }
-};
 
-// ===== MOCK USERS =====
+  const target =
+    getStored()
+
+  return new Proxy(
+    target,
+    {
+      get(
+        target,
+        prop
+      ) {
+        const current =
+          getStored()
+
+        const value =
+          Reflect.get(
+            current,
+            prop
+          )
+
+        /*
+         * Method array:
+         *
+         * find
+         * filter
+         * map
+         * push
+         * pop
+         * splice
+         * findIndex
+         * etc.
+         */
+        if (
+          typeof value ===
+          'function'
+        ) {
+          return function (
+            this: unknown,
+            ...args: unknown[]
+          ) {
+            const result =
+              (
+                value as Function
+              ).apply(
+                current,
+                args
+              )
+
+            /*
+             * Simpan hasil perubahan
+             * ke localStorage.
+             */
+            if (
+              typeof window !==
+              'undefined'
+            ) {
+              localStorage.setItem(
+                key,
+                JSON.stringify(
+                  current
+                )
+              )
+            }
+
+            /*
+             * Sinkronkan target Proxy.
+             */
+            target.length = 0
+
+            target.push(
+              ...current
+            )
+
+            return result
+          }
+        }
+
+        return value
+      },
+
+      set(
+        target,
+        prop,
+        value
+      ) {
+        const current =
+          getStored()
+
+        const result =
+          Reflect.set(
+            current,
+            prop,
+            value
+          )
+
+        if (
+          typeof window !==
+          'undefined'
+        ) {
+          localStorage.setItem(
+            key,
+            JSON.stringify(
+              current
+            )
+          )
+        }
+
+        /*
+         * Sinkronkan target Proxy.
+         */
+        target.length = 0
+
+        target.push(
+          ...current
+        )
+
+        return result
+      },
+    }
+  )
+}
+
+/**
+ * Persistent object untuk data seperti SummaryStats.
+ */
+function createPersistentObject<
+  T extends object
+>(
+  key: string,
+  initialData: T
+): T {
+  const getStored = (): T => {
+    if (
+      typeof window ===
+      'undefined'
+    ) {
+      return {
+        ...initialData,
+      }
+    }
+
+    const stored =
+      localStorage.getItem(key)
+
+    if (stored) {
+      try {
+        const parsed =
+          JSON.parse(stored)
+
+        if (
+          parsed &&
+          typeof parsed ===
+            'object' &&
+          !Array.isArray(parsed)
+        ) {
+          return parsed as T
+        }
+      } catch (error) {
+        console.error(
+          `Gagal membaca ${key} dari localStorage:`,
+          error
+        )
+      }
+    }
+
+    const freshData = {
+      ...initialData,
+    }
+
+    localStorage.setItem(
+      key,
+      JSON.stringify(
+        freshData
+      )
+    )
+
+    return freshData
+  }
+
+  const target =
+    getStored()
+
+  return new Proxy(
+    target,
+    {
+      get(
+        target,
+        prop
+      ) {
+        const current =
+          getStored()
+
+        return Reflect.get(
+          current,
+          prop
+        )
+      },
+
+      set(
+        target,
+        prop,
+        value
+      ) {
+        const current =
+          getStored()
+
+        const result =
+          Reflect.set(
+            current,
+            prop,
+            value
+          )
+
+        if (
+          typeof window !==
+          'undefined'
+        ) {
+          localStorage.setItem(
+            key,
+            JSON.stringify(
+              current
+            )
+          )
+        }
+
+        return result
+      },
+    }
+  )
+}
+
+/**
+ * Reset seluruh data aplikasi.
+ */
+export const resetAllData =
+  () => {
+    if (
+      typeof window !==
+      'undefined'
+    ) {
+      localStorage.clear()
+      window.location.reload()
+    }
+  }
+
+// ============================================================
+// MOCK USERS
+// ============================================================
+
 const initialUsers: User[] = [
   {
     id: 'u1',
     name: 'Ikmal Ali',
     email: 'ikmal@example.com',
     phone: '08123456789',
-    role: 'user',
+    role: 'USER',
     createdAt: '2024-01-15',
   },
   {
@@ -112,7 +467,7 @@ const initialUsers: User[] = [
     name: 'Siti Rahayu',
     email: 'siti@example.com',
     phone: '08234567890',
-    role: 'user',
+    role: 'USER',
     createdAt: '2024-02-20',
   },
   {
@@ -120,7 +475,7 @@ const initialUsers: User[] = [
     name: 'Budi Santoso',
     email: 'budi@example.com',
     phone: '08345678901',
-    role: 'user',
+    role: 'USER',
     createdAt: '2024-03-10',
   },
   {
@@ -128,7 +483,7 @@ const initialUsers: User[] = [
     name: 'Dewi Lestari',
     email: 'dewi@example.com',
     phone: '08456789012',
-    role: 'user',
+    role: 'USER',
     createdAt: '2024-03-15',
   },
   {
@@ -136,7 +491,7 @@ const initialUsers: User[] = [
     name: 'Eko Prasetyo',
     email: 'eko@example.com',
     phone: '08567890123',
-    role: 'user',
+    role: 'USER',
     createdAt: '2024-04-01',
   },
   {
@@ -144,391 +499,870 @@ const initialUsers: User[] = [
     name: 'Admin Sistem',
     email: 'admin@spkmustahik.id',
     phone: '08111111111',
-    role: 'admin',
+    role: 'ADMIN',
     createdAt: '2024-01-01',
   },
-];
+]
 
-export const mockUsers = createPersistentArray<User>('spk_users', initialUsers);
+export const mockUsers =
+  createPersistentArray<User>(
+    'spk_users',
+    initialUsers
+  )
 
-// ===== CURRENT LOGGED IN USER (mock) =====
-export const currentUser: User = mockUsers[0];
-export const currentAdmin: User = mockUsers[5];
+// ============================================================
+// CURRENT LOGGED IN USER (MOCK)
+// ============================================================
 
-// ===== MOCK DATA MUSTAHIK =====
-const initialMustahik: DataMustahik[] = [
-  {
-    id: 'dm1',
-    userId: 'u1',
-    nik: '3201010101900001',
-    namaLengkap: 'Ikmal Ali',
-    tempatLahir: 'Kalimantan',
-    tanggalLahir: '1990-01-01',
-    jenisKelamin: 'L',
-    alamat: 'Jl. Merdeka No. 10',
-    kelurahan: 'Adadeh',
-    kecamatan: 'Kalimantan Timur',
-    kota: 'Kalimantan',
-    provinsi: 'Samarinda',
-    noHp: '08123456789',
-    statusPernikahan: 'menikah',
-    pekerjaan: 'Buruh Harian',
-    penghasilan: 1500000,
-    jumlahTanggungan: 4,
-    statusRumah: 'sewa',
-    kondisiRumah: 'sedang',
-    kepemilikanAset: 'tidak_ada',
-  },
-  {
-    id: 'dm2',
-    userId: 'u2',
-    nik: '3201010202850002',
-    namaLengkap: 'Siti Rahayu',
-    tempatLahir: 'Sukabumi',
-    tanggalLahir: '1985-02-02',
-    jenisKelamin: 'P',
-    alamat: 'Jl. Anggrek No. 5',
-    kelurahan: 'Babakan',
-    kecamatan: 'Cimahi Selatan',
-    kota: 'Cimahi',
-    provinsi: 'Samarinda',
-    noHp: '08234567890',
-    statusPernikahan: 'cerai_mati',
-    pekerjaan: 'Pedagang Kecil',
-    penghasilan: 900000,
-    jumlahTanggungan: 3,
-    statusRumah: 'menumpang',
-    kondisiRumah: 'buruk',
-    kepemilikanAset: 'tidak_ada',
-  },
-  {
-    id: 'dm3',
-    userId: 'u3',
-    nik: '3201010303920003',
-    namaLengkap: 'Budi Santoso',
-    tempatLahir: 'Bandung',
-    tanggalLahir: '1992-03-03',
-    jenisKelamin: 'L',
-    alamat: 'Jl. Kenari No. 12',
-    kelurahan: 'Cicendo',
-    kecamatan: 'Bandung Wetan',
-    kota: 'Bandung',
-    provinsi: 'Samarinda',
-    noHp: '08345678901',
-    statusPernikahan: 'menikah',
-    pekerjaan: 'Tukang Bangunan',
-    penghasilan: 2000000,
-    jumlahTanggungan: 2,
-    statusRumah: 'sewa',
-    kondisiRumah: 'sedang',
-    kepemilikanAset: 'tidak_ada',
-  },
-  {
-    id: 'dm4',
-    userId: 'u4',
-    nik: '3201010404880004',
-    namaLengkap: 'Dewi Lestari',
-    tempatLahir: 'Garut',
-    tanggalLahir: '1988-04-04',
-    jenisKelamin: 'P',
-    alamat: 'Jl. Mawar No. 3',
-    kelurahan: 'Tarogong',
-    kecamatan: 'Garut Kota',
-    kota: 'Garut',
-    provinsi: 'Samarinda',
-    noHp: '08456789012',
-    statusPernikahan: 'menikah',
-    pekerjaan: 'Ibu Rumah Tangga',
-    penghasilan: 800000,
-    jumlahTanggungan: 5,
-    statusRumah: 'menumpang',
-    kondisiRumah: 'buruk',
-    kepemilikanAset: 'tidak_ada',
-  },
-  {
-    id: 'dm5',
-    userId: 'u5',
-    nik: '3201010505950005',
-    namaLengkap: 'Eko Prasetyo',
-    tempatLahir: 'Tasikmalaya',
-    tanggalLahir: '1995-05-05',
-    jenisKelamin: 'L',
-    alamat: 'Jl. Pahlawan No. 8',
-    kelurahan: 'Cihideung',
-    kecamatan: 'Tasikmalaya Kota',
-    kota: 'Tasikmalaya',
-    provinsi: 'Samarinda',
-    noHp: '08567890123',
-    statusPernikahan: 'belum_menikah',
-    pekerjaan: 'Tidak Bekerja',
-    penghasilan: 500000,
-    jumlahTanggungan: 1,
-    statusRumah: 'menumpang',
-    kondisiRumah: 'sedang',
-    kepemilikanAset: 'tidak_ada',
-  },
-];
+export const currentUser: User =
+  mockUsers[0]
 
-export const mockDataMustahik = createPersistentArray<DataMustahik>('spk_data_mustahik', initialMustahik);
+export const currentAdmin: User =
+  mockUsers[5]
 
-// ===== MOCK PENGAJUAN =====
-const initialPengajuan: Pengajuan[] = [
-  {
-    id: 'p1',
-    userId: 'u1',
-    mustahikId: 'dm1',
-    namaLengkap: 'Ikmal Ali',
-    nik: '3201010101900001',
-    status: 'LOLOS_VERIFIKASI',
-    tanggalPengajuan: '2024-04-10',
-    tanggalVerifikasi: '2024-04-15',
-    catatan: 'Data lengkap dan valid. Semua dokumen sesuai.',
-  },
-  {
-    id: 'p2',
-    userId: 'u2',
-    mustahikId: 'dm2',
-    namaLengkap: 'Siti Rahayu',
-    nik: '3201010202850002',
-    status: 'LOLOS_VERIFIKASI',
-    tanggalPengajuan: '2024-04-12',
-    tanggalVerifikasi: '2024-04-18',
-    catatan: 'Data valid, lolos verifikasi lapangan.',
-  },
-  {
-    id: 'p3',
-    userId: 'u3',
-    mustahikId: 'dm3',
-    namaLengkap: 'Budi Santoso',
-    nik: '3201010303920003',
-    status: 'MENUNGGU_VERIFIKASI',
-    tanggalPengajuan: '2024-04-15',
-  },
-  {
-    id: 'p4',
-    userId: 'u4',
-    mustahikId: 'dm4',
-    namaLengkap: 'Dewi Lestari',
-    nik: '3201010404880004',
-    status: 'LOLOS_VERIFIKASI',
-    tanggalPengajuan: '2024-04-15',
-    tanggalVerifikasi: '2024-04-20',
-  },
-  {
-    id: 'p5',
-    userId: 'u5',
-    mustahikId: 'dm5',
-    namaLengkap: 'Eko Prasetyo',
-    nik: '3201010505950005',
-    status: 'PERLU_PERBAIKAN',
-    tanggalPengajuan: '2024-04-20',
-    tanggalVerifikasi: '2024-04-23',
-    catatan: 'Foto KTP kurang jelas, mohon upload ulang.',
-  },
-];
+// ============================================================
+// MOCK DATA MUSTAHIK
+// ============================================================
 
-export const mockPengajuan = createPersistentArray<Pengajuan>('spk_pengajuan', initialPengajuan);
+const initialMustahik:
+  DataMustahik[] = [
+    {
+      id: 'dm1',
+      userId: 'u1',
+      nik: '3201010101900001',
+      namaLengkap: 'Ikmal Ali',
+      tempatLahir: 'Kalimantan',
+      tanggalLahir:
+        '1990-01-01',
+      jenisKelamin: 'L',
+      alamat:
+        'Jl. Merdeka No. 10',
+      kelurahan: 'Adadeh',
+      kecamatan:
+        'Kalimantan Timur',
+      kota: 'Kalimantan',
+      provinsi: 'Samarinda',
+      noHp: '08123456789',
+      statusPernikahan:
+        'menikah',
+      pekerjaan:
+        'Buruh Harian',
+      penghasilan: 1500000,
+      jumlahTanggungan: 4,
+      statusRumah: 'sewa',
+      kondisiRumah: 'sedang',
+      kepemilikanAset:
+        'tidak_ada',
+    },
 
-export const saveMockPengajuan = (data: Pengajuan[]) => {
-  mockPengajuan.length = 0;
-  mockPengajuan.push(...data);
-};
+    {
+      id: 'dm2',
+      userId: 'u2',
+      nik: '3201010202850002',
+      namaLengkap:
+        'Siti Rahayu',
+      tempatLahir:
+        'Sukabumi',
+      tanggalLahir:
+        '1985-02-02',
+      jenisKelamin: 'P',
+      alamat:
+        'Jl. Anggrek No. 5',
+      kelurahan:
+        'Babakan',
+      kecamatan:
+        'Cimahi Selatan',
+      kota: 'Cimahi',
+      provinsi: 'Samarinda',
+      noHp: '08234567890',
+      statusPernikahan:
+        'cerai_mati',
+      pekerjaan:
+        'Pedagang Kecil',
+      penghasilan: 900000,
+      jumlahTanggungan: 3,
+      statusRumah:
+        'menumpang',
+      kondisiRumah:
+        'buruk',
+      kepemilikanAset:
+        'tidak_ada',
+    },
 
-// ===== MOCK KRITERIA =====
-const initialKriteria: Kriteria[] = [
-  {
-    id: 'k1',
-    nama: 'Penghasilan',
-    kode: 'C1',
-    tipe: 'cost',
-    bobot: 0.30,
-    deskripsi: 'Penghasilan bulanan calon mustahik',
-  },
-  {
-    id: 'k2',
-    nama: 'Jumlah Tanggungan',
-    kode: 'C2',
-    tipe: 'benefit',
-    bobot: 0.25,
-    deskripsi: 'Jumlah anggota keluarga yang ditanggung',
-  },
-  {
-    id: 'k3',
-    nama: 'Kondisi Rumah',
-    kode: 'C3',
-    tipe: 'benefit',
-    bobot: 0.20,
-    deskripsi: 'Kondisi fisik tempat tinggal',
-  },
-  {
-    id: 'k4',
-    nama: 'Status Pekerjaan',
-    kode: 'C4',
-    tipe: 'benefit',
-    bobot: 0.15,
-    deskripsi: 'Status dan jenis pekerjaan utama',
-  },
-  {
-    id: 'k5',
-    nama: 'Kepemilikan Aset',
-    kode: 'C5',
-    tipe: 'cost',
-    bobot: 0.10,
-    deskripsi: 'Kepemilikan aset berharga (kendaraan, tanah, dll)',
-  },
-];
+    {
+      id: 'dm3',
+      userId: 'u3',
+      nik: '3201010303920003',
+      namaLengkap:
+        'Budi Santoso',
+      tempatLahir:
+        'Bandung',
+      tanggalLahir:
+        '1992-03-03',
+      jenisKelamin: 'L',
+      alamat:
+        'Jl. Kenari No. 12',
+      kelurahan:
+        'Cicendo',
+      kecamatan:
+        'Bandung Wetan',
+      kota: 'Bandung',
+      provinsi: 'Samarinda',
+      noHp: '08345678901',
+      statusPernikahan:
+        'menikah',
+      pekerjaan:
+        'Tukang Bangunan',
+      penghasilan: 2000000,
+      jumlahTanggungan: 2,
+      statusRumah: 'sewa',
+      kondisiRumah:
+        'sedang',
+      kepemilikanAset:
+        'tidak_ada',
+    },
 
-export const mockKriteria = createPersistentArray<Kriteria>('spk_kriteria', initialKriteria);
+    {
+      id: 'dm4',
+      userId: 'u4',
+      nik: '3201010404880004',
+      namaLengkap:
+        'Dewi Lestari',
+      tempatLahir:
+        'Garut',
+      tanggalLahir:
+        '1988-04-04',
+      jenisKelamin: 'P',
+      alamat:
+        'Jl. Mawar No. 3',
+      kelurahan:
+        'Tarogong',
+      kecamatan:
+        'Garut Kota',
+      kota: 'Garut',
+      provinsi: 'Samarinda',
+      noHp: '08456789012',
+      statusPernikahan:
+        'menikah',
+      pekerjaan:
+        'Ibu Rumah Tangga',
+      penghasilan: 800000,
+      jumlahTanggungan: 5,
+      statusRumah:
+        'menumpang',
+      kondisiRumah:
+        'buruk',
+      kepemilikanAset:
+        'tidak_ada',
+    },
 
-// ===== MOCK SUBKRITERIA =====
-const initialSubKriteria: SubKriteria[] = [
-  // Penghasilan (C1) - Cost
-  { id: 'sk1', kriteriaId: 'k1', namaKriteria: 'Penghasilan', nilai: 1, keterangan: '< Rp 500.000' },
-  { id: 'sk2', kriteriaId: 'k1', namaKriteria: 'Penghasilan', nilai: 2, keterangan: 'Rp 500.001 - Rp 1.000.000' },
-  { id: 'sk3', kriteriaId: 'k1', namaKriteria: 'Penghasilan', nilai: 3, keterangan: 'Rp 1.000.001 - Rp 1.500.000' },
-  { id: 'sk4', kriteriaId: 'k1', namaKriteria: 'Penghasilan', nilai: 4, keterangan: 'Rp 1.500.001 - Rp 2.000.000' },
-  { id: 'sk5', kriteriaId: 'k1', namaKriteria: 'Penghasilan', nilai: 5, keterangan: '> Rp 2.000.000' },
-  // Jumlah Tanggungan (C2) - Benefit
-  { id: 'sk6', kriteriaId: 'k2', namaKriteria: 'Jumlah Tanggungan', nilai: 1, keterangan: '1 orang' },
-  { id: 'sk7', kriteriaId: 'k2', namaKriteria: 'Jumlah Tanggungan', nilai: 2, keterangan: '2 orang' },
-  { id: 'sk8', kriteriaId: 'k2', namaKriteria: 'Jumlah Tanggungan', nilai: 3, keterangan: '3 orang' },
-  { id: 'sk9', kriteriaId: 'k2', namaKriteria: 'Jumlah Tanggungan', nilai: 4, keterangan: '4 orang' },
-  { id: 'sk10', kriteriaId: 'k2', namaKriteria: 'Jumlah Tanggungan', nilai: 5, keterangan: '≥ 5 orang' },
-  // Kondisi Rumah (C3) - Benefit
-  { id: 'sk11', kriteriaId: 'k3', namaKriteria: 'Kondisi Rumah', nilai: 1, keterangan: 'Sangat Baik' },
-  { id: 'sk12', kriteriaId: 'k3', namaKriteria: 'Kondisi Rumah', nilai: 2, keterangan: 'Baik' },
-  { id: 'sk13', kriteriaId: 'k3', namaKriteria: 'Kondisi Rumah', nilai: 3, keterangan: 'Cukup' },
-  { id: 'sk14', kriteriaId: 'k3', namaKriteria: 'Kondisi Rumah', nilai: 4, keterangan: 'Buruk' },
-  { id: 'sk15', kriteriaId: 'k3', namaKriteria: 'Kondisi Rumah', nilai: 5, keterangan: 'Sangat Buruk' },
-  // Status Pekerjaan (C4) - Benefit
-  { id: 'sk16', kriteriaId: 'k4', namaKriteria: 'Status Pekerjaan', nilai: 1, keterangan: 'PNS / BUMN' },
-  { id: 'sk17', kriteriaId: 'k4', namaKriteria: 'Status Pekerjaan', nilai: 2, keterangan: 'Karyawan Swasta' },
-  { id: 'sk18', kriteriaId: 'k4', namaKriteria: 'Status Pekerjaan', nilai: 3, keterangan: 'Wiraswasta' },
-  { id: 'sk19', kriteriaId: 'k4', namaKriteria: 'Status Pekerjaan', nilai: 4, keterangan: 'Buruh / Harian' },
-  { id: 'sk20', kriteriaId: 'k4', namaKriteria: 'Status Pekerjaan', nilai: 5, keterangan: 'Tidak Bekerja' },
-  // Kepemilikan Aset (C5) - Cost
-  { id: 'sk21', kriteriaId: 'k5', namaKriteria: 'Kepemilikan Aset', nilai: 1, keterangan: 'Memiliki banyak aset' },
-  { id: 'sk22', kriteriaId: 'k5', namaKriteria: 'Kepemilikan Aset', nilai: 2, keterangan: 'Memiliki beberapa aset' },
-  { id: 'sk23', kriteriaId: 'k5', namaKriteria: 'Kepemilikan Aset', nilai: 3, keterangan: 'Memiliki sedikit aset' },
-  { id: 'sk24', kriteriaId: 'k5', namaKriteria: 'Kepemilikan Aset', nilai: 4, keterangan: 'Hampir tidak memiliki aset' },
-  { id: 'sk25', kriteriaId: 'k5', namaKriteria: 'Kepemilikan Aset', nilai: 5, keterangan: 'Tidak memiliki aset' },
-];
+    {
+      id: 'dm5',
+      userId: 'u5',
+      nik: '3201010505950005',
+      namaLengkap:
+        'Eko Prasetyo',
+      tempatLahir:
+        'Tasikmalaya',
+      tanggalLahir:
+        '1995-05-05',
+      jenisKelamin: 'L',
+      alamat:
+        'Jl. Pahlawan No. 8',
+      kelurahan:
+        'Cihideung',
+      kecamatan:
+        'Tasikmalaya Kota',
+      kota:
+        'Tasikmalaya',
+      provinsi: 'Samarinda',
+      noHp: '08567890123',
+      statusPernikahan:
+        'belum_menikah',
+      pekerjaan:
+        'Tidak Bekerja',
+      penghasilan: 500000,
+      jumlahTanggungan: 1,
+      statusRumah:
+        'menumpang',
+      kondisiRumah:
+        'sedang',
+      kepemilikanAset:
+        'tidak_ada',
+    },
+  ]
 
-export const mockSubKriteria = createPersistentArray<SubKriteria>('spk_subkriteria', initialSubKriteria);
+export const mockDataMustahik =
+  createPersistentArray<DataMustahik>(
+    'spk_data_mustahik',
+    initialMustahik
+  )
 
-// ===== MOCK TOPSIS RESULTS =====
-const initialTopsisResults: TopsisResult[] = [
-  {
-    id: 'tr1',
-    pengajuanId: 'p1',
-    mustahikId: 'dm1',
-    namaLengkap: 'Ikmal Ali',
-    nilaiPreferensi: 0.821,
-    ranking: 1,
-    status: 'LAYAK_DIDANAI',
-    tanggalProses: '2024-05-01',
-  },
-  {
-    id: 'tr2',
-    pengajuanId: 'p2',
-    mustahikId: 'dm2',
-    namaLengkap: 'Siti Rahayu',
-    nilaiPreferensi: 0.743,
-    ranking: 2,
-    status: 'LAYAK_DIDANAI',
-    tanggalProses: '2024-05-01',
-  },
-  {
-    id: 'tr3',
-    pengajuanId: 'p4',
-    mustahikId: 'dm4',
-    namaLengkap: 'Dewi Lestari',
-    nilaiPreferensi: 0.612,
-    ranking: 3,
-    status: 'LAYAK_DIDANAI',
-    tanggalProses: '2024-05-01',
-  },
-  {
-    id: 'tr4',
-    pengajuanId: 'p5',
-    mustahikId: 'dm5',
-    namaLengkap: 'Eko Prasetyo',
-    nilaiPreferensi: 0.521,
-    ranking: 4,
-    status: 'TIDAK_DIDANAI',
-    tanggalProses: '2024-05-01',
-  },
-  {
-    id: 'tr5',
-    pengajuanId: 'p3',
-    mustahikId: 'dm3',
-    namaLengkap: 'Budi Santoso',
-    nilaiPreferensi: 0.398,
-    ranking: 5,
-    status: 'TIDAK_DIDANAI',
-    tanggalProses: '2024-05-01',
-  },
-];
+// ============================================================
+// MOCK PENGAJUAN
+// ============================================================
 
-export const mockTopsisResults = createPersistentArray<TopsisResult>('spk_topsis_results', initialTopsisResults);
+const initialPengajuan:
+  Pengajuan[] = [
+    {
+      id: 'p1',
+      userId: 'u1',
+      mustahikId: 'dm1',
+      namaLengkap:
+        'Ikmal Ali',
+      nik: '3201010101900001',
+      status:
+        'LOLOS_VERIFIKASI',
+      tanggalPengajuan:
+        '2024-04-10',
+      tanggalVerifikasi:
+        '2024-04-15',
+      catatan:
+        'Data lengkap dan valid. Semua dokumen sesuai.',
+    },
 
-// ===== MOCK VERIFIKASI =====
-const initialVerifikasi: Verifikasi[] = [
-  {
-    id: 'v1',
-    pengajuanId: 'p1',
-    adminId: 'a1',
-    adminName: 'Admin Sistem',
-    status: 'lolos',
-    catatan: 'Data lengkap dan valid. Semua dokumen sesuai.',
-    tanggalVerifikasi: '2024-04-15',
-  },
-  {
-    id: 'v2',
-    pengajuanId: 'p2',
-    adminId: 'a1',
-    adminName: 'Admin Sistem',
-    status: 'lolos',
-    catatan: 'Data valid, lolos verifikasi lapangan.',
-    tanggalVerifikasi: '2024-04-18',
-  },
-  {
-    id: 'v3',
-    pengajuanId: 'p5',
-    adminId: 'a1',
-    adminName: 'Admin Sistem',
-    status: 'perlu_perbaikan',
-    catatan: 'Foto KTP kurang jelas, mohon upload ulang.',
-    tanggalVerifikasi: '2024-04-23',
-  },
-];
+    {
+      id: 'p2',
+      userId: 'u2',
+      mustahikId: 'dm2',
+      namaLengkap:
+        'Siti Rahayu',
+      nik: '3201010202850002',
+      status:
+        'LOLOS_VERIFIKASI',
+      tanggalPengajuan:
+        '2024-04-12',
+      tanggalVerifikasi:
+        '2024-04-18',
+      catatan:
+        'Data valid, lolos verifikasi lapangan.',
+    },
 
-export const mockVerifikasi = createPersistentArray<Verifikasi>('spk_verifikasi', initialVerifikasi);
+    {
+      id: 'p3',
+      userId: 'u3',
+      mustahikId: 'dm3',
+      namaLengkap:
+        'Budi Santoso',
+      nik: '3201010303920003',
+      status:
+        'MENUNGGU_VERIFIKASI',
+      tanggalPengajuan:
+        '2024-04-15',
+    },
 
-// ===== MOCK SUMMARY STATS =====
-const initialStats: SummaryStats = {
-  totalMustahik: 5,
-  pengajuanBaru: 2,
-  menungguVerifikasi: 2,
-  sudahDiverifikasi: 2,
-  layakDidanai: 3,
-  tidakDidanai: 2,
-};
+    {
+      id: 'p4',
+      userId: 'u4',
+      mustahikId: 'dm4',
+      namaLengkap:
+        'Dewi Lestari',
+      nik: '3201010404880004',
+      status:
+        'LOLOS_VERIFIKASI',
+      tanggalPengajuan:
+        '2024-04-15',
+      tanggalVerifikasi:
+        '2024-04-20',
+    },
 
-export const mockStats = createPersistentObject<SummaryStats>('spk_stats', initialStats);
+    {
+      id: 'p5',
+      userId: 'u5',
+      mustahikId: 'dm5',
+      namaLengkap:
+        'Eko Prasetyo',
+      nik: '3201010505950005',
+      status:
+        'PERLU_PERBAIKAN',
+      tanggalPengajuan:
+        '2024-04-20',
+      tanggalVerifikasi:
+        '2024-04-23',
+      catatan:
+        'Foto KTP kurang jelas, mohon upload ulang.',
+    },
+  ]
 
-// ===== MOCK CHART DATA =====
+export const mockPengajuan =
+  createPersistentArray<Pengajuan>(
+    'spk_pengajuan',
+    initialPengajuan
+  )
+
+export const saveMockPengajuan = (
+  data: Pengajuan[]
+) => {
+  mockPengajuan.length = 0
+  mockPengajuan.push(
+    ...data
+  )
+}
+
+// ============================================================
+// MOCK KRITERIA
+// ============================================================
+
+const initialKriteria:
+  Kriteria[] = [
+    {
+      id: 'k1',
+      nama: 'Penghasilan',
+      kode: 'C1',
+      tipe: 'cost',
+      bobot: 0.30,
+      deskripsi:
+        'Penghasilan bulanan calon mustahik',
+    },
+
+    {
+      id: 'k2',
+      nama:
+        'Jumlah Tanggungan',
+      kode: 'C2',
+      tipe: 'benefit',
+      bobot: 0.25,
+      deskripsi:
+        'Jumlah anggota keluarga yang ditanggung',
+    },
+
+    {
+      id: 'k3',
+      nama:
+        'Kondisi Rumah',
+      kode: 'C3',
+      tipe: 'benefit',
+      bobot: 0.20,
+      deskripsi:
+        'Kondisi fisik tempat tinggal',
+    },
+
+    {
+      id: 'k4',
+      nama:
+        'Status Pekerjaan',
+      kode: 'C4',
+      tipe: 'benefit',
+      bobot: 0.15,
+      deskripsi:
+        'Status dan jenis pekerjaan utama',
+    },
+
+    {
+      id: 'k5',
+      nama:
+        'Kepemilikan Aset',
+      kode: 'C5',
+      tipe: 'cost',
+      bobot: 0.10,
+      deskripsi:
+        'Kepemilikan aset berharga (kendaraan, tanah, dll)',
+    },
+  ]
+
+export const mockKriteria =
+  createPersistentArray<Kriteria>(
+    'spk_kriteria',
+    initialKriteria
+  )
+
+// ============================================================
+// MOCK SUBKRITERIA
+// ============================================================
+
+const initialSubKriteria:
+  SubKriteria[] = [
+    // Penghasilan (C1) - Cost
+
+    {
+      id: 'sk1',
+      kriteriaId: 'k1',
+      namaKriteria:
+        'Penghasilan',
+      nilai: 1,
+      keterangan:
+        '< Rp 500.000',
+    },
+
+    {
+      id: 'sk2',
+      kriteriaId: 'k1',
+      namaKriteria:
+        'Penghasilan',
+      nilai: 2,
+      keterangan:
+        'Rp 500.001 - Rp 1.000.000',
+    },
+
+    {
+      id: 'sk3',
+      kriteriaId: 'k1',
+      namaKriteria:
+        'Penghasilan',
+      nilai: 3,
+      keterangan:
+        'Rp 1.000.001 - Rp 1.500.000',
+    },
+
+    {
+      id: 'sk4',
+      kriteriaId: 'k1',
+      namaKriteria:
+        'Penghasilan',
+      nilai: 4,
+      keterangan:
+        'Rp 1.500.001 - Rp 2.000.000',
+    },
+
+    {
+      id: 'sk5',
+      kriteriaId: 'k1',
+      namaKriteria:
+        'Penghasilan',
+      nilai: 5,
+      keterangan:
+        '> Rp 2.000.000',
+    },
+
+    // Jumlah Tanggungan (C2) - Benefit
+
+    {
+      id: 'sk6',
+      kriteriaId: 'k2',
+      namaKriteria:
+        'Jumlah Tanggungan',
+      nilai: 1,
+      keterangan:
+        '1 orang',
+    },
+
+    {
+      id: 'sk7',
+      kriteriaId: 'k2',
+      namaKriteria:
+        'Jumlah Tanggungan',
+      nilai: 2,
+      keterangan:
+        '2 orang',
+    },
+
+    {
+      id: 'sk8',
+      kriteriaId: 'k2',
+      namaKriteria:
+        'Jumlah Tanggungan',
+      nilai: 3,
+      keterangan:
+        '3 orang',
+    },
+
+    {
+      id: 'sk9',
+      kriteriaId: 'k2',
+      namaKriteria:
+        'Jumlah Tanggungan',
+      nilai: 4,
+      keterangan:
+        '4 orang',
+    },
+
+    {
+      id: 'sk10',
+      kriteriaId: 'k2',
+      namaKriteria:
+        'Jumlah Tanggungan',
+      nilai: 5,
+      keterangan:
+        '≥ 5 orang',
+    },
+
+    // Kondisi Rumah (C3) - Benefit
+
+    {
+      id: 'sk11',
+      kriteriaId: 'k3',
+      namaKriteria:
+        'Kondisi Rumah',
+      nilai: 1,
+      keterangan:
+        'Sangat Baik',
+    },
+
+    {
+      id: 'sk12',
+      kriteriaId: 'k3',
+      namaKriteria:
+        'Kondisi Rumah',
+      nilai: 2,
+      keterangan:
+        'Baik',
+    },
+
+    {
+      id: 'sk13',
+      kriteriaId: 'k3',
+      namaKriteria:
+        'Kondisi Rumah',
+      nilai: 3,
+      keterangan:
+        'Cukup',
+    },
+
+    {
+      id: 'sk14',
+      kriteriaId: 'k3',
+      namaKriteria:
+        'Kondisi Rumah',
+      nilai: 4,
+      keterangan:
+        'Buruk',
+    },
+
+    {
+      id: 'sk15',
+      kriteriaId: 'k3',
+      namaKriteria:
+        'Kondisi Rumah',
+      nilai: 5,
+      keterangan:
+        'Sangat Buruk',
+    },
+
+    // Status Pekerjaan (C4) - Benefit
+
+    {
+      id: 'sk16',
+      kriteriaId: 'k4',
+      namaKriteria:
+        'Status Pekerjaan',
+      nilai: 1,
+      keterangan:
+        'PNS / BUMN',
+    },
+
+    {
+      id: 'sk17',
+      kriteriaId: 'k4',
+      namaKriteria:
+        'Status Pekerjaan',
+      nilai: 2,
+      keterangan:
+        'Karyawan Swasta',
+    },
+
+    {
+      id: 'sk18',
+      kriteriaId: 'k4',
+      namaKriteria:
+        'Status Pekerjaan',
+      nilai: 3,
+      keterangan:
+        'Wiraswasta',
+    },
+
+    {
+      id: 'sk19',
+      kriteriaId: 'k4',
+      namaKriteria:
+        'Status Pekerjaan',
+      nilai: 4,
+      keterangan:
+        'Buruh / Harian',
+    },
+
+    {
+      id: 'sk20',
+      kriteriaId: 'k4',
+      namaKriteria:
+        'Status Pekerjaan',
+      nilai: 5,
+      keterangan:
+        'Tidak Bekerja',
+    },
+
+    // Kepemilikan Aset (C5) - Cost
+
+    {
+      id: 'sk21',
+      kriteriaId: 'k5',
+      namaKriteria:
+        'Kepemilikan Aset',
+      nilai: 1,
+      keterangan:
+        'Memiliki banyak aset',
+    },
+
+    {
+      id: 'sk22',
+      kriteriaId: 'k5',
+      namaKriteria:
+        'Kepemilikan Aset',
+      nilai: 2,
+      keterangan:
+        'Memiliki beberapa aset',
+    },
+
+    {
+      id: 'sk23',
+      kriteriaId: 'k5',
+      namaKriteria:
+        'Kepemilikan Aset',
+      nilai: 3,
+      keterangan:
+        'Memiliki sedikit aset',
+    },
+
+    {
+      id: 'sk24',
+      kriteriaId: 'k5',
+      namaKriteria:
+        'Kepemilikan Aset',
+      nilai: 4,
+      keterangan:
+        'Hampir tidak memiliki aset',
+    },
+
+    {
+      id: 'sk25',
+      kriteriaId: 'k5',
+      namaKriteria:
+        'Kepemilikan Aset',
+      nilai: 5,
+      keterangan:
+        'Tidak memiliki aset',
+    },
+  ]
+
+export const mockSubKriteria =
+  createPersistentArray<SubKriteria>(
+    'spk_subkriteria',
+    initialSubKriteria
+  )
+
+// ============================================================
+// MOCK TOPSIS RESULTS
+// ============================================================
+
+const initialTopsisResults:
+  TopsisResult[] = [
+    {
+      id: 'tr1',
+      pengajuanId: 'p1',
+      mustahikId: 'dm1',
+      namaLengkap:
+        'Ikmal Ali',
+      nilaiPreferensi: 0.821,
+      ranking: 1,
+      status:
+        'LAYAK_DIDANAI',
+      tanggalProses:
+        '2024-05-01',
+    },
+
+    {
+      id: 'tr2',
+      pengajuanId: 'p2',
+      mustahikId: 'dm2',
+      namaLengkap:
+        'Siti Rahayu',
+      nilaiPreferensi: 0.743,
+      ranking: 2,
+      status:
+        'LAYAK_DIDANAI',
+      tanggalProses:
+        '2024-05-01',
+    },
+
+    {
+      id: 'tr3',
+      pengajuanId: 'p4',
+      mustahikId: 'dm4',
+      namaLengkap:
+        'Dewi Lestari',
+      nilaiPreferensi: 0.612,
+      ranking: 3,
+      status:
+        'LAYAK_DIDANAI',
+      tanggalProses:
+        '2024-05-01',
+    },
+
+    {
+      id: 'tr4',
+      pengajuanId: 'p5',
+      mustahikId: 'dm5',
+      namaLengkap:
+        'Eko Prasetyo',
+      nilaiPreferensi: 0.521,
+      ranking: 4,
+      status:
+        'TIDAK_DIDANAI',
+      tanggalProses:
+        '2024-05-01',
+    },
+
+    {
+      id: 'tr5',
+      pengajuanId: 'p3',
+      mustahikId: 'dm3',
+      namaLengkap:
+        'Budi Santoso',
+      nilaiPreferensi: 0.398,
+      ranking: 5,
+      status:
+        'TIDAK_DIDANAI',
+      tanggalProses:
+        '2024-05-01',
+    },
+  ]
+
+export const mockTopsisResults =
+  createPersistentArray<TopsisResult>(
+    'spk_topsis_results',
+    initialTopsisResults
+  )
+
+// ============================================================
+// MOCK VERIFIKASI
+// ============================================================
+
+const initialVerifikasi:
+  Verifikasi[] = [
+    {
+      id: 'v1',
+      pengajuanId: 'p1',
+      adminId: 'a1',
+      adminName:
+        'Admin Sistem',
+      status: 'lolos',
+      catatan:
+        'Data lengkap dan valid. Semua dokumen sesuai.',
+      tanggalVerifikasi:
+        '2024-04-15',
+    },
+
+    {
+      id: 'v2',
+      pengajuanId: 'p2',
+      adminId: 'a1',
+      adminName:
+        'Admin Sistem',
+      status: 'lolos',
+      catatan:
+        'Data valid, lolos verifikasi lapangan.',
+      tanggalVerifikasi:
+        '2024-04-18',
+    },
+
+    {
+      id: 'v3',
+      pengajuanId: 'p5',
+      adminId: 'a1',
+      adminName:
+        'Admin Sistem',
+      status:
+        'perlu_perbaikan',
+      catatan:
+        'Foto KTP kurang jelas, mohon upload ulang.',
+      tanggalVerifikasi:
+        '2024-04-23',
+    },
+  ]
+
+export const mockVerifikasi =
+  createPersistentArray<Verifikasi>(
+    'spk_verifikasi',
+    initialVerifikasi
+  )
+
+// ============================================================
+// MOCK SUMMARY STATS
+// ============================================================
+
+const initialStats:
+  SummaryStats = {
+    totalMustahik: 5,
+    pengajuanBaru: 2,
+    menungguVerifikasi: 2,
+    sudahDiverifikasi: 2,
+    layakDidanai: 3,
+    tidakDidanai: 2,
+  }
+
+export const mockStats =
+  createPersistentObject<SummaryStats>(
+    'spk_stats',
+    initialStats
+  )
+
+// ============================================================
+// MOCK CHART DATA
+// ============================================================
+
 export const mockChartData = [
-  { bulan: 'Jan', pengajuan: 4, lolos: 3, ditolak: 1 },
-  { bulan: 'Feb', pengajuan: 7, lolos: 5, ditolak: 2 },
-  { bulan: 'Mar', pengajuan: 5, lolos: 4, ditolak: 1 },
-  { bulan: 'Apr', pengajuan: 8, lolos: 6, ditolak: 2 },
-  { bulan: 'Mei', pengajuan: 5, lolos: 3, ditolak: 2 },
-  { bulan: 'Jun', pengajuan: 3, lolos: 2, ditolak: 1 },
-];
+  {
+    bulan: 'Jan',
+    pengajuan: 4,
+    lolos: 3,
+    ditolak: 1,
+  },
+
+  {
+    bulan: 'Feb',
+    pengajuan: 7,
+    lolos: 5,
+    ditolak: 2,
+  },
+
+  {
+    bulan: 'Mar',
+    pengajuan: 5,
+    lolos: 4,
+    ditolak: 1,
+  },
+
+  {
+    bulan: 'Apr',
+    pengajuan: 8,
+    lolos: 6,
+    ditolak: 2,
+  },
+
+  {
+    bulan: 'Mei',
+    pengajuan: 5,
+    lolos: 3,
+    ditolak: 2,
+  },
+
+  {
+    bulan: 'Jun',
+    pengajuan: 3,
+    lolos: 2,
+    ditolak: 1,
+  },
+]
+
+// ============================================================
+// MOCK STATUS DISTRIBUTION
+// ============================================================
 
 export const mockStatusDistribution = [
-  { name: 'Layak Didanai', value: 3, color: '#16a34a' },
-  { name: 'Tidak Didanai', value: 2, color: '#ef4444' },
-  { name: 'Menunggu Proses', value: 2, color: '#f59e0b' },
-];
+  {
+    name: 'Layak Didanai',
+    value: 3,
+    color: '#16a34a',
+  },
+
+  {
+    name: 'Tidak Didanai',
+    value: 2,
+    color: '#ef4444',
+  },
+
+  {
+    name: 'Menunggu Proses',
+    value: 2,
+    color: '#f59e0b',
+  },
+]
