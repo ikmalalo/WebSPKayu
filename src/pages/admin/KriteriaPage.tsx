@@ -1,216 +1,620 @@
-import { useState } from 'react'
-import { Plus, Edit2, Trash2, CheckCircle2 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { PageHeader } from '@/components/shared/PageHeader'
-import { FormField } from '@/components/shared/FormField'
-import { DataTable } from '@/components/shared/DataTable'
-import { mockKriteria } from '@/data/mockData'
-import type { Column, Kriteria } from '@/types'
+import {
+  useEffect,
+  useState,
+} from 'react'
 
-export function KriteriaPage() {
-  const [kriteriaList, setKriteriaList] = useState<Kriteria[]>(mockKriteria)
-  const [openModal, setOpenModal] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  CheckCircle2,
+  Loader2,
+} from 'lucide-react'
+
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+
+import {
+  Button,
+} from '@/components/ui/button'
+
+import {
+  Input,
+} from '@/components/ui/input'
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+
+import {
+  PageHeader,
+} from '@/components/shared/PageHeader'
+
+import {
+  FormField,
+} from '@/components/shared/FormField'
+
+import {
+  DataTable,
+} from '@/components/shared/DataTable'
+
+import {
+  getAdminKriteria,
+  createAdminKriteria,
+  updateAdminKriteria,
+  deleteAdminKriteria,
+  type AdminKriteria,
+} from '@/lib/adminApi'
+
+interface FormState {
+  nama: string
+  kode: string
+  tipe:
+    | 'BENEFIT'
+    | 'COST'
+  bobot: number
+  deskripsi: string
+}
+
+const emptyForm:
+  FormState = {
     nama: '',
     kode: '',
-    tipe: 'benefit' as 'benefit' | 'cost',
+    tipe: 'BENEFIT',
     bobot: 0.2,
     deskripsi: '',
-  })
-
-  const totalBobot = kriteriaList.reduce((acc, k) => acc + k.bobot, 0)
-  const isBobotValid = Math.abs(totalBobot - 1) < 0.001
-
-  const handleOpenAdd = () => {
-    setEditingId(null)
-    setForm({
-      nama: '',
-      kode: `C${kriteriaList.length + 1}`,
-      tipe: 'benefit',
-      bobot: 0.1,
-      deskripsi: '',
-    })
-    setOpenModal(true)
   }
 
-  const handleOpenEdit = (k: Kriteria) => {
-    setEditingId(k.id)
-    setForm({
-      nama: k.nama,
-      kode: k.kode,
-      tipe: k.tipe,
-      bobot: k.bobot,
-      deskripsi: k.deskripsi,
-    })
-    setOpenModal(true)
-  }
+export function KriteriaPage() {
+  const [
+    kriteriaList,
+    setKriteriaList,
+  ] = useState<
+    AdminKriteria[]
+  >([])
 
-  const handleSave = () => {
-    if (editingId) {
-      setKriteriaList(kriteriaList.map((k) => (k.id === editingId ? { ...k, ...form } : k)))
-    } else {
-      setKriteriaList([...kriteriaList, { id: `k${Date.now()}`, ...form }])
+  const [
+    loading,
+    setLoading,
+  ] = useState(true)
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false)
+
+  const [
+    error,
+    setError,
+  ] = useState('')
+
+  const [
+    openModal,
+    setOpenModal,
+  ] = useState(false)
+
+  const [
+    editingId,
+    setEditingId,
+  ] = useState<
+    string | null
+  >(null)
+
+  const [
+    form,
+    setForm,
+  ] =
+    useState<FormState>(
+      emptyForm
+    )
+
+  const load =
+    async () => {
+      try {
+        setLoading(true)
+
+        const data =
+          await getAdminKriteria()
+
+        setKriteriaList(
+          data
+        )
+      } catch (err: any) {
+        setError(
+          err.response
+            ?.data?.message ||
+          'Gagal mengambil kriteria.'
+        )
+      } finally {
+        setLoading(false)
+      }
     }
-    setOpenModal(false)
-  }
 
-  const handleDelete = (id: string) => {
-    setKriteriaList(kriteriaList.filter((k) => k.id !== id))
-  }
+  useEffect(() => {
+    load()
+  }, [])
 
-  const columns: Column<Kriteria>[] = [
-    {
-      key: 'kode',
-      header: 'Kode',
-      render: (row) => <span className="font-mono font-bold text-green-700 dark:text-green-400">{row.kode}</span>,
-    },
-    {
-      key: 'nama',
-      header: 'Nama Kriteria',
-      render: (row) => <span className="font-semibold text-slate-800 dark:text-slate-100">{row.nama}</span>,
-    },
-    {
-      key: 'tipe',
-      header: 'Tipe',
-      render: (row) => (
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-            row.tipe === 'benefit'
-              ? 'bg-green-50 dark:bg-slate-900 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-500/60 dark:shadow-[0_0_10px_rgba(34,197,94,0.25)]'
-              : 'bg-amber-50 dark:bg-slate-900 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-500/60 dark:shadow-[0_0_10px_rgba(245,158,11,0.25)]'
-          }`}
-        >
-          {row.tipe}
-        </span>
-      ),
-    },
-    {
-      key: 'bobot',
-      header: 'Bobot (%)',
-      render: (row) => <span className="font-bold text-slate-900 dark:text-slate-100">{(row.bobot * 100).toFixed(0)}%</span>,
-    },
-    {
-      key: 'deskripsi',
-      header: 'Deskripsi',
-      render: (row) => <span className="text-slate-500 dark:text-slate-400 text-xs">{row.deskripsi}</span>,
-    },
-    {
-      key: 'actions',
-      header: 'Aksi',
-      render: (row) => (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(row)}>
-            <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => handleDelete(row.id)}>
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
-        </div>
-      ),
-    },
-  ]
+  const totalBobot =
+    kriteriaList.reduce(
+      (
+        total,
+        item
+      ) =>
+        total +
+        Number(
+          item.bobot
+        ),
+      0
+    )
+
+  const isBobotValid =
+    Math.abs(
+      totalBobot - 1
+    ) < 0.001
+
+  const handleOpenAdd =
+    () => {
+      setEditingId(null)
+
+      setForm({
+        nama: '',
+        kode: `C${
+          kriteriaList.length +
+          1
+        }`,
+        tipe: 'BENEFIT',
+        bobot: 0.1,
+        deskripsi: '',
+      })
+
+      setOpenModal(true)
+    }
+
+  const handleOpenEdit =
+    (
+      item: AdminKriteria
+    ) => {
+      setEditingId(
+        item.id
+      )
+
+      setForm({
+        nama: item.nama,
+        kode: item.kode,
+        tipe: item.tipe,
+        bobot: Number(
+          item.bobot
+        ),
+        deskripsi:
+          item.deskripsi ||
+          '',
+      })
+
+      setOpenModal(true)
+    }
+
+  const handleSave =
+    async () => {
+      if (
+        !form.nama ||
+        !form.kode ||
+        form.bobot <= 0
+      ) {
+        setError(
+          'Kode, nama, dan bobot wajib diisi.'
+        )
+
+        return
+      }
+
+      try {
+        setSaving(true)
+        setError('')
+
+        if (
+          editingId
+        ) {
+          await updateAdminKriteria(
+            editingId,
+            {
+              ...form,
+            }
+          )
+        } else {
+          await createAdminKriteria(
+            {
+              ...form,
+            }
+          )
+        }
+
+        setOpenModal(false)
+
+        await load()
+      } catch (err: any) {
+        setError(
+          err.response
+            ?.data?.message ||
+          'Gagal menyimpan kriteria.'
+        )
+      } finally {
+        setSaving(false)
+      }
+    }
+
+  const handleDelete =
+    async (
+      id: string
+    ) => {
+      if (
+        !window.confirm(
+          'Hapus kriteria ini? Semua subkriteria terkait juga dapat ikut terhapus.'
+        )
+      ) {
+        return
+      }
+
+      try {
+        await deleteAdminKriteria(
+          id
+        )
+
+        await load()
+      } catch (err: any) {
+        setError(
+          err.response
+            ?.data?.message ||
+          'Gagal menghapus kriteria.'
+        )
+      }
+    }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Pengelolaan Kriteria TOPSIS"
-        description="Atur kriteria, tipe (benefit/cost), dan bobot penilaian"
+        description="Data kriteria berasal langsung dari database"
       >
-        <Button onClick={handleOpenAdd}>
+        <Button
+          onClick={
+            handleOpenAdd
+          }
+        >
           <Plus className="w-4 h-4 mr-2" />
           Tambah Kriteria
         </Button>
       </PageHeader>
 
-      {/* Summary Bobot Alert */}
-      <Card className={isBobotValid ? 'border-green-300 dark:border-green-900 bg-green-50/50 dark:bg-green-950/30' : 'border-amber-300 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/30'}>
+      {error && (
+        <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <Card
+        className={
+          isBobotValid
+            ? 'border-green-300 bg-green-50/50'
+            : 'border-amber-300 bg-amber-50/50'
+        }
+      >
         <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className={`w-5 h-5 ${isBobotValid ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`} />
-              <div>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  Total Bobot Kriteria: {(totalBobot * 100).toFixed(0)}%
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {isBobotValid
-                    ? 'Total bobot sudah 100%, siap untuk perhitungan TOPSIS.'
-                    : 'Peringatan: Total bobot harus berjumlah tepat 100% (1.0).'}
-                </p>
-              </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle2
+              className={
+                isBobotValid
+                  ? 'w-5 h-5 text-green-600'
+                  : 'w-5 h-5 text-amber-600'
+              }
+            />
+
+            <div>
+              <p className="text-sm font-semibold">
+                Total Bobot Kriteria:{' '}
+                {(
+                  totalBobot *
+                  100
+                ).toFixed(
+                  0
+                )}
+                %
+              </p>
+
+              <p className="text-xs text-slate-500">
+                {isBobotValid
+                  ? 'Total bobot sudah 100%.'
+                  : 'Total bobot harus berjumlah 100%.'}
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <DataTable columns={columns} data={kriteriaList} />
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+        </div>
+      ) : (
+        <DataTable
+          columns={[
+            {
+              key: 'kode',
+              header: 'Kode',
+              render: (
+                row
+              ) => (
+                <span className="font-mono font-bold text-green-700">
+                  {row.kode}
+                </span>
+              ),
+            },
 
-      {/* Modal Edit/Add */}
-      <Dialog open={openModal} onOpenChange={setOpenModal}>
+            {
+              key: 'nama',
+              header: 'Nama Kriteria',
+              render: (
+                row
+              ) => (
+                <span className="font-semibold">
+                  {row.nama}
+                </span>
+              ),
+            },
+
+            {
+              key: 'tipe',
+              header: 'Tipe',
+              render: (
+                row
+              ) => (
+                <span className="px-3 py-1 rounded-full text-xs font-bold">
+                  {row.tipe}
+                </span>
+              ),
+            },
+
+            {
+              key: 'bobot',
+              header: 'Bobot',
+              render: (
+                row
+              ) =>
+                `${(
+                  Number(
+                    row.bobot
+                  ) * 100
+                ).toFixed(
+                  0
+                )}%`,
+            },
+
+            {
+              key: 'deskripsi',
+              header: 'Deskripsi',
+              render: (
+                row
+              ) =>
+                row.deskripsi ||
+                '-',
+            },
+
+            {
+              key: 'actions',
+              header: 'Aksi',
+              render: (
+                row
+              ) => (
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      handleOpenEdit(
+                        row
+                      )
+                    }
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      handleDelete(
+                        row.id
+                      )
+                    }
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+          data={
+            kriteriaList
+          }
+        />
+      )}
+
+      <Dialog
+        open={openModal}
+        onOpenChange={
+          setOpenModal
+        }
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit Kriteria' : 'Tambah Kriteria'}</DialogTitle>
+            <DialogTitle>
+              {editingId
+                ? 'Edit Kriteria'
+                : 'Tambah Kriteria'}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <FormField label="Kode Kriteria" required>
+            <FormField
+              label="Kode"
+              required
+            >
               <Input
-                placeholder="C1, C2, dst."
-                value={form.kode}
-                onChange={(e) => setForm({ ...form, kode: e.target.value })}
+                value={
+                  form.kode
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    kode:
+                      e.target.value.toUpperCase(),
+                  })
+                }
               />
             </FormField>
 
-            <FormField label="Nama Kriteria" required>
+            <FormField
+              label="Nama"
+              required
+            >
               <Input
-                placeholder="Nama kriteria"
-                value={form.nama}
-                onChange={(e) => setForm({ ...form, nama: e.target.value })}
+                value={
+                  form.nama
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    nama:
+                      e.target.value,
+                  })
+                }
               />
             </FormField>
 
-            <FormField label="Tipe Kriteria" required>
-              <Select value={form.tipe} onValueChange={(val: any) => setForm({ ...form, tipe: val })}>
+            <FormField
+              label="Tipe"
+              required
+            >
+              <Select
+                value={
+                  form.tipe
+                }
+                onValueChange={(
+                  value
+                ) =>
+                  setForm({
+                    ...form,
+                    tipe:
+                      value as
+                        | 'BENEFIT'
+                        | 'COST',
+                  })
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
+
                 <SelectContent>
-                  <SelectItem value="benefit">Benefit (Makin tinggi makin baik)</SelectItem>
-                  <SelectItem value="cost">Cost (Makin rendah makin baik)</SelectItem>
+                  <SelectItem value="BENEFIT">
+                    Benefit
+                  </SelectItem>
+
+                  <SelectItem value="COST">
+                    Cost
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </FormField>
 
-            <FormField label="Bobot (Desimal, misal 0.25 untuk 25%)" required>
+            <FormField
+              label="Bobot"
+              required
+            >
               <Input
                 type="number"
-                step="0.01"
                 min="0"
                 max="1"
-                value={form.bobot}
-                onChange={(e) => setForm({ ...form, bobot: parseFloat(e.target.value) || 0 })}
+                step="0.01"
+                value={
+                  form.bobot
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    bobot:
+                      Number(
+                        e.target.value
+                      ),
+                  })
+                }
               />
             </FormField>
 
             <FormField label="Deskripsi">
               <Input
-                placeholder="Penjelasan kriteria..."
-                value={form.deskripsi}
-                onChange={(e) => setForm({ ...form, deskripsi: e.target.value })}
+                value={
+                  form.deskripsi
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    deskripsi:
+                      e.target.value,
+                  })
+                }
               />
             </FormField>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenModal(false)}>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setOpenModal(
+                  false
+                )
+              }
+            >
               Batal
             </Button>
-            <Button onClick={handleSave}>Simpan</Button>
+
+            <Button
+              onClick={
+                handleSave
+              }
+              disabled={
+                saving
+              }
+            >
+              {saving && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Simpan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

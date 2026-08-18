@@ -1,167 +1,578 @@
-import { useState } from 'react'
-import { Plus, Edit2, Trash2 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { PageHeader } from '@/components/shared/PageHeader'
-import { FormField } from '@/components/shared/FormField'
-import { DataTable } from '@/components/shared/DataTable'
-import { mockKriteria, mockSubKriteria } from '@/data/mockData'
-import type { Column, SubKriteria } from '@/types'
+import {
+  useEffect,
+  useState,
+} from 'react'
+
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Loader2,
+} from 'lucide-react'
+
+import {
+  Card,
+  CardContent,
+} from '@/components/ui/card'
+
+import {
+  Button,
+} from '@/components/ui/button'
+
+import {
+  Input,
+} from '@/components/ui/input'
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+
+import {
+  PageHeader,
+} from '@/components/shared/PageHeader'
+
+import {
+  FormField,
+} from '@/components/shared/FormField'
+
+import {
+  DataTable,
+} from '@/components/shared/DataTable'
+
+import {
+  getAdminKriteria,
+  getAdminSubKriteria,
+  createAdminSubKriteria,
+  updateAdminSubKriteria,
+  deleteAdminSubKriteria,
+  type AdminKriteria,
+  type AdminSubKriteria,
+} from '@/lib/adminApi'
 
 export function SubkriteriaPage() {
-  const [selectedKriteriaId, setSelectedKriteriaId] = useState<string>('k1')
-  const [subList, setSubList] = useState<SubKriteria[]>(mockSubKriteria)
-  const [openModal, setOpenModal] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({
+  const [
+    kriteriaList,
+    setKriteriaList,
+  ] = useState<
+    AdminKriteria[]
+  >([])
+
+  const [
+    subList,
+    setSubList,
+  ] = useState<
+    AdminSubKriteria[]
+  >([])
+
+  const [
+    selectedKriteriaId,
+    setSelectedKriteriaId,
+  ] = useState('')
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true)
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false)
+
+  const [
+    error,
+    setError,
+  ] = useState('')
+
+  const [
+    openModal,
+    setOpenModal,
+  ] = useState(false)
+
+  const [
+    editingId,
+    setEditingId,
+  ] = useState<
+    string | null
+  >(null)
+
+  const [
+    form,
+    setForm,
+  ] = useState({
     nilai: 1,
+    nama: '',
     keterangan: '',
   })
 
-  const currentKriteria = mockKriteria.find((k) => k.id === selectedKriteriaId) || mockKriteria[0]
-  const filteredSub = subList.filter((sk) => sk.kriteriaId === selectedKriteriaId)
+  const currentKriteria =
+    kriteriaList.find(
+      (item) =>
+        item.id ===
+        selectedKriteriaId
+    )
 
-  const handleOpenAdd = () => {
-    setEditingId(null)
-    setForm({ nilai: 1, keterangan: '' })
-    setOpenModal(true)
-  }
+  const loadKriteria =
+    async () => {
+      const result =
+        await getAdminKriteria()
 
-  const handleOpenEdit = (sk: SubKriteria) => {
-    setEditingId(sk.id)
-    setForm({ nilai: sk.nilai, keterangan: sk.keterangan })
-    setOpenModal(true)
-  }
+      setKriteriaList(
+        result
+      )
 
-  const handleSave = () => {
-    if (editingId) {
-      setSubList(subList.map((sk) => (sk.id === editingId ? { ...sk, ...form } : sk)))
-    } else {
-      setSubList([
-        ...subList,
-        {
-          id: `sk${Date.now()}`,
-          kriteriaId: selectedKriteriaId,
-          namaKriteria: currentKriteria.nama,
-          ...form,
-        },
-      ])
+      if (
+        !selectedKriteriaId &&
+        result.length
+      ) {
+        setSelectedKriteriaId(
+          result[0].id
+        )
+      }
     }
-    setOpenModal(false)
-  }
 
-  const handleDelete = (id: string) => {
-    setSubList(subList.filter((sk) => sk.id !== id))
-  }
+  const loadSub =
+    async () => {
+      if (
+        !selectedKriteriaId
+      ) {
+        setSubList([])
+        return
+      }
 
-  const columns: Column<SubKriteria>[] = [
-    {
-      key: 'nilai',
-      header: 'Nilai (Skor)',
-      render: (row) => (
-        <span className="w-8 h-8 rounded-full bg-green-100 dark:bg-slate-900 text-green-700 dark:text-green-400 font-bold flex items-center justify-center text-sm border border-green-300 dark:border-green-500/50 dark:shadow-[0_0_8px_rgba(34,197,94,0.2)]">
-          {row.nilai}
-        </span>
-      ),
-    },
-    {
-      key: 'keterangan',
-      header: 'Keterangan / Range Opsi',
-      render: (row) => <span className="font-medium text-slate-800 dark:text-slate-100">{row.keterangan}</span>,
-    },
-    {
-      key: 'actions',
-      header: 'Aksi',
-      render: (row) => (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(row)}>
-            <Edit2 className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => handleDelete(row.id)}>
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
-        </div>
-      ),
-    },
-  ]
+      const result =
+        await getAdminSubKriteria(
+          selectedKriteriaId
+        )
+
+      setSubList(
+        result
+      )
+    }
+
+  useEffect(() => {
+    const load =
+      async () => {
+        try {
+          setLoading(true)
+
+          await loadKriteria()
+        } catch (err: any) {
+          setError(
+            err.response
+              ?.data?.message ||
+            'Gagal mengambil kriteria.'
+          )
+        } finally {
+          setLoading(false)
+        }
+      }
+
+    load()
+  }, [])
+
+  useEffect(() => {
+    if (
+      !selectedKriteriaId
+    ) return
+
+    loadSub().catch(
+      (err: any) => {
+        setError(
+          err.response
+            ?.data?.message ||
+          'Gagal mengambil subkriteria.'
+        )
+      }
+    )
+  }, [
+    selectedKriteriaId,
+  ])
+
+  const handleAdd =
+    () => {
+      setEditingId(null)
+
+      setForm({
+        nilai: 1,
+        nama: '',
+        keterangan: '',
+      })
+
+      setOpenModal(true)
+    }
+
+  const handleEdit =
+    (
+      item: AdminSubKriteria
+    ) => {
+      setEditingId(
+        item.id
+      )
+
+      setForm({
+        nilai: Number(
+          item.nilai
+        ),
+        nama: item.nama,
+        keterangan:
+          item.keterangan ||
+          '',
+      })
+
+      setOpenModal(true)
+    }
+
+  const handleSave =
+    async () => {
+      if (
+        !selectedKriteriaId ||
+        !form.nama
+      ) {
+        setError(
+          'Nama subkriteria wajib diisi.'
+        )
+        return
+      }
+
+      try {
+        setSaving(true)
+        setError('')
+
+        if (
+          editingId
+        ) {
+          await updateAdminSubKriteria(
+            editingId,
+            form
+          )
+        } else {
+          await createAdminSubKriteria(
+            {
+              kriteriaId:
+                selectedKriteriaId,
+              ...form,
+            }
+          )
+        }
+
+        setOpenModal(false)
+
+        await loadSub()
+      } catch (err: any) {
+        setError(
+          err.response
+            ?.data?.message ||
+          'Gagal menyimpan subkriteria.'
+        )
+      } finally {
+        setSaving(false)
+      }
+    }
+
+  const handleDelete =
+    async (
+      id: string
+    ) => {
+      if (
+        !window.confirm(
+          'Hapus subkriteria ini?'
+        )
+      ) {
+        return
+      }
+
+      try {
+        await deleteAdminSubKriteria(
+          id
+        )
+
+        await loadSub()
+      } catch (err: any) {
+        setError(
+          err.response
+            ?.data?.message ||
+          'Gagal menghapus subkriteria.'
+        )
+      }
+    }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Pengelolaan Subkriteria"
-        description="Kelola rentang pilihan jawaban dan bobot nilainya untuk setiap kriteria"
+        description="Data subkriteria tersimpan di database"
       >
-        <Button onClick={handleOpenAdd}>
+        <Button
+          onClick={
+            handleAdd
+          }
+          disabled={
+            !currentKriteria
+          }
+        >
           <Plus className="w-4 h-4 mr-2" />
           Tambah Subkriteria
         </Button>
       </PageHeader>
 
-      {/* Select Kriteria */}
+      {error && (
+        <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       <Card>
         <CardContent className="py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <p className="text-xs text-slate-400 dark:text-slate-400 font-medium">Pilih Kriteria:</p>
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                {currentKriteria.kode} - {currentKriteria.nama} ({currentKriteria.tipe.toUpperCase()})
+              <p className="text-xs text-slate-400">
+                Pilih Kriteria
+              </p>
+
+              <h3 className="text-base font-bold mt-1">
+                {currentKriteria
+                  ? `${currentKriteria.kode} - ${currentKriteria.nama}`
+                  : 'Belum ada kriteria'}
               </h3>
             </div>
-            <Select value={selectedKriteriaId} onValueChange={setSelectedKriteriaId}>
-              <SelectTrigger className="w-full sm:w-64 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700">
+
+            <Select
+              value={
+                selectedKriteriaId
+              }
+              onValueChange={
+                setSelectedKriteriaId
+              }
+            >
+              <SelectTrigger className="w-full sm:w-72">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-800">
-                {mockKriteria.map((k) => (
-                  <SelectItem key={k.id} value={k.id}>
-                    {k.kode} - {k.nama}
-                  </SelectItem>
-                ))}
+
+              <SelectContent>
+                {kriteriaList.map(
+                  (item) => (
+                    <SelectItem
+                      key={
+                        item.id
+                      }
+                      value={
+                        item.id
+                      }
+                    >
+                      {item.kode} -{' '}
+                      {
+                        item.nama
+                      }
+                    </SelectItem>
+                  )
+                )}
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
-      <DataTable columns={columns} data={filteredSub} />
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+        </div>
+      ) : (
+        <DataTable
+          columns={[
+            {
+              key: 'nilai',
+              header: 'Nilai',
+              render: (
+                row
+              ) => (
+                <span className="font-bold text-green-700">
+                  {Number(
+                    row.nilai
+                  )}
+                </span>
+              ),
+            },
 
-      {/* Modal */}
-      <Dialog open={openModal} onOpenChange={setOpenModal}>
+            {
+              key: 'nama',
+              header: 'Nama',
+              render: (
+                row
+              ) => (
+                <span className="font-medium">
+                  {row.nama}
+                </span>
+              ),
+            },
+
+            {
+              key: 'keterangan',
+              header: 'Keterangan',
+              render: (
+                row
+              ) =>
+                row.keterangan ||
+                '-',
+            },
+
+            {
+              key: 'actions',
+              header: 'Aksi',
+              render: (
+                row
+              ) => (
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      handleEdit(
+                        row
+                      )
+                    }
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      handleDelete(
+                        row.id
+                      )
+                    }
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+          data={
+            subList
+          }
+        />
+      )}
+
+      <Dialog
+        open={openModal}
+        onOpenChange={
+          setOpenModal
+        }
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingId ? 'Edit Subkriteria' : 'Tambah Subkriteria'} ({currentKriteria.kode})
+              {editingId
+                ? 'Edit Subkriteria'
+                : 'Tambah Subkriteria'}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <FormField label="Nilai / Skor (1-5)" required>
+          <div className="space-y-4">
+            <FormField
+              label="Nama Subkriteria"
+              required
+            >
+              <Input
+                value={
+                  form.nama
+                }
+                placeholder="Contoh: Rp 500.001 - Rp 1.000.000"
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    nama:
+                      e.target.value,
+                  })
+                }
+              />
+            </FormField>
+
+            <FormField
+              label="Nilai / Skor"
+              required
+            >
               <Input
                 type="number"
                 min="1"
                 max="5"
-                value={form.nilai}
-                onChange={(e) => setForm({ ...form, nilai: parseInt(e.target.value) || 1 })}
+                value={
+                  form.nilai
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    nilai:
+                      Number(
+                        e.target.value
+                      ),
+                  })
+                }
               />
             </FormField>
 
-            <FormField label="Keterangan Opsi" required>
+            <FormField label="Keterangan">
               <Input
-                placeholder="Contoh: < Rp 500.000, 3 orang, dsb."
-                value={form.keterangan}
-                onChange={(e) => setForm({ ...form, keterangan: e.target.value })}
+                value={
+                  form.keterangan
+                }
+                onChange={(
+                  e
+                ) =>
+                  setForm({
+                    ...form,
+                    keterangan:
+                      e.target.value,
+                  })
+                }
               />
             </FormField>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenModal(false)}>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setOpenModal(
+                  false
+                )
+              }
+            >
               Batal
             </Button>
-            <Button onClick={handleSave}>Simpan</Button>
+
+            <Button
+              onClick={
+                handleSave
+              }
+              disabled={
+                saving
+              }
+            >
+              {saving && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Simpan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
