@@ -75,32 +75,30 @@ export function LaporanPage() {
   ] = useState('')
 
   const load =
-    async () => {
-      try {
-        setLoading(true)
-        setError('')
+  async () => {
+    try {
+      setLoading(true)
+      setError('')
 
-        const result =
-          await getAdminTopsisResults()
+      const result =
+        await getAdminTopsisResults()
 
-        setResults(
-          result.results
-        )
-      } catch (error: any) {
-        console.error(
-          'GET LAPORAN ERROR:',
-          error
-        )
+      setResults(result)
+    } catch (error: any) {
+      console.error(
+        'GET LAPORAN ERROR:',
+        error
+      )
 
-        setError(
-          error.response
-            ?.data?.message ||
-            'Gagal mengambil laporan TOPSIS'
-        )
-      } finally {
-        setLoading(false)
-      }
+      setError(
+        error.response
+          ?.data?.message ||
+          'Gagal mengambil laporan TOPSIS'
+      )
+    } finally {
+      setLoading(false)
     }
+  }
 
   useEffect(() => {
     load()
