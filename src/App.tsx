@@ -1,4 +1,3 @@
-
 import {
   BrowserRouter,
   Routes,
@@ -36,149 +35,195 @@ import { PengaturanPage } from '@/pages/admin/PengaturanPage'
 import { PengajuanProvider } from '@/context/PengajuanContext'
 import { AuthProvider } from '@/context/AuthContext'
 
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
+
 export default function App() {
   return (
     <AuthProvider>
       <PengajuanProvider>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
-          <Routes>
+        <BrowserRouter
+          basename={import.meta.env.BASE_URL}
+        >
+          <ErrorBoundary>
+            <Routes>
 
-            {/* ==================== AUTH ==================== */}
-            <Route element={<AuthLayout />}>
-              <Route
-                path="/login"
-                element={<LoginPage />}
-              />
+              {/* ==================== AUTH ==================== */}
 
-              <Route
-                path="/register"
-                element={<RegisterPage />}
-              />
-
-              <Route
-                path="/admin/login"
-                element={<LoginPage />}
-              />
-            </Route>
-
-            {/* ==================== USER ==================== */}
-            <Route element={<UserLayout />}>
-              <Route
-                path="/dashboard"
-                element={<UserDashboardPage />}
-              />
-
-              <Route
-                path="/pengajuan"
-                element={<PengajuanPage />}
-              />
-
-              <Route
-                path="/pengajuan/form"
-                element={<FormDataMustahikPage />}
-              />
-
-              <Route
-                path="/kuesioner"
-                element={<KuesionerPage />}
-              />
-
-              <Route
-                path="/pantau-hasil"
-                element={<PantauHasilPage />}
-              />
-
-              <Route
-                path="/pantau-hasil/detail"
-                element={<DetailHasilPage />}
-              />
-
-              <Route
-                path="/profil"
-                element={<ProfilPage />}
-              />
-            </Route>
-
-            {/* ==================== ADMIN ==================== */}
-            <Route element={<AdminLayout />}>
-              <Route
-                path="/admin/dashboard"
-                element={<AdminDashboardPage />}
-              />
-
-              <Route
-                path="/admin/mustahik"
-                element={<DataMustahikPage />}
-              />
-
-              <Route
-                path="/admin/mustahik/:id"
-                element={<DetailMustahikPage />}
-              />
-
-              <Route
-                path="/admin/verifikasi"
-                element={<VerifikasiPage />}
-              />
-
-              <Route
-                path="/admin/verifikasi/:id"
-                element={<DetailVerifikasiPage />}
-              />
-
-              <Route
-                path="/admin/kriteria"
-                element={<KriteriaPage />}
-              />
-
-              <Route
-                path="/admin/subkriteria"
-                element={<SubkriteriaPage />}
-              />
-
-              <Route
-                path="/admin/topsis"
-                element={<ProcessTopsisPage />}
-              />
-
-              <Route
-                path="/admin/ranking"
-                element={<HasilRankingPage />}
-              />
-
-              <Route
-                path="/admin/laporan"
-                element={<LaporanPage />}
-              />
-
-              <Route
-                path="/admin/pengaturan"
-                element={<PengaturanPage />}
-              />
-            </Route>
-
-            {/* ==================== DEFAULT ==================== */}
-            <Route
-              path="/"
-              element={
-                <Navigate
-                  to="/login"
-                  replace
+              <Route element={<AuthLayout />}>
+                <Route
+                  path="/login"
+                  element={<LoginPage />}
                 />
-              }
-            />
 
-            <Route
-              path="*"
-              element={
-                <Navigate
-                  to="/login"
-                  replace
+                <Route
+                  path="/register"
+                  element={<RegisterPage />}
                 />
-              }
-            />
 
-          </Routes>
+                <Route
+                  path="/admin/login"
+                  element={<LoginPage />}
+                />
+              </Route>
+
+              {/* ==================== USER ==================== */}
+
+              <Route element={<UserLayout />}>
+                <Route
+                  path="/dashboard"
+                  element={
+                    <UserDashboardPage />
+                  }
+                />
+
+                <Route
+                  path="/pengajuan"
+                  element={
+                    <PengajuanPage />
+                  }
+                />
+
+                <Route
+                  path="/pengajuan/form"
+                  element={
+                    <FormDataMustahikPage />
+                  }
+                />
+
+                <Route
+                  path="/kuesioner"
+                  element={
+                    <KuesionerPage />
+                  }
+                />
+
+                <Route
+                  path="/pantau-hasil"
+                  element={
+                    <PantauHasilPage />
+                  }
+                />
+
+                <Route
+                  path="/pantau-hasil/detail"
+                  element={
+                    <DetailHasilPage />
+                  }
+                />
+
+                <Route
+                  path="/profil"
+                  element={
+                    <ProfilPage />
+                  }
+                />
+              </Route>
+
+              {/* ==================== ADMIN ==================== */}
+
+              <Route element={<AdminLayout />}>
+                <Route
+                  path="/admin/dashboard"
+                  element={
+                    <AdminDashboardPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/mustahik"
+                  element={
+                    <DataMustahikPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/mustahik/:id"
+                  element={
+                    <DetailMustahikPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/verifikasi"
+                  element={
+                    <VerifikasiPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/verifikasi/:id"
+                  element={
+                    <DetailVerifikasiPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/kriteria"
+                  element={
+                    <KriteriaPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/subkriteria"
+                  element={
+                    <SubkriteriaPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/topsis"
+                  element={
+                    <ProcessTopsisPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/ranking"
+                  element={
+                    <HasilRankingPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/laporan"
+                  element={
+                    <LaporanPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/pengaturan"
+                  element={
+                    <PengaturanPage />
+                  }
+                />
+              </Route>
+
+              {/* ==================== DEFAULT ==================== */}
+
+              <Route
+                path="/"
+                element={
+                  <Navigate
+                    to="/login"
+                    replace
+                  />
+                }
+              />
+
+              <Route
+                path="*"
+                element={
+                  <Navigate
+                    to="/login"
+                    replace
+                  />
+                }
+              />
+
+            </Routes>
+          </ErrorBoundary>
         </BrowserRouter>
       </PengajuanProvider>
     </AuthProvider>
