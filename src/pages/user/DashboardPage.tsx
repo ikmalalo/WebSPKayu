@@ -156,6 +156,34 @@ export function UserDashboardPage() {
         </div>
       </div>
 
+      {/* MAQZIS Info */}
+      <div className="relative overflow-hidden rounded-xl border border-emerald-100 dark:border-slate-800 bg-gradient-to-r from-emerald-50 via-teal-50/20 to-green-50/30 dark:from-slate-900 dark:to-slate-900/50 p-5 shadow-sm">
+        <div className="absolute top-0 right-0 p-4 opacity-10 dark:opacity-5 pointer-events-none">
+          <svg className="w-24 h-24 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M12 3c.132 0 .263 0 .393.007a7.5 7.5 0 0 0 7.92 12.446A9 9 0 1 1 12 3z" />
+          </svg>
+        </div>
+        <div className="flex flex-col sm:flex-row items-start gap-4">
+          <div className="p-3 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-500/20 shrink-0">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 4a4.5 4.5 0 00-4.5 4.5V12h9V8.5A4.5 4.5 0 0012 4z" />
+              <path d="M12 2v2" />
+              <path d="M4 10v11M3 10h2M20 10v11M19 10h2" />
+              <path d="M6 12v9h12v-9" />
+              <path d="M9 21v-5a3 3 0 0 1 6 0v5" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1.5">
+              MAQZIS <span className="text-sm font-normal text-slate-500 dark:text-slate-400">(Maqashid-Based Zakat Information System)</span>
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-350 leading-relaxed">
+              Sistem pendukung keputusan dan monitoring berbasis <strong>Maqashid Syariah</strong> yang dirancang untuk membantu lembaga zakat dalam melakukan seleksi, penyaluran, pendampingan, monitoring, dan evaluasi dampak zakat produktif secara terintegrasi.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* QUICK STATS */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* STATUS */}

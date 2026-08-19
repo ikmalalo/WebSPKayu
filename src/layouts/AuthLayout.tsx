@@ -8,11 +8,11 @@ export function AuthLayout() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4 shadow-sm">
-            <img src={logoImg} alt="Logo SPK Mustahik" className="w-14 h-14 object-contain rounded-2xl" />
+            <img src={logoImg} alt="Logo MAQZIS" className="w-14 h-14 object-contain rounded-2xl" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">SPK Mustahik</h1>
+          <h1 className="text-2xl font-bold text-slate-900">MAQZIS</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Sistem Pendukung Keputusan Kelayakan Mustahik
+            Maqashid-Based Zakat Information System
           </p>
         </div>
 
@@ -23,7 +23,7 @@ export function AuthLayout() {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 mt-6">
-          © 2024 SPK Mustahik. Sistem Pengelolaan Zakat.
+          © 2024 MAQZIS. Maqashid-Based Zakat Information System.
         </p>
       </div>
     </div>

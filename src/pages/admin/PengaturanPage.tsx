@@ -17,7 +17,7 @@ export function PengaturanPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Pengaturan Sistem" description="Konfigurasi parameter aplikasi SPK Mustahik" />
+      <PageHeader title="Pengaturan Sistem" description="Konfigurasi parameter aplikasi MAQZIS" />
 
       {/* General config */}
       <Card>

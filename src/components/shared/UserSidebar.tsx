@@ -62,10 +62,10 @@ export function UserSidebar({ open, onClose }: SidebarProps) {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
-            <img src={logoImg} alt="Logo SPK Mustahik" className="w-8 h-8 object-contain rounded-lg" />
+            <img src={logoImg} alt="Logo MAQZIS" className="w-8 h-8 object-contain rounded-lg" />
             <div>
-              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">SPK Mustahik</span>
-              <p className="text-xs text-slate-400 leading-none">Portal Pengajuan</p>
+              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">MAQZIS</span>
+              <p className="text-xs text-slate-400 leading-none">Maqashid-Based Zakat Information System</p>
             </div>
           </div>
           <button

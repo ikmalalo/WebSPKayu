@@ -27,7 +27,7 @@ const routeLabels: Record<string, string> = {
 export function Topbar({ onMenuClick }: TopbarProps) {
   const location = useLocation()
   const currentPath = location.pathname
-  const pageTitle = routeLabels[currentPath] || 'SPK Mustahik'
+  const pageTitle = routeLabels[currentPath] || 'MAQZIS'
 
   const [isDark, setIsDark] = useState(() => {
     return document.documentElement.classList.contains('dark')

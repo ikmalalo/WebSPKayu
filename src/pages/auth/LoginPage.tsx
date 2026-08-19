@@ -575,49 +575,6 @@ export function LoginPage() {
           </Link>
         </p>
       </div>
-
-      {/* LOGIN CEPAT */}
-      <div className="mt-4 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
-        <p className="text-xs text-slate-500 font-semibold mb-2">
-          Login Cepat
-        </p>
-
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              fillQuickLogin('user')
-            }
-            disabled={loading}
-            className="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 hover:text-green-700 transition-colors shadow-sm flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="font-bold text-slate-900">
-              Login User
-            </span>
-
-            <span className="text-[10px] text-slate-400">
-              user@example.com
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              fillQuickLogin('admin')
-            }
-            disabled={loading}
-            className="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 hover:text-green-700 transition-colors shadow-sm flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span className="font-bold text-slate-900">
-              Login Admin
-            </span>
-
-            <span className="text-[10px] text-slate-400">
-              admin@spkmustahik.id
-            </span>
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
