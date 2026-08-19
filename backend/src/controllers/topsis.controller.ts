@@ -1,9 +1,14 @@
-import type { Request, Response } from 'express'
+import type {
+  Request,
+  Response,
+} from 'express'
+
 import {
   PengajuanStatus,
 } from '@prisma/client'
 
 import { prisma } from '../config/prisma'
+
 import {
   fail,
   success,
@@ -13,11 +18,254 @@ import {
   calculateTopsis,
 } from '../services/topsis/topsis.service'
 
+// ============================================================
+// GET KANDIDAT TOPSIS
+// ============================================================
+//
+// Endpoint:
+//
+// GET /api/admin/topsis/candidates
+//
+// Fungsi:
+//
+// Mengambil calon alternatif TOPSIS berdasarkan data:
+//
+// Pengajuan
+//     +
+// JawabanKuesioner
+//
+// Jadi halaman Proses TOPSIS tidak bergantung kepada
+// TopsisResult.
+//
+// Ini penting karena sebelum tombol "Hitung TOPSIS"
+// ditekan, TopsisResult memang belum ada.
+//
+// ============================================================
+
+export async function getTopsisCandidates(
+  _req: Request,
+  res: Response
+) {
+  try {
+    // ========================================================
+    // 1. AMBIL KRITERIA AKTIF
+    // ========================================================
+
+    const criteria =
+      await prisma.kriteria.findMany({
+        where: {
+          aktif: true,
+        },
+
+        orderBy: {
+          kode: 'asc',
+        },
+
+        select: {
+          id: true,
+          kode: true,
+          nama: true,
+          bobot: true,
+          tipe: true,
+          deskripsi: true,
+          aktif: true,
+        },
+      })
+
+    if (
+      criteria.length === 0
+    ) {
+      return success(
+        res,
+        'Belum ada kriteria aktif.',
+        {
+          criteria: [],
+          candidates: [],
+        }
+      )
+    }
+
+    // ========================================================
+    // 2. AMBIL PENGAJUAN YANG MASUK ALUR TOPSIS
+    // ========================================================
+    //
+    // LOLOS_VERIFIKASI
+    //     -> baru masuk proses TOPSIS
+    //
+    // DIPROSES_TOPSIS
+    //     -> sedang menunggu / siap dihitung
+    //
+    // LAYAK_DIDANAI
+    // TIDAK_DIDANAI
+    //     -> sudah pernah dihitung
+    //
+    // Status final tetap dimasukkan agar seluruh alternatif
+    // tetap konsisten jika admin melakukan perhitungan ulang.
+    //
+    // ========================================================
+
+    const pengajuan =
+      await prisma.pengajuan.findMany({
+        where: {
+          status: {
+            in: [
+              PengajuanStatus.LOLOS_VERIFIKASI,
+
+              PengajuanStatus.DIPROSES_TOPSIS,
+
+              PengajuanStatus.LAYAK_DIDANAI,
+
+              PengajuanStatus.TIDAK_DIDANAI,
+            ],
+          },
+        },
+
+        include: {
+          mustahik: {
+            select: {
+              id: true,
+              namaLengkap: true,
+              nik: true,
+            },
+          },
+
+          jawaban: {
+            include: {
+              kriteria: {
+                select: {
+                  id: true,
+                  kode: true,
+                  nama: true,
+                },
+              },
+
+              subKriteria: {
+                select: {
+                  id: true,
+                  nama: true,
+                  nilai: true,
+                  keterangan: true,
+                },
+              },
+            },
+
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+        },
+
+        orderBy: {
+          createdAt: 'asc',
+        },
+      })
+
+    // ========================================================
+    // 3. HANYA AMBIL YANG KUESIONERNYA LENGKAP
+    // ========================================================
+
+    const candidates =
+      pengajuan
+        .filter(
+          (item) =>
+            criteria.every(
+              (criterion) =>
+                item.jawaban.some(
+                  (answer) =>
+                    answer.kriteriaId ===
+                    criterion.id
+                )
+            )
+        )
+        .map(
+          (item) => ({
+            pengajuanId:
+              item.id,
+
+            status:
+              item.status,
+
+            mustahik: {
+              id:
+                item.mustahik.id,
+
+              namaLengkap:
+                item.mustahik.namaLengkap,
+
+              nik:
+                item.mustahik.nik,
+            },
+
+            jawaban:
+              criteria.map(
+                (criterion) => {
+                  const answer =
+                    item.jawaban.find(
+                      (itemAnswer) =>
+                        itemAnswer.kriteriaId ===
+                        criterion.id
+                    )
+
+                  return {
+                    kriteriaId:
+                      criterion.id,
+
+                    kode:
+                      criterion.kode,
+
+                    nama:
+                      criterion.nama,
+
+                    nilai:
+                      Number(
+                        answer?.nilai ??
+                        0
+                      ),
+                  }
+                }
+              ),
+          })
+        )
+
+    // ========================================================
+    // 4. RESPONSE
+    // ========================================================
+
+    return success(
+      res,
+      'Kandidat TOPSIS berhasil diambil.',
+      {
+        criteria,
+        candidates,
+      }
+    )
+  } catch (error) {
+    console.error(
+      'GET TOPSIS CANDIDATES ERROR:',
+      error
+    )
+
+    return fail(
+      res,
+      'Gagal mengambil kandidat TOPSIS.',
+      500
+    )
+  }
+}
+
+// ============================================================
+// PROCESS TOPSIS
+// ============================================================
+
 export async function processTopsis(
   req: Request,
   res: Response
 ) {
   try {
+    // ========================================================
+    // 1. THRESHOLD
+    // ========================================================
+
     const threshold =
       Number(
         req.body.layakThreshold
@@ -37,9 +285,9 @@ export async function processTopsis(
       )
     }
 
-    // ==========================================================
-    // 1. AMBIL KRITERIA AKTIF
-    // ==========================================================
+    // ========================================================
+    // 2. AMBIL KRITERIA AKTIF
+    // ========================================================
 
     const criteria =
       await prisma.kriteria.findMany({
@@ -66,28 +314,30 @@ export async function processTopsis(
       )
     }
 
-    // ==========================================================
-    // 2. AMBIL SEMUA PENGAJUAN YANG SUDAH SIAP DINILAI
+    // ========================================================
+    // 3. AMBIL SEMUA ALTERNATIF TOPSIS
+    // ========================================================
     //
-    // Kita TIDAK lagi hanya mengambil:
-    // DIPROSES_TOPSIS
+    // Jangan hanya DIPROSES_TOPSIS.
     //
-    // Karena setelah hasil TOPSIS sebelumnya tersimpan,
-    // status pengajuan berubah menjadi:
+    // Karena hasil TOPSIS sebelumnya mengubah status menjadi:
     //
     // LAYAK_DIDANAI
     // atau
     // TIDAK_DIDANAI
     //
-    // Kalau hanya menggunakan DIPROSES_TOPSIS,
-    // peserta yang sudah pernah dihitung akan hilang
-    // dari matriks TOPSIS berikutnya.
-    // ==========================================================
+    // Jika admin menghitung ulang, mereka tetap harus masuk
+    // ke matriks yang sama.
+    //
+    // ========================================================
 
     const eligibleStatuses = [
       PengajuanStatus.LOLOS_VERIFIKASI,
+
       PengajuanStatus.DIPROSES_TOPSIS,
+
       PengajuanStatus.LAYAK_DIDANAI,
+
       PengajuanStatus.TIDAK_DIDANAI,
     ]
 
@@ -115,9 +365,9 @@ export async function processTopsis(
         },
       })
 
-    // ==========================================================
-    // 3. FILTER PENGAJUAN DENGAN KUESIONER LENGKAP
-    // ==========================================================
+    // ========================================================
+    // 4. FILTER KUESIONER LENGKAP
+    // ========================================================
 
     const ready =
       pengajuan.filter(
@@ -142,9 +392,9 @@ export async function processTopsis(
       )
     }
 
-    // ==========================================================
-    // 4. BUAT MATRIKS X
-    // ==========================================================
+    // ========================================================
+    // 5. MATRKS X
+    // ========================================================
 
     const alternatives =
       ready.map(
@@ -170,7 +420,10 @@ export async function processTopsis(
         })
       )
 
-    // Pastikan tidak ada nilai 0 yang tidak disengaja.
+    // ========================================================
+    // 6. VALIDASI NILAI
+    // ========================================================
+
     const invalidAlternative =
       alternatives.find(
         (alternative) =>
@@ -194,9 +447,9 @@ export async function processTopsis(
       )
     }
 
-    // ==========================================================
-    // 5. HITUNG TOPSIS
-    // ==========================================================
+    // ========================================================
+    // 7. HITUNG TOPSIS
+    // ========================================================
 
     const results =
       calculateTopsis(
@@ -215,13 +468,9 @@ export async function processTopsis(
         )
       )
 
-    // ==========================================================
-    // 6. SIMPAN HASIL
-    //
-    // Karena kita ingin satu ranking yang konsisten,
-    // hasil TOPSIS lama untuk peserta yang sedang dihitung
-    // dihapus terlebih dahulu.
-    // ==========================================================
+    // ========================================================
+    // 8. SIMPAN HASIL
+    // ========================================================
 
     const persisted =
       await prisma.$transaction(
@@ -232,12 +481,16 @@ export async function processTopsis(
                 item.id
             )
 
-          // Hapus detail TOPSIS melalui parent result.
+          // --------------------------------------------------
+          // Hapus hasil lama
+          // --------------------------------------------------
+
           await tx.topsisResult.deleteMany(
             {
               where: {
                 pengajuanId: {
-                  in: pengajuanIds,
+                  in:
+                    pengajuanIds,
                 },
               },
             }
@@ -245,6 +498,10 @@ export async function processTopsis(
 
           const output: any[] =
             []
+
+          // --------------------------------------------------
+          // Simpan hasil baru
+          // --------------------------------------------------
 
           for (
             const result of results
@@ -305,18 +562,24 @@ export async function processTopsis(
                   include: {
                     pengajuan: {
                       include: {
-                        mustahik: true,
+                        mustahik:
+                          true,
                       },
                     },
 
                     details: {
                       include: {
-                        kriteria: true,
+                        kriteria:
+                          true,
                       },
                     },
                   },
                 }
               )
+
+            // ------------------------------------------------
+            // Update status pengajuan
+            // ------------------------------------------------
 
             await tx.pengajuan.update(
               {
@@ -340,9 +603,9 @@ export async function processTopsis(
         }
       )
 
-    // ==========================================================
-    // 7. RESPONSE
-    // ==========================================================
+    // ========================================================
+    // 9. RESPONSE
+    // ========================================================
 
     return success(
       res,
@@ -373,7 +636,7 @@ export async function processTopsis(
 }
 
 // ============================================================
-// GET SEMUA HASIL TOPSIS TERBARU
+// GET SEMUA HASIL TOPSIS
 // ============================================================
 
 export async function getTopsisResults(
@@ -405,7 +668,8 @@ export async function getTopsisResults(
             },
 
             {
-              ranking: 'asc',
+              ranking:
+                'asc',
             },
           ],
         }
@@ -445,7 +709,8 @@ export async function getTopsisResult(
       await prisma.topsisResult.findUnique(
         {
           where: {
-            id: req.params.id,
+            id:
+              req.params.id,
           },
 
           include: {
@@ -487,7 +752,7 @@ export async function getTopsisResult(
 
     return fail(
       res,
-      'Gagal mengambil detail hasil TOPSIS.',
+      'Gagal mengambil detail TOPSIS.',
       500
     )
   }
