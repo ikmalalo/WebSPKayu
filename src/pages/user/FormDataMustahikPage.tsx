@@ -53,9 +53,7 @@ const API_URL =
  * ============================================================
  * FORM DATA PRIBADI
  *
- * PENTING:
- * Data ekonomi dan kondisi rumah TIDAK ada lagi di sini.
- *
+ * Data ekonomi dan kondisi rumah TIDAK ada di halaman ini.
  * Data tersebut diisi melalui KUESIONER.
  * ============================================================
  */
@@ -91,42 +89,89 @@ const emptyForm: PersonalFormData = {
 }
 
 /*
- * Adapt response backend ke tipe frontend.
+ * ============================================================
+ * HELPER FORMAT TANGGAL
+ * ============================================================
  */
+
+function formatDateInput(
+  value: unknown
+): string {
+  if (
+    !value
+  ) {
+    return ''
+  }
+
+  const date =
+    new Date(
+      String(value)
+    )
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return ''
+  }
+
+  return date
+    .toISOString()
+    .split('T')[0]
+}
+
+/*
+ * ============================================================
+ * ADAPT PENGAJUAN BACKEND -> FRONTEND
+ * ============================================================
+ */
+
 function adaptPengajuan(
   p: any
 ): Pengajuan {
   return {
     id: p.id,
-    userId: p.userId,
-    mustahikId: p.mustahikId,
+
+    userId:
+      p.userId,
+
+    mustahikId:
+      p.mustahikId,
+
     namaLengkap:
       p.mustahik?.namaLengkap ||
       '',
+
     nik:
       p.mustahik?.nik ||
       '',
-    status: p.status,
+
+    status:
+      p.status,
+
     tanggalPengajuan:
       p.createdAt
-        ? new Date(
+        ? formatDateInput(
             p.createdAt
           )
-            .toISOString()
-            .split('T')[0]
-        : new Date()
-            .toISOString()
-            .split('T')[0],
+        : formatDateInput(
+            p.tanggalPengajuan
+          ),
+
     tanggalVerifikasi:
       p.verifications?.[0]
         ?.createdAt
-        ? new Date(
+        ? formatDateInput(
             p.verifications[0]
               .createdAt
           )
-            .toISOString()
-            .split('T')[0]
-        : undefined,
+        : p.tanggalVerifikasi
+          ? formatDateInput(
+              p.tanggalVerifikasi
+            )
+          : undefined,
+
     catatan:
       p.verifications?.[0]
         ?.catatan ||
@@ -134,6 +179,12 @@ function adaptPengajuan(
       undefined,
   }
 }
+
+/*
+ * ============================================================
+ * PAGE
+ * ============================================================
+ */
 
 export function FormDataMustahikPage() {
   const navigate =
@@ -146,57 +197,96 @@ export function FormDataMustahikPage() {
 
   const {
     token,
+    currentUser,
   } = useAuth()
 
-  const [form, setForm] =
+  const [
+    form,
+    setForm,
+  ] =
     useState<PersonalFormData>(
       emptyForm
     )
 
-  const [loading, setLoading] =
+  const [
+    loading,
+    setLoading,
+  ] =
     useState(false)
 
   const [
     initialLoading,
     setInitialLoading,
-  ] = useState(true)
+  ] =
+    useState(true)
 
   const [
     isEditMode,
     setIsEditMode,
-  ] = useState(false)
+  ] =
+    useState(false)
 
   const [
     error,
     setError,
-  ] = useState<string | null>(
-    null
-  )
+  ] =
+    useState<string | null>(
+      null
+    )
+
+  /*
+   * ==========================================================
+   * AUTH HEADERS
+   * ==========================================================
+   */
 
   const authHeaders = {
-    Authorization: `Bearer ${token}`,
+    Authorization:
+      `Bearer ${token}`,
   }
 
   /*
    * ==========================================================
-   * LOAD DATA USER
+   * LOAD DATA
    * ==========================================================
    */
 
   useEffect(() => {
+    let mounted = true
+
     const loadData =
       async () => {
-        if (!token) {
-          setInitialLoading(
-            false
-          )
+        if (
+          !token
+        ) {
+          if (mounted) {
+            setInitialLoading(
+              false
+            )
+          }
+
           return
         }
 
         try {
+          setError(null)
+
           /*
-           * Ambil profil user.
+           * ==================================================
+           * 1. AMBIL PROFILE USER
+           * ==================================================
+           *
+           * Endpoint ini mengembalikan:
+           *
+           * user.name
+           * user.email
+           * user.phone
+           * user.mustahik
+           *
+           * Nama dan nomor HP dari REGISTER
+           * menjadi sumber utama.
            */
+
           const profileRes =
             await axios.get(
               `${API_URL}/user/profile`,
@@ -206,70 +296,104 @@ export function FormDataMustahikPage() {
               }
             )
 
-          const mustahik =
+          const user =
             profileRes.data
-              ?.data?.user
-              ?.mustahik
+              ?.data
+              ?.user
 
           /*
-           * Kalau user sudah pernah
-           * mengisi data pribadi,
-           * tampilkan kembali.
-           *
-           * Data ekonomi TIDAK diambil
-           * ke form ini.
+           * ==================================================
+           * 2. DATA MUSTAHIK
+           * ==================================================
            */
-          if (mustahik) {
+
+          const mustahik =
+            user?.mustahik
+
+          /*
+           * ==================================================
+           * 3. ISI FORM
+           * ==================================================
+           *
+           * PRIORITAS:
+           *
+           * Nama:
+           * User.name
+           *   ↓
+           * Mustahik.namaLengkap
+           *
+           * HP:
+           * User.phone
+           *   ↓
+           * Mustahik.noHp
+           *
+           * Jadi ketika user baru register,
+           * nama dan HP langsung muncul.
+           */
+
+          if (
+            mounted
+          ) {
             setForm({
               nik:
-                mustahik.nik ||
+                mustahik?.nik ||
                 '',
+
               namaLengkap:
-                mustahik.namaLengkap ||
+                user?.name ||
+                mustahik?.namaLengkap ||
                 '',
+
               tempatLahir:
-                mustahik.tempatLahir ||
+                mustahik?.tempatLahir ||
                 '',
+
               tanggalLahir:
-                mustahik.tanggalLahir
-                  ? new Date(
-                      mustahik.tanggalLahir
-                    )
-                      .toISOString()
-                      .split(
-                        'T'
-                      )[0]
-                  : '',
+                formatDateInput(
+                  mustahik?.tanggalLahir
+                ),
+
               jenisKelamin:
-                mustahik.jenisKelamin ||
+                mustahik?.jenisKelamin ||
                 '',
+
               statusPernikahan:
-                mustahik.statusPernikahan ||
+                mustahik?.statusPernikahan ||
                 '',
+
               noHp:
-                mustahik.noHp ||
+                user?.phone ||
+                mustahik?.noHp ||
                 '',
+
               alamat:
-                mustahik.alamat ||
+                mustahik?.alamat ||
                 '',
+
               kelurahan:
-                mustahik.kelurahan ||
+                mustahik?.kelurahan ||
                 '',
+
               kecamatan:
-                mustahik.kecamatan ||
+                mustahik?.kecamatan ||
                 '',
+
               kota:
-                mustahik.kota ||
+                mustahik?.kota ||
                 '',
+
               provinsi:
-                mustahik.provinsi ||
+                mustahik?.provinsi ||
                 '',
             })
           }
 
           /*
-           * Cek apakah sudah mempunyai pengajuan.
+           * ==================================================
+           * 4. CEK PENGAJUAN YANG SUDAH ADA
+           * ==================================================
            */
+
           const pengajuanRes =
             await axios.get(
               `${API_URL}/pengajuan/me`,
@@ -281,41 +405,161 @@ export function FormDataMustahikPage() {
 
           const list: any[] =
             pengajuanRes.data
-              ?.data?.pengajuan ||
+              ?.data
+              ?.pengajuan ||
             []
 
           if (
-            list.length > 0
+            list.length >
+            0
           ) {
-            setIsEditMode(
-              true
-            )
+            const latest =
+              [...list].sort(
+                (
+                  a,
+                  b
+                ) =>
+                  new Date(
+                    b.createdAt ||
+                      b.tanggalPengajuan ||
+                      0
+                  ).getTime() -
+                  new Date(
+                    a.createdAt ||
+                      a.tanggalPengajuan ||
+                      0
+                  ).getTime()
+              )[0]
 
             const adapted =
               adaptPengajuan(
-                list[0]
+                latest
               )
 
-            /*
-             * Sinkronkan context.
-             */
-            setPengajuan(
-              adapted
+            if (
+              mounted
+            ) {
+              setIsEditMode(
+                true
+              )
+
+              setPengajuan(
+                adapted
+              )
+
+              /*
+               * Jika data Mustahik sudah ada,
+               * tetap sinkronkan nama dan HP
+               * dengan data akun User.
+               */
+              setForm(
+                (
+                  previous
+                ) => ({
+                  ...previous,
+
+                  namaLengkap:
+                    user?.name ||
+                    latest.mustahik
+                      ?.namaLengkap ||
+                    previous.namaLengkap,
+
+                  noHp:
+                    user?.phone ||
+                    latest.mustahik
+                      ?.noHp ||
+                    previous.noHp,
+
+                  nik:
+                    latest.mustahik
+                      ?.nik ||
+                    previous.nik,
+
+                  tempatLahir:
+                    latest.mustahik
+                      ?.tempatLahir ||
+                    previous.tempatLahir,
+
+                  tanggalLahir:
+                    formatDateInput(
+                      latest.mustahik
+                        ?.tanggalLahir
+                    ) ||
+                    previous.tanggalLahir,
+
+                  jenisKelamin:
+                    latest.mustahik
+                      ?.jenisKelamin ||
+                    previous.jenisKelamin,
+
+                  statusPernikahan:
+                    latest.mustahik
+                      ?.statusPernikahan ||
+                    previous.statusPernikahan,
+
+                  alamat:
+                    latest.mustahik
+                      ?.alamat ||
+                    previous.alamat,
+
+                  kelurahan:
+                    latest.mustahik
+                      ?.kelurahan ||
+                    previous.kelurahan,
+
+                  kecamatan:
+                    latest.mustahik
+                      ?.kecamatan ||
+                    previous.kecamatan,
+
+                  kota:
+                    latest.mustahik
+                      ?.kota ||
+                    previous.kota,
+
+                  provinsi:
+                    latest.mustahik
+                      ?.provinsi ||
+                    previous.provinsi,
+                })
+              )
+            }
+          }
+        } catch (
+          requestError: any
+        ) {
+          console.error(
+            'GAGAL MEMUAT DATA PENGAJUAN:',
+            requestError
+          )
+
+          if (
+            mounted
+          ) {
+            setError(
+              requestError
+                .response
+                ?.data
+                ?.message ||
+                'Gagal memuat data pengguna.'
             )
           }
-        } catch (error) {
-          console.error(
-            'Gagal memuat data pengajuan:',
-            error
-          )
         } finally {
-          setInitialLoading(
-            false
-          )
+          if (
+            mounted
+          ) {
+            setInitialLoading(
+              false
+            )
+          }
         }
       }
 
     loadData()
+
+    return () => {
+      mounted = false
+    }
   }, [token])
 
   /*
@@ -328,10 +572,15 @@ export function FormDataMustahikPage() {
     field: keyof PersonalFormData,
     value: string
   ) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
+    setForm(
+      (
+        previous
+      ) => ({
+        ...previous,
+        [field]:
+          value,
+      })
+    )
   }
 
   /*
@@ -343,8 +592,9 @@ export function FormDataMustahikPage() {
   const handleSubmit =
     async () => {
       /*
-       * Validasi minimal.
+       * Validasi NIK.
        */
+
       if (
         !form.nik ||
         form.nik.length !==
@@ -353,67 +603,115 @@ export function FormDataMustahikPage() {
         setError(
           'NIK harus terdiri dari 16 digit.'
         )
+
         return
       }
+
+      /*
+       * Nama harus berasal dari akun.
+       */
 
       if (
         !form.namaLengkap
       ) {
         setError(
-          'Nama lengkap wajib diisi.'
+          'Nama lengkap dari akun belum tersedia.'
         )
+
         return
       }
 
-      setLoading(true)
+      /*
+       * Nomor HP juga harus tersedia.
+       */
+
+      if (
+        !form.noHp
+      ) {
+        setError(
+          'Nomor HP dari akun belum tersedia.'
+        )
+
+        return
+      }
+
+      setLoading(
+        true
+      )
+
       setError(null)
 
       try {
         /*
-         * HANYA kirim data pribadi.
+         * ==================================================
+         * PAYLOAD
+         * ==================================================
          *
-         * Tidak ada:
-         * penghasilan
-         * jumlahTanggungan
-         * pekerjaan
-         * statusRumah
-         * kondisiRumah
-         * kepemilikanAset
+         * Data ekonomi TIDAK dikirim.
          *
-         * karena semuanya berasal
-         * dari kuesioner.
+         * Penghasilan
+         * Jumlah tanggungan
+         * Kondisi rumah
+         * Pekerjaan
+         * Kepemilikan aset
+         *
+         * semuanya melalui KUESIONER.
          */
+
         const payload = {
           nik:
             form.nik,
+
+          /*
+           * Nama diambil dari currentUser
+           * jika tersedia.
+           */
           namaLengkap:
+            currentUser?.name ||
             form.namaLengkap,
+
           tempatLahir:
             form.tempatLahir,
+
           tanggalLahir:
             form.tanggalLahir,
+
           jenisKelamin:
             form.jenisKelamin,
+
           statusPernikahan:
             form.statusPernikahan,
+
+          /*
+           * HP diambil dari currentUser
+           * jika tersedia.
+           */
           noHp:
+            currentUser?.phone ||
             form.noHp,
+
           alamat:
             form.alamat,
+
           kelurahan:
             form.kelurahan,
+
           kecamatan:
             form.kecamatan,
+
           kota:
             form.kota,
+
           provinsi:
             form.provinsi,
         }
 
         /*
-         * Kalau sudah mempunyai pengajuan,
-         * update data pribadi saja.
+         * ==================================================
+         * UPDATE DATA MUSTAHIK
+         * ==================================================
          */
+
         if (
           isEditMode &&
           pengajuan
@@ -427,9 +725,6 @@ export function FormDataMustahikPage() {
             }
           )
 
-          /*
-           * Langsung ke kuesioner.
-           */
           navigate(
             '/kuesioner'
           )
@@ -438,8 +733,11 @@ export function FormDataMustahikPage() {
         }
 
         /*
-         * Buat pengajuan baru.
+         * ==================================================
+         * CREATE PENGAJUAN
+         * ==================================================
          */
+
         const response =
           await axios.post(
             `${API_URL}/pengajuan`,
@@ -452,9 +750,12 @@ export function FormDataMustahikPage() {
 
         const created =
           response.data
-            ?.data?.pengajuan
+            ?.data
+            ?.pengajuan
 
-        if (created) {
+        if (
+          created
+        ) {
           setPengajuan(
             adaptPengajuan(
               created
@@ -463,25 +764,49 @@ export function FormDataMustahikPage() {
         }
 
         /*
-         * Setelah data pribadi selesai,
-         * user wajib mengisi kuesioner.
+         * Setelah data pribadi berhasil,
+         * lanjut ke kuesioner.
          */
+
         navigate(
           '/kuesioner'
         )
-      } catch (error: any) {
+      } catch (
+        requestError: any
+      ) {
         console.error(
-          'Gagal menyimpan data mustahik:',
-          error
+          'GAGAL MENYIMPAN DATA MUSTAHIK:',
+          requestError
         )
 
+        if (
+          requestError
+            .response
+            ?.status ===
+          409
+        ) {
+          setError(
+            requestError
+              .response
+              ?.data
+              ?.message ||
+              'Anda sudah memiliki pengajuan.'
+          )
+
+          return
+        }
+
         setError(
-          error.response
-            ?.data?.message ||
+          requestError
+            .response
+            ?.data
+            ?.message ||
             'Gagal menyimpan data. Silakan coba lagi.'
         )
       } finally {
-        setLoading(false)
+        setLoading(
+          false
+        )
       }
     }
 
@@ -522,7 +847,10 @@ export function FormDataMustahikPage() {
         description="Lengkapi data pribadi Anda. Data ekonomi dan kondisi tempat tinggal akan diisi melalui kuesioner."
       />
 
-      {/* ERROR */}
+      {/* ======================================================
+          ERROR
+      ====================================================== */}
+
       {error && (
         <div className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl">
           <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
@@ -533,7 +861,10 @@ export function FormDataMustahikPage() {
         </div>
       )}
 
-      {/* DATA PRIBADI */}
+      {/* ======================================================
+          DATA PRIBADI
+      ====================================================== */}
+
       <Card>
         <CardHeader>
           <CardTitle>
@@ -542,9 +873,16 @@ export function FormDataMustahikPage() {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* IDENTITAS */}
+
+          {/* ==================================================
+              IDENTITAS
+          ================================================== */}
+
           <FormSection title="Identitas Diri">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              {/* NIK */}
+
               <FormField
                 label="NIK"
                 htmlFor="nik"
@@ -559,43 +897,39 @@ export function FormDataMustahikPage() {
                     form.nik
                   }
                   onChange={(
-                    e
+                    event
                   ) =>
                     set(
                       'nik',
-                      e.target
-                        .value
-                        .replace(
-                          /\D/g,
-                          ''
-                        )
+                      event.target.value.replace(
+                        /\D/g,
+                        ''
+                      )
                     )
                   }
                 />
               </FormField>
 
+              {/* NAMA */}
+
               <FormField
                 label="Nama Lengkap"
                 htmlFor="nama"
                 required
+                hint="Otomatis dari nama saat registrasi"
               >
                 <Input
                   id="nama"
-                  placeholder="Sesuai KTP"
+                  placeholder="Nama lengkap"
                   value={
                     form.namaLengkap
                   }
-                  onChange={(
-                    e
-                  ) =>
-                    set(
-                      'namaLengkap',
-                      e.target
-                        .value
-                    )
-                  }
+                  readOnly
+                  className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed"
                 />
               </FormField>
+
+              {/* TEMPAT LAHIR */}
 
               <FormField
                 label="Tempat Lahir"
@@ -609,16 +943,17 @@ export function FormDataMustahikPage() {
                     form.tempatLahir
                   }
                   onChange={(
-                    e
+                    event
                   ) =>
                     set(
                       'tempatLahir',
-                      e.target
-                        .value
+                      event.target.value
                     )
                   }
                 />
               </FormField>
+
+              {/* TANGGAL LAHIR */}
 
               <FormField
                 label="Tanggal Lahir"
@@ -633,16 +968,17 @@ export function FormDataMustahikPage() {
                     form.tanggalLahir
                   }
                   onChange={(
-                    e
+                    event
                   ) =>
                     set(
                       'tanggalLahir',
-                      e.target
-                        .value
+                      event.target.value
                     )
                   }
                 />
               </FormField>
+
+              {/* JENIS KELAMIN */}
 
               <FormField
                 label="Jenis Kelamin"
@@ -680,6 +1016,8 @@ export function FormDataMustahikPage() {
                   </SelectContent>
                 </Select>
               </FormField>
+
+              {/* STATUS PERNIKAHAN */}
 
               <FormField
                 label="Status Pernikahan"
@@ -726,10 +1064,13 @@ export function FormDataMustahikPage() {
                 </Select>
               </FormField>
 
+              {/* NOMOR HP */}
+
               <FormField
                 label="Nomor HP"
                 htmlFor="no-hp"
                 required
+                hint="Otomatis dari nomor HP saat registrasi"
               >
                 <Input
                   id="no-hp"
@@ -738,23 +1079,21 @@ export function FormDataMustahikPage() {
                   value={
                     form.noHp
                   }
-                  onChange={(
-                    e
-                  ) =>
-                    set(
-                      'noHp',
-                      e.target
-                        .value
-                    )
-                  }
+                  readOnly
+                  className="bg-slate-100 dark:bg-slate-800 cursor-not-allowed"
                 />
               </FormField>
+
             </div>
           </FormSection>
 
-          {/* ALAMAT */}
+          {/* ==================================================
+              ALAMAT
+          ================================================== */}
+
           <FormSection title="Alamat">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
               <FormField
                 label="Alamat Lengkap"
                 htmlFor="alamat"
@@ -768,12 +1107,11 @@ export function FormDataMustahikPage() {
                     form.alamat
                   }
                   onChange={(
-                    e
+                    event
                   ) =>
                     set(
                       'alamat',
-                      e.target
-                        .value
+                      event.target.value
                     )
                   }
                 />
@@ -791,12 +1129,11 @@ export function FormDataMustahikPage() {
                     form.kelurahan
                   }
                   onChange={(
-                    e
+                    event
                   ) =>
                     set(
                       'kelurahan',
-                      e.target
-                        .value
+                      event.target.value
                     )
                   }
                 />
@@ -814,12 +1151,11 @@ export function FormDataMustahikPage() {
                     form.kecamatan
                   }
                   onChange={(
-                    e
+                    event
                   ) =>
                     set(
                       'kecamatan',
-                      e.target
-                        .value
+                      event.target.value
                     )
                   }
                 />
@@ -837,12 +1173,11 @@ export function FormDataMustahikPage() {
                     form.kota
                   }
                   onChange={(
-                    e
+                    event
                   ) =>
                     set(
                       'kota',
-                      e.target
-                        .value
+                      event.target.value
                     )
                   }
                 />
@@ -860,20 +1195,23 @@ export function FormDataMustahikPage() {
                     form.provinsi
                   }
                   onChange={(
-                    e
+                    event
                   ) =>
                     set(
                       'provinsi',
-                      e.target
-                        .value
+                      event.target.value
                     )
                   }
                 />
               </FormField>
+
             </div>
           </FormSection>
 
-          {/* INFO */}
+          {/* ==================================================
+              INFO
+          ================================================== */}
+
           <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-xl border border-green-200 dark:border-green-800">
             <p className="text-sm font-semibold text-green-800 dark:text-green-300">
               Selanjutnya: Kuesioner
@@ -890,16 +1228,24 @@ export function FormDataMustahikPage() {
               dasar perhitungan SPK TOPSIS.
             </p>
           </div>
+
         </CardContent>
       </Card>
 
-      {/* BUTTON */}
+      {/* ======================================================
+          BUTTON
+      ====================================================== */}
+
       <div className="flex justify-end">
         <Button
           onClick={
             handleSubmit
           }
-          disabled={loading}
+          disabled={
+            loading ||
+            !form.namaLengkap ||
+            !form.noHp
+          }
           className="min-w-[180px]"
         >
           {loading ? (
