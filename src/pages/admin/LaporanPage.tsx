@@ -47,12 +47,14 @@ import type {
 } from '@/types'
 
 export function LaporanPage() {
+  // ============================================================
+  // STATE
+  // ============================================================
+
   const [
     results,
     setResults,
-  ] = useState<
-    AdminTopsisResult[]
-  >([])
+  ] = useState<AdminTopsisResult[]>([])
 
   const [
     year,
@@ -74,8 +76,11 @@ export function LaporanPage() {
     setError,
   ] = useState('')
 
-  const load =
-  async () => {
+  // ============================================================
+  // LOAD DATA
+  // ============================================================
+
+  const load = async () => {
     try {
       setLoading(true)
       setError('')
@@ -83,113 +88,172 @@ export function LaporanPage() {
       const result =
         await getAdminTopsisResults()
 
-      setResults(result)
-    } catch (error: any) {
+      /*
+       * getAdminTopsisResults() sekarang mengembalikan
+       * AdminTopsisResult[] secara langsung.
+       *
+       * Jadi TIDAK menggunakan:
+       *
+       * result.results
+       *
+       * melainkan langsung:
+       *
+       * result
+       */
+
+      setResults(
+        Array.isArray(result)
+          ? result
+          : []
+      )
+    } catch (error: unknown) {
       console.error(
         'GET LAPORAN ERROR:',
         error
       )
 
-      setError(
-        error.response
-          ?.data?.message ||
-          'Gagal mengambil laporan TOPSIS'
-      )
+      let message =
+        'Gagal mengambil laporan TOPSIS'
+
+      if (
+        error instanceof Error &&
+        error.message
+      ) {
+        message =
+          error.message
+      }
+
+      setError(message)
     } finally {
       setLoading(false)
     }
   }
 
+  // ============================================================
+  // INITIAL LOAD
+  // ============================================================
+
   useEffect(() => {
-    load()
+    void load()
   }, [])
 
-  const years =
-    useMemo(() => {
-      const set =
-        new Set<string>()
+  // ============================================================
+  // YEARS
+  // ============================================================
 
-      results.forEach(
+  const years = useMemo(() => {
+    const yearSet =
+      new Set<string>()
+
+    results.forEach(
+      (item) => {
+        if (
+          !item.tanggalProses
+        ) {
+          return
+        }
+
+        const date =
+          new Date(
+            item.tanggalProses
+          )
+
+        if (
+          !Number.isNaN(
+            date.getTime()
+          )
+        ) {
+          yearSet.add(
+            String(
+              date.getFullYear()
+            )
+          )
+        }
+      }
+    )
+
+    return Array.from(
+      yearSet
+    ).sort(
+      (
+        a,
+        b
+      ) =>
+        Number(b) -
+        Number(a)
+    )
+  }, [results])
+
+  // ============================================================
+  // FILTER
+  // ============================================================
+
+  const filtered = useMemo(() => {
+    return results
+      .filter(
         (item) => {
+          if (
+            year === 'all'
+          ) {
+            return true
+          }
+
+          if (
+            !item.tanggalProses
+          ) {
+            return false
+          }
+
           const date =
             new Date(
               item.tanggalProses
             )
 
           if (
-            !Number.isNaN(
+            Number.isNaN(
               date.getTime()
             )
           ) {
-            set.add(
-              String(
-                date.getFullYear()
-              )
-            )
+            return false
           }
+
+          return (
+            date.getFullYear() ===
+            Number(year)
+          )
         }
       )
+      .filter(
+        (item) => {
+          if (
+            status === 'all'
+          ) {
+            return true
+          }
 
-      return Array.from(
-        set
-      ).sort(
+          return (
+            item.status ===
+            status
+          )
+        }
+      )
+      .sort(
         (
           a,
           b
         ) =>
-          Number(b) -
-          Number(a)
+          Number(a.ranking) -
+          Number(b.ranking)
       )
-    }, [results])
+  }, [
+    results,
+    year,
+    status,
+  ])
 
-  const filtered =
-    useMemo(() => {
-      return results
-        .filter(
-          (item) => {
-            if (
-              year ===
-              'all'
-            ) {
-              return true
-            }
-
-            return (
-              new Date(
-                item.tanggalProses
-              ).getFullYear() ===
-              Number(year)
-            )
-          }
-        )
-        .filter(
-          (item) => {
-            if (
-              status ===
-              'all'
-            ) {
-              return true
-            }
-
-            return (
-              item.status ===
-              status
-            )
-          }
-        )
-        .sort(
-          (
-            a,
-            b
-          ) =>
-            a.ranking -
-            b.ranking
-        )
-    }, [
-      results,
-      year,
-      status,
-    ])
+  // ============================================================
+  // STATISTICS
+  // ============================================================
 
   const layak =
     filtered.filter(
@@ -205,123 +269,178 @@ export function LaporanPage() {
         'TIDAK_DIDANAI'
     ).length
 
-  const formatDate =
-    (
-      value: string
-    ) => {
-      const date =
-        new Date(value)
+  // ============================================================
+  // FORMAT DATE
+  // ============================================================
 
-      if (
-        Number.isNaN(
-          date.getTime()
-        )
-      ) {
-        return '-'
+  const formatDate = (
+    value?: string | null
+  ) => {
+    if (!value) {
+      return '-'
+    }
+
+    const date =
+      new Date(value)
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+      return '-'
+    }
+
+    return date.toLocaleDateString(
+      'id-ID',
+      {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
       }
+    )
+  }
 
-      return date.toLocaleDateString(
-        'id-ID',
+  // ============================================================
+  // GET MUSTAHIK NAME
+  // ============================================================
+
+  const getNamaMustahik = (
+    item: AdminTopsisResult
+  ) => {
+    return (
+      item.pengajuan
+        ?.mustahik
+        ?.namaLengkap ||
+      '-'
+    )
+  }
+
+  // ============================================================
+  // GET NIK
+  // ============================================================
+
+  const getNik = (
+    item: AdminTopsisResult
+  ) => {
+    return (
+      item.pengajuan
+        ?.mustahik
+        ?.nik ||
+      '-'
+    )
+  }
+
+  // ============================================================
+  // EXPORT CSV
+  // ============================================================
+
+  const exportCSV = () => {
+    if (
+      filtered.length === 0
+    ) {
+      return
+    }
+
+    const header = [
+      'Ranking',
+      'Nama Mustahik',
+      'NIK',
+      'Nilai TOPSIS',
+      'Keputusan',
+      'Tanggal Proses',
+    ]
+
+    const rows =
+      filtered.map(
+        (item) => [
+          item.ranking,
+
+          getNamaMustahik(
+            item
+          ),
+
+          getNik(
+            item
+          ),
+
+          Number(
+            item.nilaiPreferensi
+          ).toFixed(4),
+
+          item.status,
+
+          formatDate(
+            item.tanggalProses
+          ),
+        ]
+      )
+
+    const csv = [
+      header,
+      ...rows,
+    ]
+      .map(
+        (row) =>
+          row
+            .map(
+              (value) =>
+                `"${String(
+                  value
+                ).replace(
+                  /"/g,
+                  '""'
+                )}"`
+            )
+            .join(',')
+      )
+      .join('\n')
+
+    const blob =
+      new Blob(
+        [csv],
         {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
+          type:
+            'text/csv;charset=utf-8;',
         }
       )
-    }
 
-  const exportCSV =
-    () => {
-      const header = [
-        'Ranking',
-        'Nama Mustahik',
-        'NIK',
-        'Nilai TOPSIS',
-        'Keputusan',
-        'Tanggal Proses',
-      ]
-
-      const rows =
-        filtered.map(
-          (item) => [
-            item.ranking,
-            item
-              .pengajuan
-              .mustahik
-              .namaLengkap,
-            item
-              .pengajuan
-              .mustahik
-              .nik,
-            Number(
-              item.nilaiPreferensi
-            ).toFixed(
-              4
-            ),
-            item.status,
-            formatDate(
-              item.tanggalProses
-            ),
-          ]
-        )
-
-      const csv = [
-        header,
-        ...rows,
-      ]
-        .map(
-          (row) =>
-            row
-              .map(
-                (value) =>
-                  `"${String(
-                    value
-                  ).replace(
-                    /"/g,
-                    '""'
-                  )}"`
-              )
-              .join(',')
-        )
-        .join('\n')
-
-      const blob =
-        new Blob(
-          [csv],
-          {
-            type:
-              'text/csv;charset=utf-8;',
-          }
-        )
-
-      const url =
-        URL.createObjectURL(
-          blob
-        )
-
-      const link =
-        document.createElement(
-          'a'
-        )
-
-      link.href =
-        url
-
-      link.download =
-        `laporan-topsis-${year}.csv`
-
-      document.body.appendChild(
-        link
+    const url =
+      URL.createObjectURL(
+        blob
       )
 
-      link.click()
-
-      link.remove()
-
-      URL.revokeObjectURL(
-        url
+    const link =
+      document.createElement(
+        'a'
       )
-    }
+
+    link.href =
+      url
+
+    link.download =
+      `laporan-topsis-${
+        year === 'all'
+          ? 'semua-tahun'
+          : year
+      }.csv`
+
+    document.body.appendChild(
+      link
+    )
+
+    link.click()
+
+    link.remove()
+
+    URL.revokeObjectURL(
+      url
+    )
+  }
+
+  // ============================================================
+  // TABLE COLUMNS
+  // ============================================================
 
   const columns:
     Column<AdminTopsisResult>[] =
@@ -357,10 +476,9 @@ export function LaporanPage() {
         ) => (
           <span className="font-semibold">
             {
-              row
-                .pengajuan
-                .mustahik
-                .namaLengkap
+              getNamaMustahik(
+                row
+              )
             }
           </span>
         ),
@@ -379,15 +497,14 @@ export function LaporanPage() {
           <span className="font-mono font-bold text-green-700">
             {Number(
               row.nilaiPreferensi
-            ).toFixed(
-              4
-            )}
+            ).toFixed(4)}
           </span>
         ),
       },
 
       {
-        key: 'status',
+        key:
+          'status',
 
         header:
           'Keputusan',
@@ -396,12 +513,14 @@ export function LaporanPage() {
           row
         ) => (
           <span
-            className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-              row.status ===
-              'LAYAK_DIDANAI'
-                ? 'bg-green-100 text-green-700 border border-green-300'
-                : 'bg-red-50 text-red-700 border border-red-200'
-            }`}
+            className={
+              `px-2.5 py-1 rounded-full text-xs font-semibold ${
+                row.status ===
+                'LAYAK_DIDANAI'
+                  ? 'bg-green-100 text-green-700 border border-green-300'
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`
+            }
           >
             {row.status ===
             'LAYAK_DIDANAI'
@@ -427,8 +546,16 @@ export function LaporanPage() {
       },
     ]
 
+  // ============================================================
+  // RENDER
+  // ============================================================
+
   return (
     <div className="space-y-6">
+      {/* ======================================================
+          HEADER
+      ====================================================== */}
+
       <PageHeader
         title="Laporan & Rekapitulasi"
         description="Cetak dan ekspor laporan kelayakan mustahik berdasarkan hasil TOPSIS"
@@ -452,8 +579,9 @@ export function LaporanPage() {
               exportCSV
             }
             disabled={
+              loading ||
               filtered.length ===
-              0
+                0
             }
             className="bg-green-600 hover:bg-green-700 text-white"
           >
@@ -464,8 +592,12 @@ export function LaporanPage() {
         </div>
       </PageHeader>
 
+      {/* ======================================================
+          ERROR
+      ====================================================== */}
+
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex justify-between items-center">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex justify-between items-center gap-4">
           <span>
             {error}
           </span>
@@ -473,8 +605,8 @@ export function LaporanPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={
-              load
+            onClick={() =>
+              void load()
             }
           >
             <RefreshCw className="w-4 h-4 mr-1" />
@@ -483,6 +615,10 @@ export function LaporanPage() {
           </Button>
         </div>
       )}
+
+      {/* ======================================================
+          FILTER
+      ====================================================== */}
 
       <Card>
         <CardContent className="py-4 flex flex-col sm:flex-row gap-4">
@@ -493,6 +629,8 @@ export function LaporanPage() {
               Filter Laporan:
             </span>
           </div>
+
+          {/* YEAR */}
 
           <Select
             value={year}
@@ -529,6 +667,8 @@ export function LaporanPage() {
             </SelectContent>
           </Select>
 
+          {/* STATUS */}
+
           <Select
             value={status}
             onValueChange={
@@ -556,7 +696,13 @@ export function LaporanPage() {
         </CardContent>
       </Card>
 
+      {/* ======================================================
+          SUMMARY
+      ====================================================== */}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* TOTAL */}
+
         <Card>
           <CardContent className="py-4 text-center">
             <p className="text-xs text-slate-500">
@@ -572,6 +718,8 @@ export function LaporanPage() {
           </CardContent>
         </Card>
 
+        {/* LAYAK */}
+
         <Card className="border-green-200 bg-green-50/30">
           <CardContent className="py-4 text-center">
             <p className="text-xs text-green-700 font-medium">
@@ -584,6 +732,8 @@ export function LaporanPage() {
             </p>
           </CardContent>
         </Card>
+
+        {/* TIDAK */}
 
         <Card className="border-red-200 bg-red-50/30">
           <CardContent className="py-4 text-center">
@@ -599,10 +749,14 @@ export function LaporanPage() {
         </Card>
       </div>
 
+      {/* ======================================================
+          TABLE
+      ====================================================== */}
+
       <Card>
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
-            <div className="py-16 flex justify-center">
+            <div className="py-16 flex justify-center items-center">
               <Loader2 className="w-6 h-6 animate-spin text-green-600" />
             </div>
           ) : (
