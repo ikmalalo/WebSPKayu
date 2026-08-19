@@ -192,9 +192,7 @@ const pengajuanInclude = {
 // MUSTAHIK DATA
 // ============================================================
 //
-// PENTING:
-//
-// Nama dan nomor HP TIDAK diambil dari body.
+// Nama dan nomor HP diambil dari User.
 //
 // Nama:
 //     User.name
@@ -202,7 +200,8 @@ const pengajuanInclude = {
 // Nomor HP:
 //     User.phone
 //
-// Karena data tersebut berasal dari REGISTER.
+// Data ekonomi dan kondisi rumah bukan nilai TOPSIS langsung.
+// Nilai TOPSIS berasal dari jawaban kuesioner.
 // ============================================================
 
 function createMustahikData(
@@ -213,18 +212,16 @@ function createMustahikData(
   }
 ) {
   return {
-    /*
-     * IDENTITAS
-     */
+    // ========================================================
+    // IDENTITAS
+    // ========================================================
 
     nik:
       String(
         raw.nik || ''
       ).trim(),
 
-    /*
-     * 🔒 OTOMATIS DARI USER
-     */
+    // 🔒 OTOMATIS DARI USER
     namaLengkap:
       user.name,
 
@@ -243,11 +240,11 @@ function createMustahikData(
         raw.jenisKelamin
       ),
 
-    /*
-     * KONTAK
-     *
-     * 🔒 OTOMATIS DARI USER
-     */
+    // ========================================================
+    // KONTAK
+    // ========================================================
+
+    // 🔒 OTOMATIS DARI USER
     noHp:
       user.phone,
 
@@ -256,9 +253,9 @@ function createMustahikData(
         raw.statusPernikahan
       ),
 
-    /*
-     * ALAMAT
-     */
+    // ========================================================
+    // ALAMAT
+    // ========================================================
 
     alamat:
       stringOrNull(
@@ -285,30 +282,13 @@ function createMustahikData(
         raw.provinsi
       ),
 
-    /*
-     * ========================================================
-     * DATA EKONOMI / KONDISI RUMAH
-     * ========================================================
-     *
-     * Data ini BUKAN berasal dari form pengajuan utama.
-     *
-     * Untuk alur aplikasi:
-     *
-     * Pengajuan
-     *      ↓
-     * Kuesioner
-     *      ↓
-     * JawabanKuesioner
-     *      ↓
-     * TOPSIS
-     *
-     * Jadi nilai TOPSIS harus berasal dari kuesioner.
-     *
-     * Field berikut hanya dipertahankan agar kompatibel
-     * dengan schema Mustahik yang sudah ada.
-     *
-     * Jangan digunakan sebagai nilai TOPSIS secara langsung.
-     */
+    // ========================================================
+    // DATA TAMBAHAN
+    // ========================================================
+    //
+    // Data ini dipertahankan agar kompatibel dengan schema.
+    // Penilaian TOPSIS tetap menggunakan JawabanKuesioner.
+    // ========================================================
 
     penghasilan:
       numberOrNull(
@@ -409,7 +389,7 @@ export async function createPengajuan(
     }
 
     // ========================================================
-    // AMBIL USER
+    // USER
     // ========================================================
 
     const user =
@@ -469,7 +449,7 @@ export async function createPengajuan(
     }
 
     // ========================================================
-    // VALIDASI USER NAME
+    // VALIDASI NAMA USER
     // ========================================================
 
     if (
@@ -499,7 +479,7 @@ export async function createPengajuan(
     }
 
     // ========================================================
-    // 🔒 SATU USER = SATU PENGAJUAN
+    // SATU USER = SATU PENGAJUAN
     // ========================================================
 
     const existingPengajuan =
@@ -509,7 +489,8 @@ export async function createPengajuan(
         },
 
         orderBy: {
-          createdAt: 'desc',
+          createdAt:
+            'desc',
         },
       })
 
@@ -658,7 +639,6 @@ export async function createPengajuan(
       error
     )
 
-    // Prisma unique constraint
     if (
       error?.code ===
       'P2002'
@@ -684,11 +664,7 @@ export async function createPengajuan(
 //
 // GET /api/pengajuan/me
 //
-// Mengambil semua pengajuan user.
-//
-// Saat ini sistem hanya mengizinkan satu,
-// tetapi response tetap berupa array supaya kompatibel
-// dengan frontend yang sekarang.
+// User hanya mendapatkan pengajuannya sendiri.
 // ============================================================
 
 export async function getMyPengajuan(
@@ -751,8 +727,6 @@ export async function getMyPengajuan(
 // ============================================================
 //
 // GET /api/pengajuan/:id
-//
-// User hanya dapat melihat pengajuannya sendiri.
 // ============================================================
 
 export async function getPengajuanById(
@@ -843,20 +817,10 @@ export async function getPengajuanById(
 // UPDATE DATA MUSTAHIK
 // ============================================================
 //
-// Nama function mengikuti controller terbaru kamu:
-//
-// updateMustahikData
-//
-// Route yang dipakai project kamu:
 // PATCH /api/pengajuan/mustahik
 //
-// atau jika route menggunakan :id,
-// fungsi ini juga mengambil req.params.id.
-// ============================================================
+// Yang boleh diubah:
 //
-// PENTING:
-//
-// Yang boleh diubah user:
 // - NIK
 // - tempat lahir
 // - tanggal lahir
@@ -868,13 +832,15 @@ export async function getPengajuanById(
 // - kota
 // - provinsi
 //
-// Yang TIDAK boleh diubah:
+// Yang tidak boleh diubah:
+//
 // - namaLengkap
 // - noHp
 // - userId
-// - status
-// - tanggal verifikasi
+// - status pengajuan
 // - hasil TOPSIS
+//
+// DRAFT dan PERLU_PERBAIKAN masih boleh diedit.
 // ============================================================
 
 export async function updateMustahikData(
@@ -882,6 +848,10 @@ export async function updateMustahikData(
   res: Response
 ) {
   try {
+    // ========================================================
+    // AUTH
+    // ========================================================
+
     const userId =
       getUserId(req)
 
@@ -894,7 +864,7 @@ export async function updateMustahikData(
     }
 
     // ========================================================
-    // AMBIL USER
+    // USER
     // ========================================================
 
     const user =
@@ -911,7 +881,7 @@ export async function updateMustahikData(
     }
 
     // ========================================================
-    // CARI PENGAJUAN USER
+    // CARI PENGAJUAN
     // ========================================================
 
     const pengajuan =
@@ -921,7 +891,8 @@ export async function updateMustahikData(
         },
 
         orderBy: {
-          createdAt: 'desc',
+          createdAt:
+            'desc',
         },
       })
 
@@ -936,29 +907,32 @@ export async function updateMustahikData(
     }
 
     // ========================================================
-    // STATUS YANG TIDAK BOLEH DIUBAH LAGI
+    // STATUS TERKUNCI
     // ========================================================
     //
-    // Setelah kuesioner dikirim,
-    // data pribadi juga sebaiknya tidak diubah
-    // sembarangan karena sudah masuk proses verifikasi.
+    // PERBAIKAN ERROR TYPESCRIPT:
     //
+    // Explicitly beri tipe PengajuanStatus[].
+    //
+    // DRAFT dan PERLU_PERBAIKAN tidak dimasukkan
+    // karena user masih boleh melakukan perbaikan.
     // ========================================================
 
-    const lockedStatuses = [
+    const lockedStatuses:
+      PengajuanStatus[] = [
       PengajuanStatus.MENUNGGU_VERIFIKASI,
 
       PengajuanStatus.SEDANG_DIVERIFIKASI,
 
       PengajuanStatus.LOLOS_VERIFIKASI,
 
+      PengajuanStatus.DITOLAK,
+
       PengajuanStatus.DIPROSES_TOPSIS,
 
       PengajuanStatus.LAYAK_DIDANAI,
 
       PengajuanStatus.TIDAK_DIDANAI,
-
-      PengajuanStatus.DITOLAK,
     ]
 
     if (
@@ -1042,28 +1016,11 @@ export async function updateMustahikData(
     // ========================================================
     // DATA YANG BOLEH DIUPDATE
     // ========================================================
-    //
-    // Jangan menggunakan spread req.body secara langsung.
-    // Supaya user tidak bisa mengirim:
-    //
-    // {
-    //   status: "LOLOS_VERIFIKASI"
-    // }
-    //
-    // atau:
-    //
-    // {
-    //   namaLengkap: "Nama Palsu"
-    // }
-    //
-    // ========================================================
 
     const updateData = {
       nik,
 
-      /*
-       * 🔒 Nama selalu dari User.
-       */
+      // 🔒 Nama dari User
       namaLengkap:
         user.name,
 
@@ -1082,9 +1039,7 @@ export async function updateMustahikData(
           raw.jenisKelamin
         ),
 
-      /*
-       * 🔒 Nomor HP selalu dari User.
-       */
+      // 🔒 Nomor HP dari User
       noHp:
         user.phone,
 
@@ -1120,7 +1075,7 @@ export async function updateMustahikData(
     }
 
     // ========================================================
-    // UPDATE
+    // UPDATE TRANSACTION
     // ========================================================
 
     const updated =
@@ -1129,9 +1084,9 @@ export async function updateMustahikData(
           tx
         ) => {
 
-          // --------------------------------------------------
-          // Update Mustahik
-          // --------------------------------------------------
+          // ==================================================
+          // UPDATE MUSTAHIK
+          // ==================================================
 
           await tx.mustahik.update({
             where: {
@@ -1143,9 +1098,9 @@ export async function updateMustahikData(
               updateData,
           })
 
-          // --------------------------------------------------
-          // Ambil pengajuan terbaru
-          // --------------------------------------------------
+          // ==================================================
+          // AMBIL DATA TERBARU
+          // ==================================================
 
           const updatedPengajuan =
             await tx.pengajuan.findUnique({
@@ -1158,9 +1113,9 @@ export async function updateMustahikData(
                 pengajuanInclude,
             })
 
-          // --------------------------------------------------
-          // Audit Log
-          // --------------------------------------------------
+          // ==================================================
+          // AUDIT LOG
+          // ==================================================
 
           await tx.auditLog.create({
             data: {
@@ -1227,7 +1182,6 @@ export async function updateMustahikData(
 // ============================================================
 //
 // Hanya DRAFT yang boleh dibatalkan.
-//
 // Setelah kuesioner dikirim,
 // pengajuan tidak boleh dihapus.
 // ============================================================
@@ -1308,11 +1262,19 @@ export async function deletePengajuan(
         tx
       ) => {
 
+        // ----------------------------------------------------
+        // DELETE PENGAJUAN
+        // ----------------------------------------------------
+
         await tx.pengajuan.delete({
           where: {
             id,
           },
         })
+
+        // ----------------------------------------------------
+        // AUDIT LOG
+        // ----------------------------------------------------
 
         await tx.auditLog.create({
           data: {
