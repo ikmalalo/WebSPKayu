@@ -48,6 +48,8 @@ model User {
   auditLogs     AuditLog[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+
+  @@map("user")
 }
 
 model Mustahik {
@@ -77,6 +79,7 @@ model Mustahik {
   updatedAt        DateTime    @updatedAt
 
   @@index([namaLengkap])
+  @@map("mustahik")
 }
 
 model Pengajuan {
@@ -97,6 +100,7 @@ model Pengajuan {
 
   @@index([userId, status])
   @@index([mustahikId])
+  @@map("pengajuan")
 }
 
 model Kriteria {
@@ -112,6 +116,8 @@ model Kriteria {
   topsisDetails TopsisDetail[]
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
+
+  @@map("kriteria")
 }
 
 model SubKriteria {
@@ -127,6 +133,7 @@ model SubKriteria {
 
   @@unique([kriteriaId, nama])
   @@index([kriteriaId])
+  @@map("subkriteria")
 }
 
 model JawabanKuesioner {
@@ -143,6 +150,7 @@ model JawabanKuesioner {
 
   @@unique([pengajuanId, kriteriaId])
   @@index([pengajuanId])
+  @@map("jawabankuesioner")
 }
 
 model Verifikasi {
@@ -157,6 +165,7 @@ model Verifikasi {
   updatedAt   DateTime         @updatedAt
 
   @@index([pengajuanId])
+  @@map("verifikasi")
 }
 
 model TopsisResult {
@@ -173,6 +182,7 @@ model TopsisResult {
 
   @@index([pengajuanId])
   @@index([tanggalProses, ranking])
+  @@map("topsisresult")
 }
 
 model TopsisDetail {
@@ -186,6 +196,7 @@ model TopsisDetail {
   kriteria         Kriteria     @relation(fields: [kriteriaId], references: [id], onDelete: Restrict)
 
   @@unique([topsisResultId, kriteriaId])
+  @@map("topsisdetail")
 }
 
 model AuditLog {
@@ -200,4 +211,5 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([userId])
+  @@map("auditlog")
 }
