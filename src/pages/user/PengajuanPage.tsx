@@ -1,5 +1,12 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import {
+  useState,
+  useEffect,
+} from 'react'
+
+import {
+  Link,
+} from 'react-router-dom'
+
 import {
   FileText,
   Plus,
@@ -59,15 +66,60 @@ const API_URL =
 
 
 // ============================================================
-// HELPER DATE
+// TYPES
 // ============================================================
-//
-// Supaya halaman tidak blank apabila backend mengirim:
-// - null
-// - undefined
-// - string kosong
-// - tanggal invalid
-//
+
+interface JawabanApi {
+  id?: string
+
+  nilai?: number | string
+
+  kriteria?: {
+    id?: string
+    kode?: string
+    nama?: string
+  }
+
+  subKriteria?: {
+    id?: string
+    nama?: string
+    nilai?: number | string
+  }
+}
+
+
+interface PengajuanApi {
+  id: string
+  userId: string
+  mustahikId: string
+
+  status: string
+
+  catatan?: string | null
+
+  tanggalPengajuan?: string | null
+
+  tanggalVerifikasi?: string | null
+
+  createdAt?: string | null
+
+  updatedAt?: string | null
+
+  mustahik?: any
+
+  jawaban?: JawabanApi[]
+
+  verifications?: Array<{
+    id?: string
+    status?: string
+    catatan?: string | null
+    createdAt?: string | null
+  }>
+}
+
+
+// ============================================================
+// HELPER DATE
 // ============================================================
 
 function safeDate(
@@ -101,34 +153,69 @@ function safeDate(
 
 
 // ============================================================
-// ADAPT PENGAJUAN
+// HELPER TEXT
 // ============================================================
-//
-// Backend mengembalikan:
-// {
-//   id,
-//   userId,
-//   mustahik,
-//   status,
-//   verifications: [...]
-// }
-//
-// Backend sudah kita atur:
-// createdAt DESC
-//
-// Jadi:
-// verifications[0]
-// = verifikasi TERBARU
-//
+
+function normalizeText(
+  value: unknown
+): string {
+  return String(
+    value ??
+    ''
+  )
+    .trim()
+    .toLowerCase()
+}
+
+
+// ============================================================
+// FORMAT STATUS RUMAH
+// ============================================================
+
+function formatStatusRumah(
+  value?: string | null
+): string {
+  if (!value) {
+    return '-'
+  }
+
+  const map: Record<
+    string,
+    string
+  > = {
+    milik_sendiri:
+      'Milik Sendiri',
+
+    sewa:
+      'Sewa / Kontrak',
+
+    menumpang:
+      'Menumpang',
+  }
+
+  return (
+    map[value] ||
+    value
+      .replace(
+        /_/g,
+        ' '
+      )
+      .replace(
+        /\b\w/g,
+        (char) =>
+          char.toUpperCase()
+      )
+  )
+}
+
+
+// ============================================================
+// ADAPT PENGAJUAN
 // ============================================================
 
 function adaptPengajuan(
-  p: any
+  p: PengajuanApi
 ): Pengajuan {
-
-  // ----------------------------------------------------------
-  // Ambil verifikasi terbaru
-  // ----------------------------------------------------------
 
   const verifications =
     Array.isArray(
@@ -138,20 +225,10 @@ function adaptPengajuan(
       : []
 
   const latestVerification =
-    verifications.length > 0
+    verifications.length >
+    0
       ? verifications[0]
       : undefined
-
-
-  // ----------------------------------------------------------
-  // Tanggal pengajuan
-  // ----------------------------------------------------------
-  //
-  // Prioritas:
-  // 1. tanggalPengajuan
-  // 2. createdAt
-  //
-  // ----------------------------------------------------------
 
   const tanggalPengajuan =
     safeDate(
@@ -159,75 +236,41 @@ function adaptPengajuan(
       p?.createdAt
     )
 
-
-  // ----------------------------------------------------------
-  // Tanggal verifikasi
-  // ----------------------------------------------------------
-
   const tanggalVerifikasi =
     safeDate(
       latestVerification?.createdAt ||
       p?.tanggalVerifikasi
     )
 
-
-  // ----------------------------------------------------------
-  // Catatan
-  // ----------------------------------------------------------
-  //
-  // Prioritas:
-  //
-  // 1. catatan verifikasi terbaru
-  // 2. catatan pengajuan
-  //
-  // Ini yang memperbaiki masalah:
-  //
-  // Admin:
-  // DITOLAK
-  // "Catatan lama"
-  //
-  // kemudian:
-  //
-  // LOLOS
-  // "Catatan baru"
-  //
-  // User akan melihat:
-  // "Catatan baru"
-  //
-  // ----------------------------------------------------------
-
   const catatan =
     latestVerification?.catatan ??
     p?.catatan ??
     undefined
 
-
-  // ----------------------------------------------------------
-  // Return
-  // ----------------------------------------------------------
-
   return {
     id:
-      p?.id ?? '',
+      p?.id ??
+      '',
 
     userId:
-      p?.userId ?? '',
+      p?.userId ??
+      '',
 
     mustahikId:
-      p?.mustahikId ?? '',
+      p?.mustahikId ??
+      '',
 
     namaLengkap:
       p?.mustahik?.namaLengkap ??
-      p?.namaLengkap ??
       '',
 
     nik:
       p?.mustahik?.nik ??
-      p?.nik ??
       '',
 
     status:
-      p?.status ?? 'DRAFT',
+      p?.status ??
+      'DRAFT',
 
     tanggalPengajuan,
 
@@ -243,10 +286,6 @@ function adaptPengajuan(
 // ============================================================
 // ADAPT DATA MUSTAHIK
 // ============================================================
-//
-// Semua data dibuat aman agar frontend tidak crash ketika
-// ada field null dari database.
-// ============================================================
 
 function adaptMustahik(
   data: any
@@ -254,19 +293,24 @@ function adaptMustahik(
 
   return {
     id:
-      data?.id ?? '',
+      data?.id ??
+      '',
 
     userId:
-      data?.userId ?? '',
+      data?.userId ??
+      '',
 
     nik:
-      data?.nik ?? '',
+      data?.nik ??
+      '',
 
     namaLengkap:
-      data?.namaLengkap ?? '',
+      data?.namaLengkap ??
+      '',
 
     tempatLahir:
-      data?.tempatLahir ?? '',
+      data?.tempatLahir ??
+      '',
 
     tanggalLahir:
       safeDate(
@@ -275,55 +319,264 @@ function adaptMustahik(
 
     jenisKelamin:
       data?.jenisKelamin ??
-      'L',
+      '',
 
     alamat:
-      data?.alamat ?? '',
+      data?.alamat ??
+      '',
 
     kelurahan:
-      data?.kelurahan ?? '',
+      data?.kelurahan ??
+      '',
 
     kecamatan:
-      data?.kecamatan ?? '',
+      data?.kecamatan ??
+      '',
 
     kota:
-      data?.kota ?? '',
+      data?.kota ??
+      '',
 
     provinsi:
-      data?.provinsi ?? '',
+      data?.provinsi ??
+      '',
 
     noHp:
-      data?.noHp ?? '',
+      data?.noHp ??
+      '',
 
     statusPernikahan:
       data?.statusPernikahan ??
-      'belum_menikah',
+      '',
 
     pekerjaan:
-      data?.pekerjaan ?? '',
+      data?.pekerjaan ??
+      '',
 
     penghasilan:
-      Number(
-        data?.penghasilan ?? 0
-      ),
+      data?.penghasilan !==
+      null &&
+      data?.penghasilan !==
+      undefined &&
+      data?.penghasilan !==
+      ''
+        ? Number(
+            data.penghasilan
+          )
+        : 0,
 
     jumlahTanggungan:
-      Number(
-        data?.jumlahTanggungan ?? 0
-      ),
+      data?.jumlahTanggungan !==
+      null &&
+      data?.jumlahTanggungan !==
+      undefined &&
+      data?.jumlahTanggungan !==
+      ''
+        ? Number(
+            data.jumlahTanggungan
+          )
+        : 0,
 
     statusRumah:
       data?.statusRumah ??
-      'milik_sendiri',
+      '',
 
     kondisiRumah:
       data?.kondisiRumah ??
-      'baik',
+      '',
 
     kepemilikanAset:
       data?.kepemilikanAset ??
-      'tidak_ada',
+      '',
   }
+}
+
+
+// ============================================================
+// AMBIL JAWABAN BERDASARKAN KODE KRITERIA
+// ============================================================
+
+function getAnswerByKode(
+  jawaban: JawabanApi[],
+  kode: string
+): JawabanApi | undefined {
+
+  return jawaban.find(
+    (
+      item
+    ) =>
+      normalizeText(
+        item?.kriteria?.kode
+      ) ===
+      normalizeText(
+        kode
+      )
+  )
+}
+
+
+// ============================================================
+// FORMAT PENGHASILAN DARI KUESIONER
+// ============================================================
+//
+// C1:
+// < Rp 500.000
+// Rp 500.001 - Rp 1.000.000
+// Rp 1.000.001 - Rp 1.500.000
+// Rp 1.500.001 - Rp 2.000.000
+// > Rp 2.000.000
+//
+// ============================================================
+
+function getPenghasilanDisplay(
+  mustahik: DataMustahik | null,
+  jawaban: JawabanApi[]
+): string {
+
+  if (
+    mustahik?.penghasilan &&
+    mustahik.penghasilan > 0
+  ) {
+    return `Rp ${mustahik.penghasilan.toLocaleString(
+      'id-ID'
+    )}`
+  }
+
+  const answer =
+    getAnswerByKode(
+      jawaban,
+      'C1'
+    )
+
+  const nama =
+    answer?.subKriteria?.nama
+
+  if (nama) {
+    return nama
+  }
+
+  return '-'
+}
+
+
+// ============================================================
+// FORMAT JUMLAH TANGGUNGAN
+// ============================================================
+
+function getTanggunganDisplay(
+  mustahik: DataMustahik | null,
+  jawaban: JawabanApi[]
+): string {
+
+  if (
+    mustahik?.jumlahTanggungan !==
+    null &&
+    mustahik?.jumlahTanggungan !==
+    undefined &&
+    mustahik.jumlahTanggungan >
+    0
+  ) {
+    return `${mustahik.jumlahTanggungan} Orang`
+  }
+
+  const answer =
+    getAnswerByKode(
+      jawaban,
+      'C2'
+    )
+
+  const nama =
+    answer?.subKriteria?.nama
+
+  if (nama) {
+    return nama
+  }
+
+  return '-'
+}
+
+
+// ============================================================
+// FORMAT KONDISI RUMAH
+// ============================================================
+
+function getKondisiRumahDisplay(
+  mustahik: DataMustahik | null,
+  jawaban: JawabanApi[]
+): string {
+
+  if (
+    mustahik?.kondisiRumah
+  ) {
+    return mustahik.kondisiRumah
+  }
+
+  const answer =
+    getAnswerByKode(
+      jawaban,
+      'C3'
+    )
+
+  return (
+    answer?.subKriteria?.nama ||
+    '-'
+  )
+}
+
+
+// ============================================================
+// FORMAT PEKERJAAN
+// ============================================================
+
+function getPekerjaanDisplay(
+  mustahik: DataMustahik | null,
+  jawaban: JawabanApi[]
+): string {
+
+  if (
+    mustahik?.pekerjaan
+  ) {
+    return mustahik.pekerjaan
+  }
+
+  const answer =
+    getAnswerByKode(
+      jawaban,
+      'C4'
+    )
+
+  return (
+    answer?.subKriteria?.nama ||
+    '-'
+  )
+}
+
+
+// ============================================================
+// FORMAT KEPEMILIKAN ASET
+// ============================================================
+
+function getAsetDisplay(
+  mustahik: DataMustahik | null,
+  jawaban: JawabanApi[]
+): string {
+
+  if (
+    mustahik?.kepemilikanAset
+  ) {
+    return mustahik.kepemilikanAset
+  }
+
+  const answer =
+    getAnswerByKode(
+      jawaban,
+      'C5'
+    )
+
+  return (
+    answer?.subKriteria?.nama ||
+    '-'
+  )
 }
 
 
@@ -339,7 +592,8 @@ export function PengajuanPage() {
 
   const {
     token,
-  } = useAuth()
+  } =
+    useAuth()
 
 
   // ==========================================================
@@ -351,7 +605,8 @@ export function PengajuanPage() {
       contextPengajuan,
 
     setPengajuan,
-  } = usePengajuan()
+  } =
+    usePengajuan()
 
 
   // ==========================================================
@@ -362,298 +617,333 @@ export function PengajuanPage() {
     pengajuan,
     setPengajuanLocal,
   ] =
-    useState<Pengajuan | null>(
+    useState<
+      Pengajuan | null
+    >(
       contextPengajuan
     )
+
 
   const [
     mustahik,
     setMustahik,
   ] =
-    useState<DataMustahik | null>(
+    useState<
+      DataMustahik | null
+    >(
       null
     )
+
+
+  const [
+    jawaban,
+    setJawaban,
+  ] =
+    useState<
+      JawabanApi[]
+    >(
+      []
+    )
+
 
   const [
     loading,
     setLoading,
   ] =
-    useState(true)
+    useState(
+      true
+    )
+
 
   const [
     error,
     setError,
   ] =
-    useState('')
-
-
-  // ==========================================================
-  // AUTH HEADER
-  // ==========================================================
-
-  const authHeaders = {
-    Authorization:
-      `Bearer ${token}`,
-  }
+    useState(
+      ''
+    )
 
 
   // ==========================================================
   // LOAD DATA
   // ==========================================================
 
-  useEffect(() => {
+  useEffect(
+    () => {
 
-    let mounted = true
-
-    const load = async () => {
-
-      // ------------------------------------------------------
-      // Belum login
-      // ------------------------------------------------------
-
-      if (!token) {
-
-        if (mounted) {
-          setLoading(false)
-        }
-
-        return
-      }
+      let mounted =
+        true
 
 
-      try {
+      const load =
+        async () => {
 
-        if (mounted) {
-          setLoading(true)
-          setError('')
-        }
+          if (
+            !token
+          ) {
 
-
-        // ====================================================
-        // REQUEST
-        // ====================================================
-        //
-        // Kita ambil:
-        //
-        // 1. Pengajuan user
-        // 2. Profile user
-        //
-        // ====================================================
-
-        const [
-          pengajuanRes,
-          profileRes,
-        ] =
-          await Promise.all([
-
-            axios.get(
-              `${API_URL}/pengajuan/me`,
-              {
-                headers:
-                  authHeaders,
-              }
-            ),
-
-            axios.get(
-              `${API_URL}/user/profile`,
-              {
-                headers:
-                  authHeaders,
-              }
-            ),
-          ])
-
-
-        // ====================================================
-        // PENGAJUAN
-        // ====================================================
-
-        const list =
-          Array.isArray(
-            pengajuanRes
-              ?.data
-              ?.data
-              ?.pengajuan
-          )
-            ? pengajuanRes
-                .data
-                .data
-                .pengajuan
-            : []
-
-
-        // ----------------------------------------------------
-        // Ambil pengajuan terbaru
-        // ----------------------------------------------------
-        //
-        // Backend seharusnya sudah order:
-        // createdAt DESC
-        //
-        // Tetapi kita tetap sort di frontend
-        // sebagai pengaman.
-        //
-        // ----------------------------------------------------
-
-        const sortedList =
-          [...list].sort(
-            (
-              a: any,
-              b: any
-            ) => {
-
-              const dateA =
-                new Date(
-                  a?.createdAt ||
-                  a?.tanggalPengajuan ||
-                  0
-                ).getTime()
-
-              const dateB =
-                new Date(
-                  b?.createdAt ||
-                  b?.tanggalPengajuan ||
-                  0
-                ).getTime()
-
-              return (
-                dateB - dateA
+            if (
+              mounted
+            ) {
+              setLoading(
+                false
               )
             }
-          )
+
+            return
+          }
 
 
-        if (
-          mounted
-        ) {
+          try {
 
-          if (
-            sortedList.length >
-            0
-          ) {
+            if (
+              mounted
+            ) {
+              setLoading(
+                true
+              )
+
+              setError(
+                ''
+              )
+            }
+
+
+            const headers = {
+              Authorization:
+                `Bearer ${token}`,
+            }
+
+
+            const [
+              pengajuanRes,
+              profileRes,
+            ] =
+              await Promise.all([
+                axios.get(
+                  `${API_URL}/pengajuan/me`,
+                  {
+                    headers,
+                  }
+                ),
+
+                axios.get(
+                  `${API_URL}/user/profile`,
+                  {
+                    headers,
+                  }
+                ),
+              ])
+
 
             // ================================================
-            // ADAPT PENGAJUAN
+            // PENGAJUAN
             // ================================================
 
-            const adapted =
-              adaptPengajuan(
-                sortedList[0]
+            const list =
+              Array.isArray(
+                pengajuanRes
+                  ?.data
+                  ?.data
+                  ?.pengajuan
+              )
+                ? pengajuanRes
+                    .data
+                    .data
+                    .pengajuan
+                : []
+
+
+            const sortedList =
+              [...list].sort(
+                (
+                  a: PengajuanApi,
+                  b: PengajuanApi
+                ) => {
+
+                  const dateA =
+                    new Date(
+                      a?.createdAt ||
+                      a?.tanggalPengajuan ||
+                      0
+                    ).getTime()
+
+                  const dateB =
+                    new Date(
+                      b?.createdAt ||
+                      b?.tanggalPengajuan ||
+                      0
+                    ).getTime()
+
+                  return (
+                    dateB -
+                    dateA
+                  )
+                }
               )
 
 
-            setPengajuanLocal(
-              adapted
+            if (
+              mounted
+            ) {
+
+              if (
+                sortedList.length >
+                0
+              ) {
+
+                const latest =
+                  sortedList[0] as PengajuanApi
+
+
+                const adapted =
+                  adaptPengajuan(
+                    latest
+                  )
+
+
+                setPengajuanLocal(
+                  adapted
+                )
+
+
+                setPengajuan(
+                  adapted
+                )
+
+
+                // ============================================
+                // JAWABAN KUESIONER
+                // ============================================
+
+                setJawaban(
+                  Array.isArray(
+                    latest?.jawaban
+                  )
+                    ? latest.jawaban
+                    : []
+                )
+
+
+                // ============================================
+                // MUSTAHIK DARI PENGAJUAN
+                //
+                // Ini lebih diprioritaskan karena sudah
+                // satu relasi dengan pengajuan yang aktif.
+                // ============================================
+
+                if (
+                  latest?.mustahik
+                ) {
+
+                  setMustahik(
+                    adaptMustahik(
+                      latest.mustahik
+                    )
+                  )
+                }
+
+              } else {
+
+                setPengajuanLocal(
+                  null
+                )
+
+                setPengajuan(
+                  null
+                )
+
+                setJawaban(
+                  []
+                )
+              }
+            }
+
+
+            // ================================================
+            // PROFILE MUSTAHIK
+            //
+            // Dipakai jika data mustahik belum tersedia dari
+            // endpoint pengajuan.
+            // ================================================
+
+            const profileMustahik =
+              profileRes
+                ?.data
+                ?.data
+                ?.user
+                ?.mustahik
+
+
+            if (
+              mounted &&
+              profileMustahik
+            ) {
+
+              setMustahik(
+                (
+                  current
+                ) =>
+                  current ||
+                  adaptMustahik(
+                    profileMustahik
+                  )
+              )
+            }
+
+          } catch (
+            e: any
+          ) {
+
+            console.error(
+              'Gagal memuat pengajuan:',
+              e
             )
 
-            setPengajuan(
-              adapted
-            )
 
-          } else {
+            if (
+              mounted
+            ) {
 
-            setPengajuanLocal(
-              null
-            )
+              setError(
+                e?.response
+                  ?.data
+                  ?.message ||
+                e?.message ||
+                'Gagal memuat data pengajuan'
+              )
+            }
 
-            setPengajuan(
-              null
-            )
+          } finally {
+
+            if (
+              mounted
+            ) {
+              setLoading(
+                false
+              )
+            }
           }
         }
 
 
-        // ====================================================
-        // PROFILE / MUSTAHIK
-        // ====================================================
-
-        const mustahikData =
-          profileRes
-            ?.data
-            ?.data
-            ?.user
-            ?.mustahik
+      load()
 
 
-        if (
-          mounted
-        ) {
-
-          if (
-            mustahikData
-          ) {
-
-            setMustahik(
-              adaptMustahik(
-                mustahikData
-              )
-            )
-
-          } else {
-
-            setMustahik(
-              null
-            )
-          }
-        }
-
-
-      } catch (
-        e: any
-      ) {
-
-        console.error(
-          'Gagal memuat pengajuan:',
-          e
-        )
-
-
-        if (
-          mounted
-        ) {
-
-          setError(
-            e?.response
-              ?.data
-              ?.message ||
-            e?.message ||
-            'Gagal memuat data pengajuan'
-          )
-        }
-
-      } finally {
-
-        if (
-          mounted
-        ) {
-          setLoading(false)
-        }
+      return () => {
+        mounted =
+          false
       }
-    }
 
-
-    load()
-
-
-    // --------------------------------------------------------
-    // Cleanup
-    // --------------------------------------------------------
-
-    return () => {
-      mounted = false
-    }
-
-  }, [
-    token,
-  ])
+    },
+    [
+      token,
+    ]
+  )
 
 
   // ==========================================================
-  // EXISTING DATA
-  // ==========================================================
-  //
-  // Pengajuan dan mustahik tidak harus diperlakukan
-  // sebagai satu kondisi yang menyebabkan blank page.
-  //
+  // EXISTING
   // ==========================================================
 
   const hasExisting =
@@ -692,9 +982,8 @@ export function PengajuanPage() {
 
     <div className="space-y-6">
 
-      {/* ======================================================
-          HEADER
-          ====================================================== */}
+
+      {/* HEADER */}
 
       <PageHeader
         title="Pengajuan Mustahik"
@@ -722,13 +1011,11 @@ export function PengajuanPage() {
       </PageHeader>
 
 
-      {/* ======================================================
-          ERROR
-          ====================================================== */}
+      {/* ERROR */}
 
       {error && (
 
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-400">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
 
           {error}
 
@@ -737,18 +1024,14 @@ export function PengajuanPage() {
       )}
 
 
-      {/* ======================================================
-          EXISTING PENGAJUAN
-          ====================================================== */}
+      {/* ADA PENGAJUAN */}
 
       {hasExisting ? (
 
         <div className="space-y-4">
 
 
-          {/* ==================================================
-              PENGAJUAN CARD
-              ================================================== */}
+          {/* PENGAJUAN */}
 
           <Card>
 
@@ -759,10 +1042,13 @@ export function PengajuanPage() {
                 <div>
 
                   <CardTitle>
+
                     {pengajuan?.namaLengkap ||
                       mustahik?.namaLengkap ||
                       '-'}
+
                   </CardTitle>
+
 
                   <p className="text-xs text-slate-400 mt-1 font-mono">
 
@@ -794,20 +1080,15 @@ export function PengajuanPage() {
             <CardContent className="space-y-4">
 
 
-              {/* ==============================================
-                  INFO PENGAJUAN
-                  ============================================== */}
-
               <div className="grid grid-cols-2 gap-4 text-sm">
 
-
-                {/* ID */}
 
                 <div>
 
                   <p className="text-slate-500 text-xs">
                     ID Pengajuan
                   </p>
+
 
                   <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono text-xs mt-0.5">
 
@@ -826,13 +1107,12 @@ export function PengajuanPage() {
                 </div>
 
 
-                {/* TANGGAL PENGAJUAN */}
-
                 <div>
 
                   <p className="text-slate-500 text-xs">
                     Tanggal Pengajuan
                   </p>
+
 
                   <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs mt-0.5">
 
@@ -847,8 +1127,6 @@ export function PengajuanPage() {
                 </div>
 
 
-                {/* TANGGAL VERIFIKASI */}
-
                 {pengajuan?.tanggalVerifikasi && (
 
                   <div>
@@ -856,6 +1134,7 @@ export function PengajuanPage() {
                     <p className="text-slate-500 text-xs">
                       Tanggal Verifikasi
                     </p>
+
 
                     <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs mt-0.5">
 
@@ -872,9 +1151,7 @@ export function PengajuanPage() {
               </div>
 
 
-              {/* =================================================
-                  CATATAN ADMIN
-                  ================================================= */}
+              {/* CATATAN ADMIN */}
 
               {pengajuan?.catatan && (
 
@@ -886,6 +1163,7 @@ export function PengajuanPage() {
                       className="w-4 h-4 text-amber-600 mt-0.5 shrink-0"
                     />
 
+
                     <div>
 
                       <p className="text-xs font-semibold text-amber-800 dark:text-amber-400">
@@ -893,6 +1171,7 @@ export function PengajuanPage() {
                         Catatan Admin:
 
                       </p>
+
 
                       <p className="text-sm text-amber-700 dark:text-amber-300 mt-0.5">
 
@@ -909,9 +1188,7 @@ export function PengajuanPage() {
               )}
 
 
-              {/* =================================================
-                  ACTION
-                  ================================================= */}
+              {/* ACTION */}
 
               <div className="flex gap-2">
 
@@ -940,233 +1217,269 @@ export function PengajuanPage() {
           </Card>
 
 
-          {/* ==================================================
-              DATA SUMMARY
-              ================================================== */}
+          {/* DATA MUSTAHIK */}
 
-          {mustahik && (
+          <Card>
 
-            <Card>
+            <CardHeader>
 
-              <CardHeader>
+              <div className="flex items-center justify-between">
 
-                <div className="flex items-center justify-between">
+                <CardTitle>
+                  Data Diri Mustahik
+                </CardTitle>
 
-                  <CardTitle>
-                    Data Diri Mustahik
-                  </CardTitle>
 
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="sm"
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                >
+
+                  <Link
+                    to="/pengajuan/form"
+                    className="text-xs text-green-600 flex items-center gap-1"
                   >
 
-                    <Link
-                      to="/pengajuan/form"
-                      className="text-xs text-green-600 flex items-center gap-1"
-                    >
+                    Edit Data
 
-                      Edit Data
+                    <ChevronRight
+                      className="w-3 h-3"
+                    />
 
-                      <ChevronRight
-                        className="w-3 h-3"
-                      />
+                  </Link>
 
-                    </Link>
+                </Button>
 
-                  </Button>
+              </div>
+
+            </CardHeader>
+
+
+            <CardContent>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+
+
+                {/* NAMA */}
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Nama Lengkap
+                  </p>
+
+
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
+
+                    {mustahik?.namaLengkap ||
+                      '-'}
+
+                  </p>
 
                 </div>
 
-              </CardHeader>
+
+                {/* NIK */}
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    NIK
+                  </p>
 
 
-              <CardContent>
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
 
-                <div className="grid grid-cols-2 gap-3 text-sm">
-
-
-                  {/* NAMA */}
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-                      Nama Lengkap
-                    </p>
-
-                    <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
-
-                      {mustahik.namaLengkap ||
-                        '-'}
-
-                    </p>
-
-                  </div>
-
-
-                  {/* NIK */}
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-                      NIK
-                    </p>
-
-                    <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
-                      {mustahik.nik
-                        ? formatNIK(
-                            mustahik.nik
-                          )
-                        : '-'}
-
-                    </p>
-
-                  </div>
-
-
-                  {/* TEMPAT LAHIR */}
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-                      Tempat Lahir
-                    </p>
-
-                    <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
-
-                      {mustahik.tempatLahir ||
-                        '-'}
-
-                    </p>
-
-                  </div>
-
-
-                  {/* PEKERJAAN */}
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-                      Pekerjaan
-                    </p>
-
-                    <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
-
-                      {mustahik.pekerjaan ||
-                        '-'}
-
-                    </p>
-
-                  </div>
-
-
-                  {/* ALAMAT */}
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-                      Alamat
-                    </p>
-
-                    <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
-
-                      {[
-                        mustahik.alamat,
-                        mustahik.kota,
-                      ]
-                        .filter(
-                          Boolean
+                    {mustahik?.nik
+                      ? formatNIK(
+                          mustahik.nik
                         )
-                        .join(', ') ||
-                        '-'}
+                      : '-'}
 
-                    </p>
-
-                  </div>
-
-
-                  {/* STATUS RUMAH */}
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-                      Status Rumah
-                    </p>
-
-                    <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
-
-                      {mustahik.statusRumah
-                        ? mustahik.statusRumah.replace(
-                            /_/g,
-                            ' '
-                          )
-                        : '-'}
-
-                    </p>
-
-                  </div>
-
-
-                  {/* JUMLAH TANGGUNGAN */}
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-                      Jumlah Tanggungan
-                    </p>
-
-                    <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
-                      {Number.isFinite(
-                        mustahik.jumlahTanggungan
-                      )
-                        ? `${mustahik.jumlahTanggungan} Orang`
-                        : '-'}
-
-                    </p>
-
-                  </div>
-
-
-                  {/* PENGHASILAN */}
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-                      Penghasilan
-                    </p>
-
-                    <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
-                      {Number.isFinite(
-                        mustahik.penghasilan
-                      )
-                        ? `Rp ${mustahik.penghasilan.toLocaleString(
-                            'id-ID'
-                          )}`
-                        : '-'}
-
-                    </p>
-
-                  </div>
+                  </p>
 
                 </div>
 
-              </CardContent>
 
-            </Card>
+                {/* TEMPAT LAHIR */}
 
-          )}
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Tempat Lahir
+                  </p>
+
+
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
+
+                    {mustahik?.tempatLahir ||
+                      '-'}
+
+                  </p>
+
+                </div>
+
+
+                {/* PEKERJAAN DARI KUESIONER */}
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Status Pekerjaan
+                  </p>
+
+
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
+
+                    {getPekerjaanDisplay(
+                      mustahik,
+                      jawaban
+                    )}
+
+                  </p>
+
+                </div>
+
+
+                {/* ALAMAT */}
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Alamat
+                  </p>
+
+
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
+
+                    {[
+                      mustahik?.alamat,
+                      mustahik?.kota,
+                    ]
+                      .filter(
+                        Boolean
+                      )
+                      .join(', ') ||
+                      '-'}
+
+                  </p>
+
+                </div>
+
+
+                {/* STATUS RUMAH */}
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Status Rumah
+                  </p>
+
+
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
+
+                    {formatStatusRumah(
+                      mustahik?.statusRumah
+                    )}
+
+                  </p>
+
+                </div>
+
+
+                {/* KONDISI RUMAH */}
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Kondisi Rumah
+                  </p>
+
+
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
+
+                    {getKondisiRumahDisplay(
+                      mustahik,
+                      jawaban
+                    )}
+
+                  </p>
+
+                </div>
+
+
+                {/* JUMLAH TANGGUNGAN */}
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Jumlah Tanggungan
+                  </p>
+
+
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
+
+                    {getTanggunganDisplay(
+                      mustahik,
+                      jawaban
+                    )}
+
+                  </p>
+
+                </div>
+
+
+                {/* PENGHASILAN */}
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Penghasilan
+                  </p>
+
+
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
+
+                    {getPenghasilanDisplay(
+                      mustahik,
+                      jawaban
+                    )}
+
+                  </p>
+
+                </div>
+
+
+                {/* KEPEMILIKAN ASET */}
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Kepemilikan Aset
+                  </p>
+
+
+                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
+
+                    {getAsetDisplay(
+                      mustahik,
+                      jawaban
+                    )}
+
+                  </p>
+
+                </div>
+
+              </div>
+
+            </CardContent>
+
+          </Card>
 
         </div>
 
       ) : (
-
-        /* ====================================================
-           EMPTY STATE
-           ==================================================== */
 
         <Card>
 
