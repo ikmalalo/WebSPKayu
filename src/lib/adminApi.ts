@@ -14,6 +14,7 @@ const API_URL =
 
 const api = axios.create({
   baseURL: API_URL,
+
   headers: {
     'Content-Type': 'application/json',
   },
@@ -26,6 +27,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token =
+      localStorage.getItem('spk_token') ||
       localStorage.getItem('token') ||
       localStorage.getItem('auth_token') ||
       localStorage.getItem('accessToken')
@@ -37,6 +39,7 @@ api.interceptors.request.use(
 
     return config
   },
+
   (error) => {
     return Promise.reject(error)
   }
@@ -95,13 +98,9 @@ function getErrorMessage(
 
 export interface AdminUser {
   id: string
-
   name: string
-
   email: string
-
   phone?: string | null
-
   role?: string
 }
 
@@ -111,56 +110,35 @@ export interface AdminUser {
 
 export interface AdminMustahik {
   id: string
-
   userId: string
-
   nik: string
-
   namaLengkap: string
 
   tempatLahir?: string | null
-
   tanggalLahir?: string | null
-
   jenisKelamin?: string | null
 
   alamat?: string | null
-
   kelurahan?: string | null
-
   kecamatan?: string | null
-
   kota?: string | null
-
   provinsi?: string | null
 
   noHp?: string | null
-
   statusPernikahan?: string | null
-
   pekerjaan?: string | null
 
-  penghasilan?:
-    | number
-    | string
-    | null
-
-  jumlahTanggungan?:
-    | number
-    | null
+  penghasilan?: number | string | null
+  jumlahTanggungan?: number | null
 
   statusRumah?: string | null
-
   kondisiRumah?: string | null
-
   kepemilikanAset?: string | null
 
   createdAt?: string
-
   updatedAt?: string
 
   user?: AdminUser
-
   pengajuan?: AdminPengajuan[]
 }
 
@@ -170,31 +148,23 @@ export interface AdminMustahik {
 
 export interface AdminPengajuan {
   id: string
-
   userId: string
-
   mustahikId: string
 
   status: string
-
   catatan?: string | null
 
   tanggalPengajuan?: string | null
-
   tanggalVerifikasi?: string | null
 
   createdAt?: string
-
   updatedAt?: string
 
   user?: AdminUser
-
   mustahik?: AdminMustahik
 
   jawaban?: AdminJawaban[]
-
   verifications?: AdminVerifikasi[]
-
   topsisResults?: AdminTopsisResult[]
 }
 
@@ -206,25 +176,16 @@ export interface AdminJawaban {
   id: string
 
   pengajuanId: string
-
   kriteriaId: string
-
   subKriteriaId: string
 
-  nilai:
-    | number
-    | string
+  nilai: number | string
 
   kriteria?: {
     id: string
-
     kode: string
-
     nama: string
-
-    bobot:
-      | number
-      | string
+    bobot: number | string
 
     tipe:
       | 'BENEFIT'
@@ -233,13 +194,8 @@ export interface AdminJawaban {
 
   subKriteria?: {
     id: string
-
     nama: string
-
-    nilai:
-      | number
-      | string
-
+    nilai: number | string
     keterangan?: string | null
   }
 }
@@ -257,15 +213,12 @@ export interface AdminVerifikasi {
   id: string
 
   pengajuanId: string
-
   adminId: string
 
   status: VerificationStatus
-
   catatan?: string | null
 
   createdAt?: string
-
   updatedAt?: string
 
   admin?: AdminUser
@@ -279,23 +232,18 @@ export interface AdminVerificationDetail {
   id: string
 
   pengajuanId: string
-
   adminId?: string | null
 
   status?: VerificationStatus
-
   catatan?: string | null
 
   createdAt?: string
-
   updatedAt?: string
 
   pengajuan: AdminPengajuan
-
   mustahik: AdminMustahik
 
   verifications?: AdminVerifikasi[]
-
   jawaban?: AdminJawaban[]
 }
 
@@ -305,14 +253,10 @@ export interface AdminVerificationDetail {
 
 export interface AdminKriteria {
   id: string
-
   kode: string
-
   nama: string
 
-  bobot:
-    | number
-    | string
+  bobot: number | string
 
   tipe:
     | 'BENEFIT'
@@ -325,7 +269,6 @@ export interface AdminKriteria {
   subKriteria?: AdminSubKriteria[]
 
   createdAt?: string
-
   updatedAt?: string
 }
 
@@ -335,26 +278,19 @@ export interface AdminKriteria {
 
 export interface AdminSubKriteria {
   id: string
-
   kriteriaId: string
 
   nama: string
-
-  nilai:
-    | number
-    | string
+  nilai: number | string
 
   keterangan?: string | null
 
   createdAt?: string
-
   updatedAt?: string
 
   kriteria?: {
     id: string
-
     kode: string
-
     nama: string
   }
 }
@@ -367,20 +303,11 @@ export interface AdminTopsisDetail {
   id: string
 
   topsisResultId: string
-
   kriteriaId: string
 
-  nilaiAwal:
-    | number
-    | string
-
-  nilaiNormalisasi:
-    | number
-    | string
-
-  nilaiTerbobot:
-    | number
-    | string
+  nilaiAwal: number | string
+  nilaiNormalisasi: number | string
+  nilaiTerbobot: number | string
 
   kriteria?: AdminKriteria
 }
@@ -407,7 +334,6 @@ export interface AdminTopsisResult {
   tanggalProses: string
 
   createdAt?: string
-
   updatedAt?: string
 
   pengajuan?: AdminPengajuan
@@ -430,17 +356,13 @@ export interface AdminTopsisCandidate {
 
   mustahik: {
     id: string
-
     namaLengkap: string
-
     nik: string
   }
 
   jawaban: {
     kriteriaId: string
-
     kode: string
-
     nama: string
 
     nilai:
@@ -468,17 +390,13 @@ export interface AdminDashboardData {
 
   chart: {
     bulan: string
-
     pengajuan: number
-
     lolos: number
-
     ditolak: number
   }[]
 
   statusDistribution: {
     name: string
-
     value: number
   }[]
 }
@@ -514,7 +432,6 @@ export async function getAdminDashboard(): Promise<AdminDashboardData> {
 export async function getAdminMustahik(
   params?: {
     search?: string
-
     status?: string
   }
 ): Promise<AdminMustahik[]> {
@@ -665,7 +582,7 @@ export async function updateAdminMustahik(
     return (
       data?.mustahik ||
       data
-    )
+    ) as AdminMustahik
   } catch (error) {
     throw new Error(
       getErrorMessage(
@@ -782,11 +699,6 @@ export async function getAdminVerifikasiDetail(
       )
     }
 
-    /*
-     * Normalisasi supaya DetailVerifikasiPage
-     * selalu menerima struktur yang sama.
-     */
-
     const pengajuan =
       detail.pengajuan ??
       data?.pengajuan
@@ -816,13 +728,9 @@ export async function getAdminVerifikasiDetail(
 
     return {
       ...detail,
-
       pengajuan,
-
       mustahik,
-
       verifications,
-
       jawaban,
     } as AdminVerificationDetail
   } catch (error) {
@@ -855,7 +763,6 @@ export async function submitAdminVerifikasi(
   id: string,
   payload: {
     status: VerificationStatus
-
     catatan?: string
   }
 ): Promise<AdminVerifikasi> {
@@ -893,7 +800,6 @@ export async function createAdminVerifikasi(
   id: string,
   payload: {
     status: VerificationStatus
-
     catatan?: string
   }
 ): Promise<AdminVerifikasi> {
@@ -911,7 +817,6 @@ export async function updateAdminVerifikasi(
   id: string,
   payload: {
     status: VerificationStatus
-
     catatan?: string
   }
 ): Promise<AdminVerifikasi> {
@@ -942,10 +847,12 @@ export async function updateAdminVerifikasi(
 }
 
 // ============================================================
-// KRITERIA
+// GET KRITERIA
 // ============================================================
 
-export async function getAdminKriteria(): Promise<AdminKriteria[]> {
+export async function getAdminKriteria(): Promise<
+  AdminKriteria[]
+> {
   try {
     const response =
       await api.get(
@@ -995,9 +902,7 @@ export async function getAdminKriteria(): Promise<AdminKriteria[]> {
 export async function createAdminKriteria(
   payload: {
     kode: string
-
     nama: string
-
     bobot: number
 
     tipe:
@@ -1005,7 +910,6 @@ export async function createAdminKriteria(
       | 'COST'
 
     deskripsi?: string
-
     aktif?: boolean
   }
 ): Promise<AdminKriteria> {
@@ -1043,9 +947,7 @@ export async function updateAdminKriteria(
   id: string,
   payload: Partial<{
     kode: string
-
     nama: string
-
     bobot: number
 
     tipe:
@@ -1053,7 +955,6 @@ export async function updateAdminKriteria(
       | 'COST'
 
     deskripsi: string
-
     aktif: boolean
   }>
 ): Promise<AdminKriteria> {
@@ -1105,7 +1006,7 @@ export async function deleteAdminKriteria(
 }
 
 // ============================================================
-// SUBKRITERIA
+// GET SUBKRITERIA
 // ============================================================
 
 export async function getAdminSubKriteria(
@@ -1176,11 +1077,8 @@ export async function getAdminSubKriteria(
 export async function createAdminSubKriteria(
   payload: {
     kriteriaId: string
-
     nama: string
-
     nilai: number
-
     keterangan?: string
   }
 ): Promise<AdminSubKriteria> {
@@ -1219,11 +1117,8 @@ export async function updateAdminSubKriteria(
   id: string,
   payload: Partial<{
     kriteriaId: string
-
     nama: string
-
     nilai: number
-
     keterangan: string
   }>
 ): Promise<AdminSubKriteria> {
@@ -1269,7 +1164,7 @@ export async function deleteAdminSubKriteria(
     throw new Error(
       getErrorMessage(
         error,
-        'Gagal menghapus subkriteria.'
+        'Gagal menghapus data subkriteria.'
       )
     )
   }
@@ -1281,7 +1176,6 @@ export async function deleteAdminSubKriteria(
 
 export async function getAdminTopsisCandidates(): Promise<{
   criteria: AdminKriteria[]
-
   candidates: AdminTopsisCandidate[]
 }> {
   try {
@@ -1322,9 +1216,7 @@ export async function processAdminTopsis(
   layakThreshold: number
 ): Promise<{
   threshold: number
-
   jumlahAlternatif: number
-
   results: AdminTopsisResult[]
 }> {
   try {
@@ -1394,9 +1286,7 @@ export async function getAdminTopsisResults(): Promise<
       return data.results
     }
 
-    if (
-      Array.isArray(data)
-    ) {
+    if (Array.isArray(data)) {
       return data
     }
 
