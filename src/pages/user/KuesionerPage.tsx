@@ -14,6 +14,7 @@ import {
   CheckCircle,
   Lock,
   ArrowRight,
+  Home,
 } from 'lucide-react'
 
 import {
@@ -66,8 +67,7 @@ interface KriteriaApi {
     | 'BENEFIT'
     | 'COST'
   deskripsi?: string | null
-  subKriteria:
-    SubKriteriaApi[]
+  subKriteria: SubKriteriaApi[]
 }
 
 interface ExistingAnswer {
@@ -88,6 +88,31 @@ const LOCKED_STATUSES = [
   'DIPROSES_TOPSIS',
   'LAYAK_DIDANAI',
   'TIDAK_DIDANAI',
+]
+
+// ============================================================
+// STATUS RUMAH
+// ============================================================
+
+const STATUS_RUMAH_OPTIONS = [
+  {
+    value: 'milik_sendiri',
+    label: 'Milik Sendiri',
+    description:
+      'Rumah merupakan milik pribadi atau keluarga sendiri',
+  },
+  {
+    value: 'sewa',
+    label: 'Sewa / Kontrak',
+    description:
+      'Tinggal di rumah sewa atau kontrakan',
+  },
+  {
+    value: 'menumpang',
+    label: 'Menumpang',
+    description:
+      'Tinggal bersama keluarga atau pihak lain',
+  },
 ]
 
 // ============================================================
@@ -125,6 +150,11 @@ export function KuesionerPage() {
       string
     >
   >({})
+
+  const [
+    statusRumah,
+    setStatusRumah,
+  ] = useState<string>('')
 
   const [
     loading,
@@ -291,7 +321,11 @@ export function KuesionerPage() {
                           .split(
                             'T'
                           )[0]
-                      : '',
+                      : undefined,
+
+                  catatan:
+                    p.catatan ||
+                    undefined,
 
                   tanggalVerifikasi:
                     p.tanggalVerifikasi
@@ -303,35 +337,32 @@ export function KuesionerPage() {
                             'T'
                           )[0]
                       : undefined,
-
-                  catatan:
-                    p.catatan ||
-                    undefined,
                 }
 
-              if (
-                mounted
-              ) {
-                setPengajuan(
-                  currentPengajuan
-                )
-              }
+              setPengajuan(
+                currentPengajuan
+              )
             }
           }
 
           // --------------------------------------------------
-          // Tidak punya pengajuan
+          // Kalau tidak ada pengajuan
           // --------------------------------------------------
 
           if (
-            !currentPengajuan?.id
+            !currentPengajuan
           ) {
+            if (mounted) {
+              setLoading(
+                false
+              )
+            }
+
             return
           }
 
           // --------------------------------------------------
           // Ambil detail pengajuan
-          // Termasuk jawaban yang sudah tersimpan.
           // --------------------------------------------------
 
           const detailResponse =
@@ -349,90 +380,80 @@ export function KuesionerPage() {
               ?.data
               ?.pengajuan
 
-          if (!detail) {
+          if (
+            !mounted
+          ) {
             return
           }
 
           // --------------------------------------------------
-          // Ambil jawaban existing
+          // Ambil status rumah dari Mustahik
+          // --------------------------------------------------
+
+          if (
+            detail
+              ?.mustahik
+              ?.statusRumah
+          ) {
+            setStatusRumah(
+              detail
+                .mustahik
+                .statusRumah
+            )
+          }
+
+          // --------------------------------------------------
+          // Ambil jawaban yang sudah tersimpan
           // --------------------------------------------------
 
           const existingAnswers:
             ExistingAnswer[] =
-            Array.isArray(
-              detail.jawaban
-            )
-              ? detail.jawaban
-              : []
-
-          const answerMap:
-            Record<
-              string,
-              string
-            > = {}
-
-          existingAnswers.forEach(
-            (
-              answer
-            ) => {
-              answerMap[
-                answer.kriteriaId
-              ] =
-                answer.subKriteriaId
-            }
-          )
+            detail
+              ?.jawaban ||
+            []
 
           if (
-            mounted
+            existingAnswers.length >
+            0
           ) {
-            setAnswers(
-              answerMap
-            )
+            const mappedAnswers:
+              Record<
+                string,
+                string
+              > =
+              {}
 
-            // ------------------------------------------------
-            // Kalau status sudah bukan DRAFT,
-            // kuesioner dianggap sudah dikirim.
-            // ------------------------------------------------
-
-            const isLocked =
-              LOCKED_STATUSES.includes(
-                detail.status
-              )
-
-            setSubmitted(
-              isLocked
-            )
-
-            setPengajuan(
+            existingAnswers.forEach(
               (
-                previous
-              ) => ({
-                ...(previous ||
-                  currentPengajuan!),
+                answer
+              ) => {
+                mappedAnswers[
+                  answer.kriteriaId
+                ] =
+                  answer.subKriteriaId
+              }
+            )
 
-                id:
-                  detail.id,
-
-                status:
-                  detail.status,
-
-                tanggalVerifikasi:
-                  detail.tanggalVerifikasi
-                    ? new Date(
-                        detail.tanggalVerifikasi
-                      )
-                        .toISOString()
-                        .split(
-                          'T'
-                        )[0]
-                    : undefined,
-
-                catatan:
-                  detail.catatan ||
-                  undefined,
-              })
+            setAnswers(
+              mappedAnswers
             )
           }
+
+          // --------------------------------------------------
+          // Cek status lock
+          // --------------------------------------------------
+
+          if (
+            detail &&
+            LOCKED_STATUSES.includes(
+              detail.status
+            )
+          ) {
+            setSubmitted(
+              true
+            )
+          }
+
         } catch (
           err: any
         ) {
@@ -448,7 +469,7 @@ export function KuesionerPage() {
               err.response
                 ?.data
                 ?.message ||
-                'Gagal memuat kuesioner.'
+                'Gagal memuat data kuesioner.'
             )
           }
         } finally {
@@ -465,38 +486,35 @@ export function KuesionerPage() {
     load()
 
     return () => {
-      mounted = false
+      mounted =
+        false
     }
   }, [
     token,
   ])
 
   // ==========================================================
-  // CEK LOCK
+  // LOCK
   // ==========================================================
 
   const isLocked =
     submitted ||
-    LOCKED_STATUSES.includes(
-      pengajuan?.status ||
-        ''
+    (
+      pengajuan &&
+      LOCKED_STATUSES.includes(
+        pengajuan.status
+      )
     )
 
   // ==========================================================
   // SELECT ANSWER
   // ==========================================================
 
-  const handleSelect =
+  const handleSelectAnswer =
     (
       kriteriaId: string,
       subKriteriaId: string
     ) => {
-
-      // ------------------------------------------------------
-      // 🔒 Kalau sudah dikirim,
-      // tidak boleh mengubah jawaban.
-      // ------------------------------------------------------
-
       if (
         isLocked
       ) {
@@ -516,64 +534,61 @@ export function KuesionerPage() {
     }
 
   // ==========================================================
-  // PROGRESS
-  // ==========================================================
-
-  const answered =
-    Object.keys(
-      answers
-    ).length
-
-  const totalQuestions =
-    kriteria.length
-
-  const progress =
-    totalQuestions >
-    0
-      ? Math.round(
-          (answered /
-            totalQuestions) *
-            100
-        )
-      : 0
-
-  // ==========================================================
   // SUBMIT
   // ==========================================================
 
   const handleSubmit =
     async () => {
+      if (
+        !pengajuan
+      ) {
+        setError(
+          'Pengajuan tidak ditemukan.'
+        )
 
-      // ------------------------------------------------------
-      // 🔒 Frontend guard
-      // ------------------------------------------------------
+        return
+      }
 
       if (
         isLocked
       ) {
+        return
+      }
+
+      // ------------------------------------------------------
+      // Validasi semua kriteria
+      // ------------------------------------------------------
+
+      const unanswered =
+        kriteria.filter(
+          (
+            item
+          ) =>
+            !answers[
+              item.id
+            ]
+        )
+
+      if (
+        unanswered.length >
+        0
+      ) {
         setError(
-          'Kuesioner sudah pernah dikirim dan tidak dapat dikirim ulang.'
+          `Masih ada ${unanswered.length} pertanyaan yang belum dijawab.`
         )
 
         return
       }
 
-      if (
-        !pengajuan?.id
-      ) {
-        setError(
-          'Pengajuan belum tersedia. Silakan isi data pribadi terlebih dahulu.'
-        )
-
-        return
-      }
+      // ------------------------------------------------------
+      // Validasi status rumah
+      // ------------------------------------------------------
 
       if (
-        answered <
-        totalQuestions
+        !statusRumah
       ) {
         setError(
-          'Semua pertanyaan wajib dijawab.'
+          'Silakan pilih status rumah terlebih dahulu.'
         )
 
         return
@@ -586,7 +601,6 @@ export function KuesionerPage() {
       setError(null)
 
       try {
-
         const jawaban =
           kriteria.map(
             (
@@ -603,7 +617,7 @@ export function KuesionerPage() {
           )
 
         // ----------------------------------------------------
-        // POST PERTAMA
+        // Kirim kuesioner
         // ----------------------------------------------------
 
         await axios.post(
@@ -613,6 +627,10 @@ export function KuesionerPage() {
               pengajuan.id,
 
             jawaban,
+
+            // PENTING:
+            // Status rumah ikut dikirim ke backend
+            statusRumah,
           },
           {
             headers:
@@ -629,7 +647,7 @@ export function KuesionerPage() {
         )
 
         // ----------------------------------------------------
-        // Refresh context dari database
+        // Refresh context
         // ----------------------------------------------------
 
         await refreshPengajuan()
@@ -660,8 +678,10 @@ export function KuesionerPage() {
             (
               previous
             ) => ({
-              ...(previous ||
-                pengajuan),
+              ...(
+                previous ||
+                pengajuan
+              ),
 
               status:
                 detail.status,
@@ -691,9 +711,11 @@ export function KuesionerPage() {
         navigate(
           '/pantau-hasil',
           {
-            replace: true,
+            replace:
+              true,
           }
         )
+
       } catch (
         err: any
       ) {
@@ -701,11 +723,6 @@ export function KuesionerPage() {
           'GAGAL MENGIRIM KUESIONER:',
           err
         )
-
-        // ----------------------------------------------------
-        // Kalau backend menjawab 409,
-        // berarti kuesioner memang sudah pernah dikirim.
-        // ----------------------------------------------------
 
         if (
           err.response
@@ -734,6 +751,7 @@ export function KuesionerPage() {
             ?.message ||
             'Gagal menyimpan jawaban kuesioner.'
         )
+
       } finally {
         setSubmitting(
           false
@@ -820,37 +838,18 @@ export function KuesionerPage() {
       {isLocked && (
         <Card className="border-green-200 bg-green-50/50">
           <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                <Lock className="w-5 h-5 text-green-600" />
-              </div>
+            <div className="flex gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
 
-              <div className="flex-1">
-                <p className="font-semibold text-green-800">
-                  Kuesioner sudah dikirim
+              <div>
+                <p className="font-medium text-green-800">
+                  Kuesioner telah dikirim
                 </p>
 
                 <p className="text-sm text-green-700 mt-1">
-                  Jawaban Anda sudah tersimpan
-                  di database dan sedang diproses
-                  sesuai alur pengajuan. Kuesioner
-                  hanya dapat dikirim satu kali.
+                  Jawaban kuesioner tidak dapat diubah kembali
+                  dan sedang menunggu proses selanjutnya.
                 </p>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 border-green-300 text-green-700"
-                  onClick={() =>
-                    navigate(
-                      '/pantau-hasil'
-                    )
-                  }
-                >
-                  Pantau Pengajuan
-
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
               </div>
             </div>
           </CardContent>
@@ -858,67 +857,17 @@ export function KuesionerPage() {
       )}
 
       {/* ======================================================
-          PROGRESS
-      ====================================================== */}
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Progress Pengisian
-            </span>
-
-            <span className="text-sm font-bold text-green-600">
-              {answered}/
-              {totalQuestions}
-            </span>
-          </div>
-
-          <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-green-500 rounded-full transition-all duration-300"
-              style={{
-                width:
-                  `${progress}%`,
-              }}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ======================================================
           ERROR
       ====================================================== */}
 
       {error && (
-        <div
-          className={cn(
-            'flex items-start gap-2 p-3 rounded-lg border',
-            isLocked
-              ? 'bg-amber-50 border-amber-200'
-              : 'bg-red-50 border-red-200'
-          )}
-        >
-          <HelpCircle
-            className={cn(
-              'w-4 h-4 mt-0.5 shrink-0',
-              isLocked
-                ? 'text-amber-600'
-                : 'text-red-600'
-            )}
-          />
-
-          <p
-            className={cn(
-              'text-sm',
-              isLocked
-                ? 'text-amber-700'
-                : 'text-red-700'
-            )}
-          >
-            {error}
-          </p>
-        </div>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <p className="text-sm text-red-600">
+              {error}
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {/* ======================================================
@@ -926,186 +875,258 @@ export function KuesionerPage() {
       ====================================================== */}
 
       {!isLocked && (
-        <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-slate-900 rounded-lg border border-blue-200 dark:border-blue-900">
-          <HelpCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardContent className="p-4">
+            <div className="flex gap-3">
+              <HelpCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
 
-          <p className="text-xs text-blue-700 dark:text-blue-300">
-            Jawaban kuesioner akan menjadi
-            nilai kriteria SPK TOPSIS.
-            Pastikan seluruh jawaban sudah
-            benar sebelum menekan tombol
-            Kirim Kuesioner. Kuesioner hanya
-            dapat dikirim satu kali.
-          </p>
-        </div>
+              <div>
+                <p className="font-medium text-blue-800">
+                  Petunjuk Pengisian
+                </p>
+
+                <p className="text-sm text-blue-700 mt-1">
+                  Pilih satu jawaban pada setiap kriteria sesuai
+                  kondisi Anda saat ini. Pastikan seluruh pertanyaan
+                  telah dijawab sebelum mengirim kuesioner.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* ======================================================
-          QUESTIONS
+          DATA PENGAJUAN
       ====================================================== */}
 
-      <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            Data Pengajuan
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-xs text-slate-500">
+                Nama Lengkap
+              </p>
+
+              <p className="font-medium text-slate-800 mt-1">
+                {pengajuan.namaLengkap}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500">
+                NIK
+              </p>
+
+              <p className="font-medium text-slate-800 mt-1">
+                {pengajuan.nik}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ======================================================
+          STATUS RUMAH
+      ====================================================== */}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Home className="w-5 h-5 text-green-600" />
+
+            Status Tempat Tinggal
+
+            <span className="text-red-500">
+              *
+            </span>
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent>
+          <p className="text-sm text-slate-500 mb-4">
+            Pilih status rumah atau tempat tinggal Anda saat ini.
+          </p>
+
+          <div className="grid gap-3 md:grid-cols-3">
+
+            {STATUS_RUMAH_OPTIONS.map(
+              (
+                option
+              ) => {
+                const selected =
+                  statusRumah ===
+                  option.value
+
+                return (
+                  <button
+                    key={
+                      option.value
+                    }
+                    type="button"
+                    disabled={
+                      isLocked
+                    }
+                    onClick={() => {
+                      if (
+                        !isLocked
+                      ) {
+                        setStatusRumah(
+                          option.value
+                        )
+                      }
+                    }}
+                    className={cn(
+                      'rounded-lg border p-4 text-left transition-all',
+
+                      selected
+                        ? 'border-green-600 bg-green-50 ring-1 ring-green-600'
+                        : 'border-slate-200 bg-white hover:border-green-400',
+
+                      isLocked &&
+                        'cursor-not-allowed opacity-80'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+
+                      <div>
+                        <p className="font-medium text-slate-800">
+                          {option.label}
+                        </p>
+
+                        <p className="text-xs text-slate-500 mt-1">
+                          {option.description}
+                        </p>
+                      </div>
+
+                      {selected && (
+                        <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                      )}
+                    </div>
+                  </button>
+                )
+              }
+            )}
+
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ======================================================
+          KRITERIA KUESIONER
+      ====================================================== */}
+
+      <div className="space-y-5">
 
         {kriteria.map(
           (
             item,
             index
-          ) => {
-
-            const selected =
-              answers[
+          ) => (
+            <Card
+              key={
                 item.id
-              ]
+              }
+            >
+              <CardHeader>
+                <CardTitle className="text-base leading-relaxed">
 
-            return (
-              <Card
-                key={
-                  item.id
-                }
-              >
+                  <span className="text-green-600 mr-2">
+                    {index + 1}.
+                  </span>
 
-                <CardHeader>
-                  <div className="flex items-start gap-3">
+                  {item.nama}
+                </CardTitle>
 
-                    <div
-                      className={cn(
-                        'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
-                        isLocked
-                          ? 'bg-slate-100 text-slate-500'
-                          : 'bg-green-100 text-green-700'
-                      )}
-                    >
-                      {index + 1}
-                    </div>
+                {item.deskripsi && (
+                  <p className="text-sm text-slate-500">
+                    {item.deskripsi}
+                  </p>
+                )}
+              </CardHeader>
 
-                    <div>
-                      <CardTitle className="text-base">
-                        {item.kode} —{' '}
-                        {item.nama}
+              <CardContent>
+                <div className="space-y-3">
 
-                        <span
+                  {item.subKriteria.map(
+                    (
+                      sub
+                    ) => {
+                      const selected =
+                        answers[
+                          item.id
+                        ] ===
+                        sub.id
+
+                      return (
+                        <button
+                          key={
+                            sub.id
+                          }
+                          type="button"
+                          disabled={
+                            isLocked
+                          }
+                          onClick={() =>
+                            handleSelectAnswer(
+                              item.id,
+                              sub.id
+                            )
+                          }
                           className={cn(
-                            'ml-2 text-xs font-semibold px-2 py-0.5 rounded-full border',
+                            'w-full rounded-lg border p-4 text-left transition-all',
 
-                            item.tipe ===
-                              'BENEFIT'
-                              ? 'bg-green-50 text-green-700 border-green-200'
-                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                            selected
+                              ? 'border-green-600 bg-green-50 ring-1 ring-green-600'
+                              : 'border-slate-200 hover:border-green-400 hover:bg-slate-50',
+
+                            isLocked &&
+                              'cursor-not-allowed opacity-80'
                           )}
                         >
-                          {item.tipe ===
-                          'BENEFIT'
-                            ? 'Benefit'
-                            : 'Cost'}
-                        </span>
-                      </CardTitle>
-
-                      {item.deskripsi && (
-                        <p className="text-xs text-slate-400 mt-1">
-                          {
-                            item.deskripsi
-                          }
-                        </p>
-                      )}
-                    </div>
-
-                  </div>
-                </CardHeader>
-
-                <CardContent>
-                  <div className="space-y-2">
-
-                    {item.subKriteria.map(
-                      (
-                        sub
-                      ) => {
-
-                        const isSelected =
-                          selected ===
-                          sub.id
-
-                        return (
-                          <label
-                            key={
-                              sub.id
-                            }
-                            className={cn(
-                              'flex items-center gap-3 p-3 rounded-lg border transition-all',
-
-                              isLocked
-                                ? 'cursor-default opacity-90'
-                                : 'cursor-pointer hover:border-green-300 hover:bg-slate-50 dark:hover:bg-slate-800',
-
-                              isSelected
-                                ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
-                                : 'border-slate-200 dark:border-slate-800'
-                            )}
-                          >
-
-                            <input
-                              type="radio"
-                              name={
-                                item.id
-                              }
-                              value={
-                                sub.id
-                              }
-                              checked={
-                                isSelected
-                              }
-                              disabled={
-                                isLocked
-                              }
-                              onChange={() =>
-                                handleSelect(
-                                  item.id,
-                                  sub.id
-                                )
-                              }
-                              className="sr-only"
-                            />
+                          <div className="flex items-start gap-3">
 
                             <div
                               className={cn(
-                                'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
+                                'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
 
-                                isSelected
-                                  ? 'border-green-500 bg-green-500'
-                                  : 'border-slate-300 dark:border-slate-600'
+                                selected
+                                  ? 'border-green-600 bg-green-600'
+                                  : 'border-slate-300'
                               )}
                             >
-                              {isSelected && (
-                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                              {selected && (
+                                <CheckCircle className="h-4 w-4 text-white" />
                               )}
                             </div>
 
-                            <div className="flex items-center justify-between flex-1 gap-3">
+                            <div>
+                              <p className="font-medium text-slate-800">
+                                {sub.nama}
+                              </p>
 
-                              <span className="text-sm text-slate-700 dark:text-slate-200">
-                                {sub.keterangan ||
-                                  sub.nama}
-                              </span>
-
-                              <span className="text-xs font-bold text-slate-400">
-                                Nilai:{' '}
-                                {Number(
-                                  sub.nilai
-                                )}
-                              </span>
-
+                              {sub.keterangan && (
+                                <p className="text-sm text-slate-500 mt-1">
+                                  {sub.keterangan}
+                                </p>
+                              )}
                             </div>
+                          </div>
+                        </button>
+                      )
+                    }
+                  )}
 
-                          </label>
-                        )
-                      }
-                    )}
-
-                  </div>
-                </CardContent>
-
-              </Card>
-            )
-          }
+                </div>
+              </CardContent>
+            </Card>
+          )
         )}
 
       </div>
@@ -1118,78 +1139,68 @@ export function KuesionerPage() {
         <div className="flex justify-end">
 
           <Button
+            size="lg"
+            disabled={
+              submitting ||
+              kriteria.length === 0
+            }
             onClick={
               handleSubmit
             }
-            disabled={
-              submitting ||
-              answered <
-                totalQuestions
-            }
-            className="min-w-[200px]"
+            className="gap-2"
           >
-
             {submitting ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Mengirim Kuesioner...
-              </>
-            ) : answered <
-              totalQuestions ? (
-              <>
-                <Send className="w-4 h-4 mr-2" />
-                Lengkapi Kuesioner
+                <Loader2 className="w-4 h-4 animate-spin" />
+
+                Mengirim...
               </>
             ) : (
               <>
-                <CheckCircle className="w-4 h-4 mr-2" />
                 Kirim Kuesioner
+
+                <Send className="w-4 h-4" />
               </>
             )}
-
           </Button>
 
         </div>
       )}
 
       {/* ======================================================
-          LOCKED FOOTER
+          LOCKED ACTION
       ====================================================== */}
 
       {isLocked && (
-        <Card>
-          <CardContent className="py-5">
-            <div className="flex items-center justify-between gap-4">
+        <div className="flex justify-end">
 
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-green-600" />
+          <Button
+            onClick={() =>
+              navigate(
+                '/pantau-hasil'
+              )
+            }
+            className="gap-2"
+          >
+            Pantau Hasil
 
-                <div>
-                  <p className="text-sm font-semibold">
-                    Jawaban sudah tersimpan
-                  </p>
+            <ArrowRight className="w-4 h-4" />
+          </Button>
 
-                  <p className="text-xs text-slate-500">
-                    Tidak ada pengiriman ulang
-                    untuk pengajuan ini.
-                  </p>
-                </div>
-              </div>
+        </div>
+      )}
 
-              <Button
-                variant="outline"
-                onClick={() =>
-                  navigate(
-                    '/pantau-hasil'
-                  )
-                }
-              >
-                Pantau Hasil
-              </Button>
+      {/* ======================================================
+          FOOTER LOCK INFO
+      ====================================================== */}
 
-            </div>
-          </CardContent>
-        </Card>
+      {isLocked && (
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+
+          <Lock className="w-4 h-4" />
+
+          Kuesioner sudah dikunci.
+        </div>
       )}
 
     </div>

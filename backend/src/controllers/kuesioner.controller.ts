@@ -231,6 +231,7 @@ async function saveAnswers(
     const {
       pengajuanId,
       jawaban,
+      statusRumah,
     } =
       req.body as {
         pengajuanId?: string
@@ -239,6 +240,11 @@ async function saveAnswers(
           kriteriaId: string
           subKriteriaId: string
         }>
+
+        statusRumah?:
+          | 'milik_sendiri'
+          | 'sewa'
+          | 'menumpang'
       }
 
     // ========================================================
@@ -265,6 +271,25 @@ async function saveAnswers(
       return fail(
         res,
         'Jawaban kuesioner wajib diisi',
+        422
+      )
+    }
+
+    const validStatusRumah = [
+      'milik_sendiri',
+      'sewa',
+      'menumpang',
+    ] as const
+
+    if (
+      !statusRumah ||
+      !validStatusRumah.includes(
+        statusRumah
+      )
+    ) {
+      return fail(
+        res,
+        'Status rumah wajib dipilih',
         422
       )
     }
@@ -313,15 +338,7 @@ async function saveAnswers(
     }
 
     // ========================================================
-    // 🔒 CEK PENGAJUAN SUDAH PERNAH DIKIRIM
-    // ========================================================
-    //
-    // Status DRAFT = masih boleh mengisi.
-    //
-    // Selain DRAFT berarti proses sudah berjalan.
-    //
-    // Jadi user TIDAK BOLEH mengirim kuesioner lagi.
-    //
+    // CEK PENGAJUAN SUDAH PERNAH DIKIRIM
     // ========================================================
 
     if (
@@ -336,13 +353,7 @@ async function saveAnswers(
     }
 
     // ========================================================
-    // 🔒 CEK DATABASE
-    // ========================================================
-    //
-    // Walaupun status masih DRAFT karena kondisi tertentu,
-    // jika jawaban sudah tersimpan lengkap, tetap jangan
-    // mengizinkan submit ulang.
-    //
+    // CEK DATABASE
     // ========================================================
 
     if (
@@ -395,7 +406,7 @@ async function saveAnswers(
       ) => {
 
         // ----------------------------------------------------
-        // Simpan semua jawaban
+        // Simpan semua jawaban TOPSIS
         // ----------------------------------------------------
 
         for (
@@ -434,8 +445,24 @@ async function saveAnswers(
         }
 
         // ----------------------------------------------------
-        // Setelah semua jawaban tersimpan,
-        // BARU ubah status.
+        // Simpan Status Rumah ke Mustahik.
+        //
+        // Status Rumah BUKAN kriteria TOPSIS.
+        // ----------------------------------------------------
+
+        await tx.mustahik.update({
+          where: {
+            id: pengajuan.mustahikId,
+          },
+
+          data: {
+            statusRumah,
+          },
+        })
+
+        // ----------------------------------------------------
+        // Setelah semua data berhasil disimpan,
+        // baru ubah status pengajuan.
         // ----------------------------------------------------
 
         await tx.pengajuan.update(
@@ -449,8 +476,6 @@ async function saveAnswers(
               status:
                 PengajuanStatus.MENUNGGU_VERIFIKASI,
 
-              // Reset catatan lama ketika
-              // pengajuan baru dikirim.
               catatan: null,
             },
           }
@@ -512,12 +537,10 @@ export const createJawaban = (
 // UPDATE JAWABAN
 // ============================================================
 //
-// Endpoint ini sengaja tetap dipertahankan supaya route lama
+// Endpoint ini tetap dipertahankan supaya route lama
 // tidak rusak.
 //
-// Tetapi user TIDAK BOLEH menggunakannya untuk mengubah
-// kuesioner setelah submit.
-//
+// Namun kuesioner tidak dapat diubah lagi setelah submit.
 // ============================================================
 
 export const updateJawaban = (
