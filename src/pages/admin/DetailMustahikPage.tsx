@@ -58,19 +58,13 @@ import {
 
 import type {
   AdminMustahik,
+  AdminJawaban,
 } from '@/lib/adminApi'
 
 // ============================================================
 // HELPER
 // ============================================================
 
-/**
- * Mengubah value dari API/Prisma menjadi number yang aman.
- *
- * Database MySQL/Prisma bisa mengembalikan Decimal
- * sebagai string, sedangkan helper formatCurrency
- * membutuhkan number.
- */
 function safeNumber(
   value: unknown
 ): number | null {
@@ -98,12 +92,6 @@ function safeNumber(
   return numberValue
 }
 
-/**
- * Helper untuk jenis kelamin.
- *
- * getJenisKelaminLabel() hanya menerima:
- * "L" | "P"
- */
 function safeJenisKelamin(
   value: unknown
 ): 'L' | 'P' | null {
@@ -117,9 +105,6 @@ function safeJenisKelamin(
   return null
 }
 
-/**
- * Format tanggal dengan aman.
- */
 function safeFormatDate(
   value: unknown
 ): string {
@@ -151,6 +136,39 @@ function safeFormatDate(
   } catch {
     return '-'
   }
+}
+
+// ============================================================
+// AMBIL JAWABAN KUESIONER BERDASARKAN KODE KRITERIA
+// ============================================================
+//
+// C1 = Penghasilan
+// C2 = Jumlah Tanggungan
+// C3 = Kondisi Rumah
+// C4 = Status Pekerjaan
+// C5 = Kepemilikan Aset
+//
+// Data kuesioner diprioritaskan karena merupakan data
+// yang benar-benar dipilih oleh user saat mengisi kuesioner.
+// ============================================================
+
+function getJawabanKuesioner(
+  jawaban: AdminJawaban[],
+  kode: string
+): string | null {
+  const item =
+    jawaban.find(
+      (
+        answer
+      ) =>
+        answer.kriteria?.kode ===
+        kode
+    )
+
+  return (
+    item?.subKriteria?.nama ||
+    null
+  )
 }
 
 // ============================================================
@@ -192,7 +210,7 @@ export function DetailMustahikPage() {
     useState('')
 
   // ==========================================================
-  // LOAD DETAIL
+  // LOAD DETAIL MUSTAHIK
   // ==========================================================
 
   useEffect(() => {
@@ -200,10 +218,6 @@ export function DetailMustahikPage() {
 
     const load =
       async () => {
-        // ----------------------------------------------------
-        // CEK ID
-        // ----------------------------------------------------
-
         if (!id) {
           if (mounted) {
             setError(
@@ -227,24 +241,12 @@ export function DetailMustahikPage() {
             setError('')
           }
 
-          // --------------------------------------------------
-          // AMBIL DATA DARI DATABASE
-          // --------------------------------------------------
-          //
-          // TIDAK ADA MOCK DATA DI SINI.
-          //
-          // ID dari URL digunakan langsung untuk mengambil
-          // mustahik yang dipilih.
-          // --------------------------------------------------
-
           const result =
             await getAdminMustahikDetail(
               id
             )
 
-          if (
-            mounted
-          ) {
+          if (mounted) {
             setMustahik(
               result.mustahik
             )
@@ -257,21 +259,19 @@ export function DetailMustahikPage() {
             requestError
           )
 
-          if (
-            mounted
-          ) {
+          if (mounted) {
             setError(
               requestError
                 ?.response
                 ?.data
                 ?.message ||
+                requestError
+                  ?.message ||
                 'Gagal mengambil detail mustahik dari database.'
             )
           }
         } finally {
-          if (
-            mounted
-          ) {
+          if (mounted) {
             setLoading(
               false
             )
@@ -290,9 +290,7 @@ export function DetailMustahikPage() {
   // LOADING
   // ==========================================================
 
-  if (
-    loading
-  ) {
+  if (loading) {
     return (
       <div className="space-y-6">
 
@@ -332,7 +330,7 @@ export function DetailMustahikPage() {
   }
 
   // ==========================================================
-  // ERROR / DATA TIDAK ADA
+  // ERROR
   // ==========================================================
 
   if (
@@ -374,8 +372,10 @@ export function DetailMustahikPage() {
               </h3>
 
               <p className="text-sm text-slate-500 mt-1 max-w-md">
-                {error ||
-                  'Data mustahik tidak ditemukan di database.'}
+                {
+                  error ||
+                  'Data mustahik tidak ditemukan di database.'
+                }
               </p>
 
               <Button
@@ -399,7 +399,7 @@ export function DetailMustahikPage() {
   }
 
   // ==========================================================
-  // DATA PENGAJUAN
+  // DATA PENGAJUAN TERBARU
   // ==========================================================
 
   const pengajuan =
@@ -414,7 +414,45 @@ export function DetailMustahikPage() {
     'DRAFT'
 
   // ==========================================================
-  // SAFE VALUES
+  // JAWABAN KUESIONER
+  // ==========================================================
+
+  const jawabanKuesioner =
+    pengajuan?.jawaban ||
+    []
+
+  const penghasilanKuesioner =
+    getJawabanKuesioner(
+      jawabanKuesioner,
+      'C1'
+    )
+
+  const tanggunganKuesioner =
+    getJawabanKuesioner(
+      jawabanKuesioner,
+      'C2'
+    )
+
+  const kondisiRumahKuesioner =
+    getJawabanKuesioner(
+      jawabanKuesioner,
+      'C3'
+    )
+
+  const pekerjaanKuesioner =
+    getJawabanKuesioner(
+      jawabanKuesioner,
+      'C4'
+    )
+
+  const asetKuesioner =
+    getJawabanKuesioner(
+      jawabanKuesioner,
+      'C5'
+    )
+
+  // ==========================================================
+  // SAFE VALUES DARI DATA MUSTAHIK
   // ==========================================================
 
   const jenisKelamin =
@@ -473,20 +511,18 @@ export function DetailMustahikPage() {
 
             <div className="flex items-center gap-4">
 
-              {/* AVATAR */}
-
               <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xl font-bold">
 
-                {(
-                  mustahik.namaLengkap ||
-                  'M'
-                )
-                  .charAt(0)
-                  .toUpperCase()}
+                {
+                  (
+                    mustahik.namaLengkap ||
+                    'M'
+                  )
+                    .charAt(0)
+                    .toUpperCase()
+                }
 
               </div>
-
-              {/* USER INFO */}
 
               <div>
 
@@ -509,57 +545,64 @@ export function DetailMustahikPage() {
 
                 <p className="text-xs text-slate-400 font-mono mt-1">
                   NIK:{' '}
-                  {mustahik.nik
-                    ? formatNIK(
-                        mustahik.nik
-                      )
-                    : '-'}
+
+                  {
+                    mustahik.nik
+                      ? formatNIK(
+                          mustahik.nik
+                        )
+                      : '-'
+                  }
                 </p>
 
-                {mustahik.user && (
-                  <div className="mt-2 space-y-0.5">
+                {
+                  mustahik.user && (
+                    <div className="mt-2 space-y-0.5">
 
-                    <p className="text-xs text-slate-500">
-                      Akun:{' '}
-                      <span className="font-medium text-slate-700">
-                        {
-                          mustahik.user.name
-                        }
-                      </span>
-                    </p>
+                      <p className="text-xs text-slate-500">
+                        Akun:{' '}
 
-                    <p className="text-xs text-slate-500">
-                      Email:{' '}
-                      <span className="font-medium text-slate-700">
-                        {
-                          mustahik.user.email
-                        }
-                      </span>
-                    </p>
+                        <span className="font-medium text-slate-700">
+                          {
+                            mustahik.user.name
+                          }
+                        </span>
+                      </p>
 
-                  </div>
-                )}
+                      <p className="text-xs text-slate-500">
+                        Email:{' '}
+
+                        <span className="font-medium text-slate-700">
+                          {
+                            mustahik.user.email
+                          }
+                        </span>
+                      </p>
+
+                    </div>
+                  )
+                }
 
               </div>
 
             </div>
 
-            {/* BUTTON VERIFIKASI */}
-
-            {pengajuan && (
-              <Button
-                asChild
-                size="sm"
-              >
-                <Link
-                  to={`/admin/verifikasi/${pengajuan.id}`}
+            {
+              pengajuan && (
+                <Button
+                  asChild
+                  size="sm"
                 >
-                  <ShieldCheck className="w-4 h-4 mr-2" />
+                  <Link
+                    to={`/admin/verifikasi/${pengajuan.id}`}
+                  >
+                    <ShieldCheck className="w-4 h-4 mr-2" />
 
-                  Verifikasi Pengajuan
-                </Link>
-              </Button>
-            )}
+                    Verifikasi Pengajuan
+                  </Link>
+                </Button>
+              )
+            }
 
           </div>
 
@@ -596,8 +639,6 @@ export function DetailMustahikPage() {
 
             <div className="grid grid-cols-2 gap-4">
 
-              {/* NIK */}
-
               <div>
 
                 <p className="text-xs text-slate-400">
@@ -616,8 +657,6 @@ export function DetailMustahikPage() {
 
               </div>
 
-              {/* NAMA */}
-
               <div>
 
                 <p className="text-xs text-slate-400">
@@ -632,8 +671,6 @@ export function DetailMustahikPage() {
                 </p>
 
               </div>
-
-              {/* TEMPAT LAHIR */}
 
               <div>
 
@@ -650,8 +687,6 @@ export function DetailMustahikPage() {
 
               </div>
 
-              {/* TANGGAL LAHIR */}
-
               <div>
 
                 <p className="text-xs text-slate-400">
@@ -659,14 +694,14 @@ export function DetailMustahikPage() {
                 </p>
 
                 <p className="font-medium text-slate-800 mt-0.5">
-                  {safeFormatDate(
-                    mustahik.tanggalLahir
-                  )}
+                  {
+                    safeFormatDate(
+                      mustahik.tanggalLahir
+                    )
+                  }
                 </p>
 
               </div>
-
-              {/* JENIS KELAMIN */}
 
               <div>
 
@@ -676,17 +711,17 @@ export function DetailMustahikPage() {
 
                 <p className="font-medium text-slate-800 mt-0.5">
 
-                  {jenisKelamin
-                    ? getJenisKelaminLabel(
-                        jenisKelamin
-                      )
-                    : '-'}
+                  {
+                    jenisKelamin
+                      ? getJenisKelaminLabel(
+                          jenisKelamin
+                        )
+                      : '-'
+                  }
 
                 </p>
 
               </div>
-
-              {/* STATUS PERNIKAHAN */}
 
               <div>
 
@@ -696,17 +731,17 @@ export function DetailMustahikPage() {
 
                 <p className="font-medium text-slate-800 mt-0.5">
 
-                  {mustahik.statusPernikahan
-                    ? getStatusPernikahanLabel(
-                        mustahik.statusPernikahan
-                      )
-                    : '-'}
+                  {
+                    mustahik.statusPernikahan
+                      ? getStatusPernikahanLabel(
+                          mustahik.statusPernikahan
+                        )
+                      : '-'
+                  }
 
                 </p>
 
               </div>
-
-              {/* NOMOR HP */}
 
               <div className="col-span-2">
 
@@ -865,7 +900,7 @@ export function DetailMustahikPage() {
 
             <div className="grid grid-cols-2 gap-4">
 
-              {/* PEKERJAAN */}
+              {/* PEKERJAAN DARI C4 */}
 
               <div>
 
@@ -875,6 +910,7 @@ export function DetailMustahikPage() {
 
                 <p className="font-medium text-slate-800 mt-0.5">
                   {
+                    pekerjaanKuesioner ||
                     mustahik.pekerjaan ||
                     '-'
                   }
@@ -882,7 +918,7 @@ export function DetailMustahikPage() {
 
               </div>
 
-              {/* PENGHASILAN */}
+              {/* PENGHASILAN DARI C1 */}
 
               <div>
 
@@ -892,18 +928,22 @@ export function DetailMustahikPage() {
 
                 <p className="font-medium text-slate-800 mt-0.5">
 
-                  {penghasilan !==
-                  null
-                    ? formatCurrency(
-                        penghasilan
-                      )
-                    : '-'}
+                  {
+                    penghasilanKuesioner ||
+                    (
+                      penghasilan !== null
+                        ? formatCurrency(
+                            penghasilan
+                          )
+                        : '-'
+                    )
+                  }
 
                 </p>
 
               </div>
 
-              {/* TANGGUNGAN */}
+              {/* JUMLAH TANGGUNGAN DARI C2 */}
 
               <div>
 
@@ -913,16 +953,20 @@ export function DetailMustahikPage() {
 
                 <p className="font-medium text-slate-800 mt-0.5">
 
-                  {jumlahTanggungan !==
-                  null
-                    ? `${jumlahTanggungan} Orang`
-                    : '-'}
+                  {
+                    tanggunganKuesioner ||
+                    (
+                      jumlahTanggungan !== null
+                        ? `${jumlahTanggungan} Orang`
+                        : '-'
+                    )
+                  }
 
                 </p>
 
               </div>
 
-              {/* ASET */}
+              {/* KEPEMILIKAN ASET DARI C5 */}
 
               <div>
 
@@ -931,12 +975,19 @@ export function DetailMustahikPage() {
                 </p>
 
                 <p className="font-medium text-slate-800 mt-0.5 capitalize">
-                  {mustahik.kepemilikanAset
-                    ? mustahik.kepemilikanAset.replace(
-                        /_/g,
-                        ' '
-                      )
-                    : '-'}
+
+                  {
+                    asetKuesioner ||
+                    (
+                      mustahik.kepemilikanAset
+                        ? mustahik.kepemilikanAset.replace(
+                            /_/g,
+                            ' '
+                          )
+                        : '-'
+                    )
+                  }
+
                 </p>
 
               </div>
@@ -981,17 +1032,19 @@ export function DetailMustahikPage() {
 
                 <p className="font-medium text-slate-800 mt-0.5">
 
-                  {mustahik.statusRumah
-                    ? getStatusRumahLabel(
-                        mustahik.statusRumah
-                      )
-                    : '-'}
+                  {
+                    mustahik.statusRumah
+                      ? getStatusRumahLabel(
+                          mustahik.statusRumah
+                        )
+                      : '-'
+                  }
 
                 </p>
 
               </div>
 
-              {/* KONDISI RUMAH */}
+              {/* KONDISI RUMAH DARI C3 */}
 
               <div>
 
@@ -1001,11 +1054,16 @@ export function DetailMustahikPage() {
 
                 <p className="font-medium text-slate-800 mt-0.5">
 
-                  {mustahik.kondisiRumah
-                    ? getKondisiRumahLabel(
-                        mustahik.kondisiRumah
-                      )
-                    : '-'}
+                  {
+                    kondisiRumahKuesioner ||
+                    (
+                      mustahik.kondisiRumah
+                        ? getKondisiRumahLabel(
+                            mustahik.kondisiRumah
+                          )
+                        : '-'
+                    )
+                  }
 
                 </p>
 
@@ -1023,201 +1081,191 @@ export function DetailMustahikPage() {
           INFORMASI PENGAJUAN
       ====================================================== */}
 
-      {pengajuan && (
-        <Card>
+      {
+        pengajuan && (
+          <Card>
 
-          <CardHeader>
+            <CardHeader>
 
-            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
 
-              <FileText className="w-4 h-4 text-green-600" />
+                <FileText className="w-4 h-4 text-green-600" />
 
-              <CardTitle>
-                Informasi Pengajuan
-              </CardTitle>
-
-            </div>
-
-          </CardHeader>
-
-          <CardContent>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-
-              {/* ID */}
-
-              <div>
-
-                <p className="text-xs text-slate-400">
-                  ID Pengajuan
-                </p>
-
-                <p className="font-mono font-medium text-slate-800 mt-1 break-all">
-                  {
-                    pengajuan.id
-                  }
-                </p>
+                <CardTitle>
+                  Informasi Pengajuan
+                </CardTitle>
 
               </div>
 
-              {/* STATUS */}
+            </CardHeader>
 
-              <div>
+            <CardContent>
 
-                <p className="text-xs text-slate-400">
-                  Status
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
 
-                <div className="mt-1">
+                <div>
 
-                  <StatusBadge
-                    status={
-                      status as any
+                  <p className="text-xs text-slate-400">
+                    ID Pengajuan
+                  </p>
+
+                  <p className="font-mono font-medium text-slate-800 mt-1 break-all">
+                    {
+                      pengajuan.id
                     }
-                  />
+                  </p>
+
+                </div>
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Status
+                  </p>
+
+                  <div className="mt-1">
+
+                    <StatusBadge
+                      status={
+                        status as any
+                      }
+                    />
+
+                  </div>
+
+                </div>
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Tanggal Pengajuan
+                  </p>
+
+                  <p className="font-medium text-slate-800 mt-1">
+
+                    {
+                      safeFormatDate(
+                        pengajuan.tanggalPengajuan
+                      )
+                    }
+
+                  </p>
 
                 </div>
 
               </div>
 
-              {/* TANGGAL */}
+              {
+                pengajuan.catatan && (
+                  <div className="mt-5 p-4 bg-amber-50 border border-amber-200 rounded-lg">
 
-              <div>
+                    <p className="text-xs font-semibold text-amber-800">
+                      Catatan Verifikasi
+                    </p>
 
-                <p className="text-xs text-slate-400">
-                  Tanggal Pengajuan
-                </p>
+                    <p className="text-sm text-amber-700 mt-1">
+                      {
+                        pengajuan.catatan
+                      }
+                    </p>
 
-                <p className="font-medium text-slate-800 mt-1">
+                  </div>
+                )
+              }
 
-                  {safeFormatDate(
-                    pengajuan.tanggalPengajuan
-                  )}
+            </CardContent>
 
-                </p>
-
-              </div>
-
-            </div>
-
-            {/* CATATAN */}
-
-            {pengajuan.catatan && (
-              <div className="mt-5 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-
-                <p className="text-xs font-semibold text-amber-800">
-                  Catatan Verifikasi
-                </p>
-
-                <p className="text-sm text-amber-700 mt-1">
-                  {
-                    pengajuan.catatan
-                  }
-                </p>
-
-              </div>
-            )}
-
-          </CardContent>
-
-        </Card>
-      )}
+          </Card>
+        )
+      }
 
       {/* ======================================================
           DATA AKUN
       ====================================================== */}
 
-      {mustahik.user && (
-        <Card>
+      {
+        mustahik.user && (
+          <Card>
 
-          <CardHeader>
+            <CardHeader>
 
-            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
 
-              <User className="w-4 h-4 text-green-600" />
+                <User className="w-4 h-4 text-green-600" />
 
-              <CardTitle>
-                Akun Pengguna
-              </CardTitle>
-
-            </div>
-
-          </CardHeader>
-
-          <CardContent>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-
-              {/* NAMA */}
-
-              <div>
-
-                <p className="text-xs text-slate-400">
-                  Nama Akun
-                </p>
-
-                <p className="font-medium text-slate-800 mt-1">
-                  {
-                    mustahik.user.name
-                  }
-                </p>
+                <CardTitle>
+                  Akun Pengguna
+                </CardTitle>
 
               </div>
 
-              {/* EMAIL */}
+            </CardHeader>
 
-              <div>
+            <CardContent>
 
-                <p className="text-xs text-slate-400">
-                  Email
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
 
-                <p className="font-medium text-slate-800 mt-1 break-all">
-                  {
-                    mustahik.user.email
-                  }
-                </p>
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Nama Akun
+                  </p>
+
+                  <p className="font-medium text-slate-800 mt-1">
+                    {
+                      mustahik.user.name
+                    }
+                  </p>
+
+                </div>
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Email
+                  </p>
+
+                  <p className="font-medium text-slate-800 mt-1 break-all">
+                    {
+                      mustahik.user.email
+                    }
+                  </p>
+
+                </div>
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Nomor HP Akun
+                  </p>
+
+                  <p className="font-medium text-slate-800 mt-1">
+                    {
+                      mustahik.user.phone ||
+                      '-'
+                    }
+                  </p>
+
+                </div>
 
               </div>
 
-              {/* PHONE */}
+            </CardContent>
 
-              <div>
-
-                <p className="text-xs text-slate-400">
-                  Nomor HP Akun
-                </p>
-
-                <p className="font-medium text-slate-800 mt-1">
-                  {
-                    mustahik.user.phone ||
-                    '-'
-                  }
-                </p>
-
-              </div>
-
-            </div>
-
-          </CardContent>
-
-        </Card>
-      )}
+          </Card>
+        )
+      }
 
       {/* ======================================================
           RIWAYAT VERIFIKASI
       ====================================================== */}
 
-      {pengajuan &&
+      {
+        pengajuan &&
         Array.isArray(
-          (
-            pengajuan as any
-          ).verifications
+          pengajuan.verifications
         ) &&
-        (
-          pengajuan as any
-        ).verifications.length >
-          0 && (
+        pengajuan.verifications.length > 0 && (
           <Card>
 
             <CardHeader>
@@ -1236,71 +1284,75 @@ export function DetailMustahikPage() {
 
             <CardContent className="space-y-3">
 
-              {(
-                (
-                  pengajuan as any
-                ).verifications ||
-                []
-              ).map(
-                (
-                  verification: any
-                ) => (
-                  <div
-                    key={
-                      verification.id
-                    }
-                    className="p-4 bg-slate-50 rounded-lg border border-slate-200"
-                  >
+              {
+                pengajuan.verifications.map(
+                  (
+                    verification: any
+                  ) => (
+                    <div
+                      key={
+                        verification.id
+                      }
+                      className="p-4 bg-slate-50 rounded-lg border border-slate-200"
+                    >
 
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
 
-                      <div>
+                        <div>
 
-                        <p className="font-semibold text-slate-800">
-                          Status:{' '}
+                          <p className="font-semibold text-slate-800">
+                            Status:{' '}
+
+                            {
+                              verification.status
+                            }
+                          </p>
+
+                          <p className="text-xs text-slate-500 mt-1">
+                            Diverifikasi oleh:{' '}
+
+                            {
+                              verification
+                                .admin
+                                ?.name ||
+                              '-'
+                            }
+                          </p>
+
+                        </div>
+
+                        <span className="text-xs text-slate-400">
+
                           {
-                            verification.status
+                            safeFormatDate(
+                              verification.createdAt
+                            )
                           }
-                        </p>
 
-                        <p className="text-xs text-slate-500 mt-1">
-                          Diverifikasi oleh:{' '}
-                          {
-                            verification
-                              .admin
-                              ?.name ||
-                            '-'
-                          }
-                        </p>
+                        </span>
 
                       </div>
 
-                      <span className="text-xs text-slate-400">
-
-                        {safeFormatDate(
-                          verification.createdAt
-                        )}
-
-                      </span>
+                      {
+                        verification.catatan && (
+                          <p className="text-sm text-slate-600 mt-3">
+                            {
+                              verification.catatan
+                            }
+                          </p>
+                        )
+                      }
 
                     </div>
-
-                    {verification.catatan && (
-                      <p className="text-sm text-slate-600 mt-3">
-                        {
-                          verification.catatan
-                        }
-                      </p>
-                    )}
-
-                  </div>
+                  )
                 )
-              )}
+              }
 
             </CardContent>
 
           </Card>
-        )}
+        )
+      }
 
     </div>
   )
