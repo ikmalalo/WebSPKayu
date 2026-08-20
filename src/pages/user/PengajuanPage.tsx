@@ -1,6 +1,6 @@
 import {
-  useState,
   useEffect,
+  useState,
 } from 'react'
 
 import {
@@ -53,6 +53,7 @@ import axios from 'axios'
 import type {
   Pengajuan,
   DataMustahik,
+  StatusPengajuan,
 } from '@/types'
 
 
@@ -93,7 +94,7 @@ interface PengajuanApi {
   userId: string
   mustahikId: string
 
-  status: string
+  status?: string
 
   catatan?: string | null
 
@@ -115,6 +116,48 @@ interface PengajuanApi {
     catatan?: string | null
     createdAt?: string | null
   }>
+}
+
+
+// ============================================================
+// STATUS VALID
+// ============================================================
+
+const VALID_STATUSES: StatusPengajuan[] = [
+  'DRAFT',
+  'MENUNGGU_VERIFIKASI',
+  'SEDANG_DIVERIFIKASI',
+  'PERLU_PERBAIKAN',
+  'LOLOS_VERIFIKASI',
+  'DITOLAK',
+  'DIPROSES_TOPSIS',
+  'LAYAK_DIDANAI',
+  'TIDAK_DIDANAI',
+]
+
+
+// ============================================================
+// NORMALIZE STATUS
+// ============================================================
+
+function toStatusPengajuan(
+  value: unknown
+): StatusPengajuan {
+  const status =
+    String(
+      value ||
+      'DRAFT'
+    ).toUpperCase()
+
+  if (
+    VALID_STATUSES.includes(
+      status as StatusPengajuan
+    )
+  ) {
+    return status as StatusPengajuan
+  }
+
+  return 'DRAFT'
 }
 
 
@@ -191,6 +234,9 @@ function formatStatusRumah(
 
     menumpang:
       'Menumpang',
+
+    dinas:
+      'Rumah Dinas',
   }
 
   return (
@@ -216,61 +262,60 @@ function formatStatusRumah(
 function adaptPengajuan(
   p: PengajuanApi
 ): Pengajuan {
-
   const verifications =
     Array.isArray(
-      p?.verifications
+      p.verifications
     )
       ? p.verifications
       : []
 
   const latestVerification =
-    verifications.length >
-    0
-      ? verifications[0]
-      : undefined
+    verifications[0]
 
   const tanggalPengajuan =
     safeDate(
-      p?.tanggalPengajuan ||
-      p?.createdAt
+      p.tanggalPengajuan ||
+      p.createdAt
     )
 
   const tanggalVerifikasi =
     safeDate(
       latestVerification?.createdAt ||
-      p?.tanggalVerifikasi
+      p.tanggalVerifikasi
     )
 
   const catatan =
     latestVerification?.catatan ??
-    p?.catatan ??
+    p.catatan ??
     undefined
 
   return {
     id:
-      p?.id ??
+      p.id ||
       '',
 
     userId:
-      p?.userId ??
+      p.userId ||
       '',
 
     mustahikId:
-      p?.mustahikId ??
+      p.mustahikId ||
       '',
 
     namaLengkap:
-      p?.mustahik?.namaLengkap ??
+      p.mustahik
+        ?.namaLengkap ||
       '',
 
     nik:
-      p?.mustahik?.nik ??
+      p.mustahik
+        ?.nik ||
       '',
 
     status:
-      p?.status ??
-      'DRAFT',
+      toStatusPengajuan(
+        p.status
+      ),
 
     tanggalPengajuan,
 
@@ -290,123 +335,169 @@ function adaptPengajuan(
 function adaptMustahik(
   data: any
 ): DataMustahik {
+  const jenisKelamin =
+    data?.jenisKelamin === 'P'
+      ? 'P'
+      : 'L'
+
+  const statusPernikahan =
+    [
+      'belum_menikah',
+      'menikah',
+      'cerai_hidup',
+      'cerai_mati',
+    ].includes(
+      data?.statusPernikahan
+    )
+      ? data.statusPernikahan
+      : 'belum_menikah'
+
+  const statusRumah =
+    [
+      'milik_sendiri',
+      'sewa',
+      'menumpang',
+      'dinas',
+    ].includes(
+      data?.statusRumah
+    )
+      ? data.statusRumah
+      : 'milik_sendiri'
+
+  const kondisiRumah =
+    [
+      'baik',
+      'sedang',
+      'buruk',
+    ].includes(
+      data?.kondisiRumah
+    )
+      ? data.kondisiRumah
+      : 'baik'
+
+  const kepemilikanAset =
+    data?.kepemilikanAset ===
+    'tidak_ada'
+      ? 'tidak_ada'
+      : 'ada'
 
   return {
     id:
-      data?.id ??
-      '',
+      String(
+        data?.id ||
+        ''
+      ),
 
     userId:
-      data?.userId ??
-      '',
+      String(
+        data?.userId ||
+        ''
+      ),
 
     nik:
-      data?.nik ??
-      '',
+      String(
+        data?.nik ||
+        ''
+      ),
 
     namaLengkap:
-      data?.namaLengkap ??
-      '',
+      String(
+        data?.namaLengkap ||
+        ''
+      ),
 
     tempatLahir:
-      data?.tempatLahir ??
-      '',
+      String(
+        data?.tempatLahir ||
+        ''
+      ),
 
     tanggalLahir:
       safeDate(
         data?.tanggalLahir
       ),
 
-    jenisKelamin:
-      data?.jenisKelamin ??
-      '',
+    jenisKelamin,
 
     alamat:
-      data?.alamat ??
-      '',
+      String(
+        data?.alamat ||
+        ''
+      ),
 
     kelurahan:
-      data?.kelurahan ??
-      '',
+      String(
+        data?.kelurahan ||
+        ''
+      ),
 
     kecamatan:
-      data?.kecamatan ??
-      '',
+      String(
+        data?.kecamatan ||
+        ''
+      ),
 
     kota:
-      data?.kota ??
-      '',
+      String(
+        data?.kota ||
+        ''
+      ),
 
     provinsi:
-      data?.provinsi ??
-      '',
+      String(
+        data?.provinsi ||
+        ''
+      ),
 
     noHp:
-      data?.noHp ??
-      '',
+      String(
+        data?.noHp ||
+        ''
+      ),
 
-    statusPernikahan:
-      data?.statusPernikahan ??
-      '',
+    statusPernikahan,
 
     pekerjaan:
-      data?.pekerjaan ??
-      '',
+      String(
+        data?.pekerjaan ||
+        ''
+      ),
 
     penghasilan:
-      data?.penghasilan !==
-      null &&
-      data?.penghasilan !==
-      undefined &&
-      data?.penghasilan !==
-      ''
-        ? Number(
-            data.penghasilan
-          )
-        : 0,
+      Number(
+        data?.penghasilan ||
+        0
+      ),
 
     jumlahTanggungan:
-      data?.jumlahTanggungan !==
-      null &&
-      data?.jumlahTanggungan !==
-      undefined &&
-      data?.jumlahTanggungan !==
-      ''
-        ? Number(
-            data.jumlahTanggungan
-          )
-        : 0,
+      Number(
+        data?.jumlahTanggungan ||
+        0
+      ),
 
-    statusRumah:
-      data?.statusRumah ??
-      '',
+    statusRumah,
 
-    kondisiRumah:
-      data?.kondisiRumah ??
-      '',
+    kondisiRumah,
 
-    kepemilikanAset:
-      data?.kepemilikanAset ??
-      '',
+    kepemilikanAset,
   }
 }
 
 
 // ============================================================
-// AMBIL JAWABAN BERDASARKAN KODE KRITERIA
+// AMBIL JAWABAN BERDASARKAN KODE
 // ============================================================
 
 function getAnswerByKode(
   jawaban: JawabanApi[],
   kode: string
 ): JawabanApi | undefined {
-
   return jawaban.find(
     (
       item
     ) =>
       normalizeText(
-        item?.kriteria?.kode
+        item.kriteria?.kode
       ) ===
       normalizeText(
         kode
@@ -416,165 +507,146 @@ function getAnswerByKode(
 
 
 // ============================================================
-// FORMAT PENGHASILAN DARI KUESIONER
-// ============================================================
-//
-// C1:
-// < Rp 500.000
-// Rp 500.001 - Rp 1.000.000
-// Rp 1.000.001 - Rp 1.500.000
-// Rp 1.500.001 - Rp 2.000.000
-// > Rp 2.000.000
-//
+// DISPLAY PENGHASILAN
 // ============================================================
 
 function getPenghasilanDisplay(
   mustahik: DataMustahik | null,
   jawaban: JawabanApi[]
 ): string {
-
   if (
-    mustahik?.penghasilan &&
-    mustahik.penghasilan > 0
+    mustahik &&
+    mustahik.penghasilan >
+    0
   ) {
     return `Rp ${mustahik.penghasilan.toLocaleString(
       'id-ID'
     )}`
   }
 
-  const answer =
+  return (
     getAnswerByKode(
       jawaban,
       'C1'
     )
-
-  const nama =
-    answer?.subKriteria?.nama
-
-  if (nama) {
-    return nama
-  }
-
-  return '-'
+      ?.subKriteria
+      ?.nama ||
+    '-'
+  )
 }
 
 
 // ============================================================
-// FORMAT JUMLAH TANGGUNGAN
+// DISPLAY TANGGUNGAN
 // ============================================================
 
 function getTanggunganDisplay(
   mustahik: DataMustahik | null,
   jawaban: JawabanApi[]
 ): string {
-
   if (
-    mustahik?.jumlahTanggungan !==
-    null &&
-    mustahik?.jumlahTanggungan !==
-    undefined &&
+    mustahik &&
     mustahik.jumlahTanggungan >
     0
   ) {
     return `${mustahik.jumlahTanggungan} Orang`
   }
 
-  const answer =
+  return (
     getAnswerByKode(
       jawaban,
       'C2'
     )
-
-  const nama =
-    answer?.subKriteria?.nama
-
-  if (nama) {
-    return nama
-  }
-
-  return '-'
+      ?.subKriteria
+      ?.nama ||
+    '-'
+  )
 }
 
 
 // ============================================================
-// FORMAT KONDISI RUMAH
+// DISPLAY KONDISI RUMAH
 // ============================================================
 
 function getKondisiRumahDisplay(
   mustahik: DataMustahik | null,
   jawaban: JawabanApi[]
 ): string {
-
   if (
     mustahik?.kondisiRumah
   ) {
-    return mustahik.kondisiRumah
+    return mustahik
+      .kondisiRumah
+      .replace(
+        /\b\w/g,
+        (char) =>
+          char.toUpperCase()
+      )
   }
 
-  const answer =
+  return (
     getAnswerByKode(
       jawaban,
       'C3'
     )
-
-  return (
-    answer?.subKriteria?.nama ||
+      ?.subKriteria
+      ?.nama ||
     '-'
   )
 }
 
 
 // ============================================================
-// FORMAT PEKERJAAN
+// DISPLAY PEKERJAAN
 // ============================================================
 
 function getPekerjaanDisplay(
   mustahik: DataMustahik | null,
   jawaban: JawabanApi[]
 ): string {
-
   if (
     mustahik?.pekerjaan
   ) {
     return mustahik.pekerjaan
   }
 
-  const answer =
+  return (
     getAnswerByKode(
       jawaban,
       'C4'
     )
-
-  return (
-    answer?.subKriteria?.nama ||
+      ?.subKriteria
+      ?.nama ||
     '-'
   )
 }
 
 
 // ============================================================
-// FORMAT KEPEMILIKAN ASET
+// DISPLAY ASET
 // ============================================================
 
 function getAsetDisplay(
   mustahik: DataMustahik | null,
   jawaban: JawabanApi[]
 ): string {
-
   if (
     mustahik?.kepemilikanAset
   ) {
-    return mustahik.kepemilikanAset
+    return mustahik
+      .kepemilikanAset ===
+      'tidak_ada'
+      ? 'Tidak memiliki aset'
+      : 'Memiliki aset'
   }
 
-  const answer =
+  return (
     getAnswerByKode(
       jawaban,
       'C5'
     )
-
-  return (
-    answer?.subKriteria?.nama ||
+      ?.subKriteria
+      ?.nama ||
     '-'
   )
 }
@@ -585,33 +657,17 @@ function getAsetDisplay(
 // ============================================================
 
 export function PengajuanPage() {
-
-  // ==========================================================
-  // AUTH
-  // ==========================================================
-
   const {
     token,
   } =
     useAuth()
 
-
-  // ==========================================================
-  // CONTEXT
-  // ==========================================================
-
   const {
     pengajuan:
       contextPengajuan,
-
     setPengajuan,
   } =
     usePengajuan()
-
-
-  // ==========================================================
-  // STATE
-  // ==========================================================
 
   const [
     pengajuan,
@@ -623,7 +679,6 @@ export function PengajuanPage() {
       contextPengajuan
     )
 
-
   const [
     mustahik,
     setMustahik,
@@ -633,7 +688,6 @@ export function PengajuanPage() {
     >(
       null
     )
-
 
   const [
     jawaban,
@@ -645,75 +699,47 @@ export function PengajuanPage() {
       []
     )
 
-
   const [
     loading,
     setLoading,
   ] =
-    useState(
-      true
-    )
-
+    useState(true)
 
   const [
     error,
     setError,
   ] =
-    useState(
-      ''
-    )
+    useState('')
 
 
   // ==========================================================
-  // LOAD DATA
+  // LOAD
   // ==========================================================
 
   useEffect(
     () => {
-
-      let mounted =
-        true
-
+      let mounted = true
 
       const load =
         async () => {
-
-          if (
-            !token
-          ) {
-
-            if (
-              mounted
-            ) {
-              setLoading(
-                false
-              )
+          if (!token) {
+            if (mounted) {
+              setLoading(false)
             }
 
             return
           }
 
-
           try {
-
-            if (
-              mounted
-            ) {
-              setLoading(
-                true
-              )
-
-              setError(
-                ''
-              )
+            if (mounted) {
+              setLoading(true)
+              setError('')
             }
-
 
             const headers = {
               Authorization:
                 `Bearer ${token}`,
             }
-
 
             const [
               pengajuanRes,
@@ -735,11 +761,6 @@ export function PengajuanPage() {
                 ),
               ])
 
-
-            // ================================================
-            // PENGAJUAN
-            // ================================================
-
             const list =
               Array.isArray(
                 pengajuanRes
@@ -753,25 +774,23 @@ export function PengajuanPage() {
                     .pengajuan
                 : []
 
-
             const sortedList =
               [...list].sort(
                 (
                   a: PengajuanApi,
                   b: PengajuanApi
                 ) => {
-
                   const dateA =
                     new Date(
-                      a?.createdAt ||
-                      a?.tanggalPengajuan ||
+                      a.createdAt ||
+                      a.tanggalPengajuan ||
                       0
                     ).getTime()
 
                   const dateB =
                     new Date(
-                      b?.createdAt ||
-                      b?.tanggalPengajuan ||
+                      b.createdAt ||
+                      b.tanggalPengajuan ||
                       0
                     ).getTime()
 
@@ -782,90 +801,52 @@ export function PengajuanPage() {
                 }
               )
 
-
             if (
-              mounted
+              sortedList.length >
+              0
             ) {
+              const latest =
+                sortedList[0] as PengajuanApi
 
-              if (
-                sortedList.length >
-                0
-              ) {
+              const adapted =
+                adaptPengajuan(
+                  latest
+                )
 
-                const latest =
-                  sortedList[0] as PengajuanApi
-
-
-                const adapted =
-                  adaptPengajuan(
-                    latest
-                  )
-
-
+              if (mounted) {
                 setPengajuanLocal(
                   adapted
                 )
-
 
                 setPengajuan(
                   adapted
                 )
 
-
-                // ============================================
-                // JAWABAN KUESIONER
-                // ============================================
-
                 setJawaban(
                   Array.isArray(
-                    latest?.jawaban
+                    latest.jawaban
                   )
                     ? latest.jawaban
                     : []
                 )
 
-
-                // ============================================
-                // MUSTAHIK DARI PENGAJUAN
-                //
-                // Ini lebih diprioritaskan karena sudah
-                // satu relasi dengan pengajuan yang aktif.
-                // ============================================
-
                 if (
-                  latest?.mustahik
+                  latest.mustahik
                 ) {
-
                   setMustahik(
                     adaptMustahik(
                       latest.mustahik
                     )
                   )
                 }
-
-              } else {
-
-                setPengajuanLocal(
-                  null
-                )
-
-                setPengajuan(
-                  null
-                )
-
-                setJawaban(
-                  []
-                )
+              }
+            } else {
+              if (mounted) {
+                setPengajuanLocal(null)
+                setPengajuan(null)
+                setJawaban([])
               }
             }
-
-
-            // ================================================
-            // PROFILE MUSTAHIK
-            //
-            // Dipakai jika data mustahik belum tersedia dari
-            // endpoint pengajuan.
-            // ================================================
 
             const profileMustahik =
               profileRes
@@ -874,12 +855,10 @@ export function PengajuanPage() {
                 ?.user
                 ?.mustahik
 
-
             if (
               mounted &&
               profileMustahik
             ) {
-
               setMustahik(
                 (
                   current
@@ -894,17 +873,12 @@ export function PengajuanPage() {
           } catch (
             e: any
           ) {
-
             console.error(
               'Gagal memuat pengajuan:',
               e
             )
 
-
-            if (
-              mounted
-            ) {
-
+            if (mounted) {
               setError(
                 e?.response
                   ?.data
@@ -913,624 +887,377 @@ export function PengajuanPage() {
                 'Gagal memuat data pengajuan'
               )
             }
-
           } finally {
-
-            if (
-              mounted
-            ) {
-              setLoading(
-                false
-              )
+            if (mounted) {
+              setLoading(false)
             }
           }
         }
 
-
       load()
 
-
       return () => {
-        mounted =
-          false
+        mounted = false
       }
-
     },
     [
       token,
+      setPengajuan,
     ]
   )
 
 
-  // ==========================================================
-  // EXISTING
-  // ==========================================================
-
   const hasExisting =
-    !!pengajuan
+    Boolean(
+      pengajuan
+    )
 
 
-  // ==========================================================
-  // LOADING
-  // ==========================================================
-
-  if (
-    loading
-  ) {
-
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-48">
-
-        <Loader2
-          className="w-6 h-6 animate-spin text-green-600"
-        />
+      <div className="flex h-48 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-green-600" />
 
         <span className="ml-2 text-sm text-slate-500">
           Memuat data pengajuan...
         </span>
-
       </div>
     )
   }
 
 
-  // ==========================================================
-  // PAGE
-  // ==========================================================
-
   return (
-
     <div className="space-y-6">
-
-
-      {/* HEADER */}
 
       <PageHeader
         title="Pengajuan Mustahik"
         description="Kelola pengajuan Anda sebagai calon penerima bantuan"
       >
-
         {!hasExisting && (
-
           <Button asChild>
-
-            <Link
-              to="/pengajuan/form"
-            >
-
-              <Plus className="w-4 h-4 mr-2" />
-
+            <Link to="/pengajuan/form">
+              <Plus className="mr-2 h-4 w-4" />
               Buat Pengajuan
-
             </Link>
-
           </Button>
-
         )}
-
       </PageHeader>
 
-
-      {/* ERROR */}
-
       {error && (
-
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-
           {error}
-
         </div>
-
       )}
 
-
-      {/* ADA PENGAJUAN */}
-
-      {hasExisting ? (
-
+      {hasExisting && pengajuan ? (
         <div className="space-y-4">
 
-
-          {/* PENGAJUAN */}
-
           <Card>
-
             <CardHeader>
-
               <div className="flex items-start justify-between gap-3">
 
                 <div>
-
                   <CardTitle>
-
-                    {pengajuan?.namaLengkap ||
+                    {pengajuan.namaLengkap ||
                       mustahik?.namaLengkap ||
                       '-'}
-
                   </CardTitle>
 
-
-                  <p className="text-xs text-slate-400 mt-1 font-mono">
-
+                  <p className="mt-1 font-mono text-xs text-slate-400">
                     NIK:{' '}
 
                     {formatNIK(
-                      pengajuan?.nik ||
+                      pengajuan.nik ||
                       mustahik?.nik ||
                       ''
                     )}
-
                   </p>
-
                 </div>
-
 
                 <StatusBadge
                   status={
-                    pengajuan?.status ||
-                    'DRAFT'
+                    pengajuan.status
                   }
                 />
-
               </div>
-
             </CardHeader>
-
 
             <CardContent className="space-y-4">
 
-
               <div className="grid grid-cols-2 gap-4 text-sm">
 
-
                 <div>
-
-                  <p className="text-slate-500 text-xs">
+                  <p className="text-xs text-slate-500">
                     ID Pengajuan
                   </p>
 
-
-                  <p className="font-semibold text-slate-900 dark:text-slate-100 font-mono text-xs mt-0.5">
-
+                  <p className="mt-0.5 font-mono text-xs font-semibold text-slate-900">
                     #
-                    {pengajuan?.id
-                      ? pengajuan.id
-                          .toUpperCase()
-                          .substring(
-                            0,
-                            8
-                          )
-                      : '-'}
-
+                    {pengajuan.id
+                      .toUpperCase()
+                      .substring(
+                        0,
+                        8
+                      )}
                   </p>
-
                 </div>
 
-
                 <div>
-
-                  <p className="text-slate-500 text-xs">
+                  <p className="text-xs text-slate-500">
                     Tanggal Pengajuan
                   </p>
 
-
-                  <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs mt-0.5">
-
-                    {pengajuan?.tanggalPengajuan
+                  <p className="mt-0.5 text-xs font-semibold text-slate-900">
+                    {pengajuan.tanggalPengajuan
                       ? formatDate(
                           pengajuan.tanggalPengajuan
                         )
                       : '-'}
-
                   </p>
-
                 </div>
 
-
-                {pengajuan?.tanggalVerifikasi && (
-
+                {pengajuan.tanggalVerifikasi && (
                   <div>
-
-                    <p className="text-slate-500 text-xs">
+                    <p className="text-xs text-slate-500">
                       Tanggal Verifikasi
                     </p>
 
-
-                    <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs mt-0.5">
-
+                    <p className="mt-0.5 text-xs font-semibold text-slate-900">
                       {formatDate(
                         pengajuan.tanggalVerifikasi
                       )}
-
                     </p>
-
                   </div>
-
                 )}
 
               </div>
 
-
-              {/* CATATAN ADMIN */}
-
-              {pengajuan?.catatan && (
-
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-lg border border-amber-200 dark:border-amber-800">
-
+              {pengajuan.catatan && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <div className="flex gap-2">
-
-                    <Info
-                      className="w-4 h-4 text-amber-600 mt-0.5 shrink-0"
-                    />
-
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
 
                     <div>
-
-                      <p className="text-xs font-semibold text-amber-800 dark:text-amber-400">
-
+                      <p className="text-xs font-semibold text-amber-800">
                         Catatan Admin:
-
                       </p>
 
-
-                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-0.5">
-
+                      <p className="mt-0.5 text-sm text-amber-700">
                         {pengajuan.catatan}
-
                       </p>
-
                     </div>
-
                   </div>
-
                 </div>
-
               )}
 
-
-              {/* ACTION */}
-
-              <div className="flex gap-2">
-
-                <Button
-                  asChild
-                  variant="outline"
-                  className="flex-1"
-                >
-
-                  <Link
-                    to="/pantau-hasil"
-                  >
-
-                    <Clock className="w-4 h-4 mr-2" />
-
-                    Pantau Hasil
-
-                  </Link>
-
-                </Button>
-
-              </div>
+              <Button
+                asChild
+                variant="outline"
+                className="w-full"
+              >
+                <Link to="/pantau-hasil">
+                  <Clock className="mr-2 h-4 w-4" />
+                  Pantau Hasil
+                </Link>
+              </Button>
 
             </CardContent>
-
           </Card>
 
 
-          {/* DATA MUSTAHIK */}
-
           <Card>
-
             <CardHeader>
-
               <div className="flex items-center justify-between">
 
                 <CardTitle>
                   Data Diri Mustahik
                 </CardTitle>
 
-
                 <Button
                   asChild
                   variant="ghost"
                   size="sm"
                 >
-
                   <Link
                     to="/pengajuan/form"
-                    className="text-xs text-green-600 flex items-center gap-1"
+                    className="flex items-center gap-1 text-xs text-green-600"
                   >
-
                     Edit Data
 
-                    <ChevronRight
-                      className="w-3 h-3"
-                    />
-
+                    <ChevronRight className="h-3 w-3" />
                   </Link>
-
                 </Button>
 
               </div>
-
             </CardHeader>
 
-
             <CardContent>
-
               <div className="grid grid-cols-2 gap-3 text-sm">
 
-
-                {/* NAMA */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     Nama Lengkap
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {mustahik?.namaLengkap ||
                       '-'}
-
                   </p>
-
                 </div>
 
-
-                {/* NIK */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     NIK
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {mustahik?.nik
                       ? formatNIK(
                           mustahik.nik
                         )
                       : '-'}
-
                   </p>
-
                 </div>
 
-
-                {/* TEMPAT LAHIR */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     Tempat Lahir
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {mustahik?.tempatLahir ||
                       '-'}
-
                   </p>
-
                 </div>
 
-
-                {/* PEKERJAAN DARI KUESIONER */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     Status Pekerjaan
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {getPekerjaanDisplay(
                       mustahik,
                       jawaban
                     )}
-
                   </p>
-
                 </div>
 
-
-                {/* ALAMAT */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     Alamat
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs capitalize">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {[
                       mustahik?.alamat,
                       mustahik?.kota,
                     ]
-                      .filter(
-                        Boolean
-                      )
+                      .filter(Boolean)
                       .join(', ') ||
                       '-'}
-
                   </p>
-
                 </div>
 
-
-                {/* STATUS RUMAH */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     Status Rumah
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {formatStatusRumah(
                       mustahik?.statusRumah
                     )}
-
                   </p>
-
                 </div>
 
-
-                {/* KONDISI RUMAH */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     Kondisi Rumah
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {getKondisiRumahDisplay(
                       mustahik,
                       jawaban
                     )}
-
                   </p>
-
                 </div>
 
-
-                {/* JUMLAH TANGGUNGAN */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     Jumlah Tanggungan
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {getTanggunganDisplay(
                       mustahik,
                       jawaban
                     )}
-
                   </p>
-
                 </div>
 
-
-                {/* PENGHASILAN */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     Penghasilan
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {getPenghasilanDisplay(
                       mustahik,
                       jawaban
                     )}
-
                   </p>
-
                 </div>
 
-
-                {/* KEPEMILIKAN ASET */}
-
                 <div>
-
                   <p className="text-xs text-slate-400">
                     Kepemilikan Aset
                   </p>
 
-
-                  <p className="font-medium text-slate-800 dark:text-slate-200 mt-0.5 text-xs">
-
+                  <p className="mt-0.5 text-xs font-medium text-slate-800">
                     {getAsetDisplay(
                       mustahik,
                       jawaban
                     )}
-
                   </p>
-
                 </div>
 
               </div>
-
             </CardContent>
-
           </Card>
 
         </div>
-
       ) : (
-
         <Card>
-
           <CardContent className="py-16 text-center">
 
-            <div className="w-16 h-16 bg-green-50 dark:bg-green-950/40 rounded-2xl flex items-center justify-center mx-auto mb-4">
-
-              <FileText
-                className="w-8 h-8 text-green-600"
-              />
-
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-green-50">
+              <FileText className="h-8 w-8 text-green-600" />
             </div>
 
-
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-
+            <h3 className="text-lg font-semibold text-slate-900">
               Belum Ada Pengajuan
-
             </h3>
 
-
-            <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto">
-
+            <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
               Anda belum memiliki pengajuan.
-              Klik tombol di bawah untuk
-              memulai proses pengajuan mustahik.
-
+              Klik tombol di bawah untuk memulai proses
+              pengajuan mustahik.
             </p>
-
 
             <Button
               asChild
               className="mt-6"
             >
-
-              <Link
-                to="/pengajuan/form"
-              >
-
-                <Plus className="w-4 h-4 mr-2" />
-
+              <Link to="/pengajuan/form">
+                <Plus className="mr-2 h-4 w-4" />
                 Mulai Pengajuan
-
               </Link>
-
             </Button>
 
           </CardContent>
-
         </Card>
-
       )}
 
     </div>

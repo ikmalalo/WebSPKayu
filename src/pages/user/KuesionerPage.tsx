@@ -46,9 +46,23 @@ import {
 
 import axios from 'axios'
 
+import type {
+  StatusPengajuan,
+} from '@/types'
+
+
+// ============================================================
+// API
+// ============================================================
+
 const API_URL =
   import.meta.env.VITE_API_URL ||
   'http://localhost:5000/api'
+
+
+// ============================================================
+// TYPES
+// ============================================================
 
 interface SubKriteriaApi {
   id: string
@@ -58,28 +72,36 @@ interface SubKriteriaApi {
   keterangan?: string | null
 }
 
+
 interface KriteriaApi {
   id: string
   kode: string
   nama: string
   bobot: number | string
+
   tipe:
     | 'BENEFIT'
     | 'COST'
+
   deskripsi?: string | null
-  subKriteria: SubKriteriaApi[]
+
+  subKriteria:
+    SubKriteriaApi[]
 }
+
 
 interface ExistingAnswer {
   kriteriaId: string
   subKriteriaId: string
 }
 
+
 // ============================================================
-// STATUS YANG SUDAH TIDAK BOLEH EDIT
+// STATUS VALID
 // ============================================================
 
-const LOCKED_STATUSES = [
+const VALID_STATUSES: StatusPengajuan[] = [
+  'DRAFT',
   'MENUNGGU_VERIFIKASI',
   'SEDANG_DIVERIFIKASI',
   'PERLU_PERBAIKAN',
@@ -89,6 +111,47 @@ const LOCKED_STATUSES = [
   'LAYAK_DIDANAI',
   'TIDAK_DIDANAI',
 ]
+
+
+// ============================================================
+// NORMALIZE STATUS
+// ============================================================
+
+function toStatusPengajuan(
+  value: unknown
+): StatusPengajuan {
+  const status =
+    String(
+      value ||
+      'DRAFT'
+    ).toUpperCase()
+
+  if (
+    VALID_STATUSES.includes(
+      status as StatusPengajuan
+    )
+  ) {
+    return status as StatusPengajuan
+  }
+
+  return 'DRAFT'
+}
+
+
+// ============================================================
+// STATUS YANG TIDAK BOLEH EDIT
+// ============================================================
+
+const LOCKED_STATUSES: StatusPengajuan[] = [
+  'MENUNGGU_VERIFIKASI',
+  'SEDANG_DIVERIFIKASI',
+  'LOLOS_VERIFIKASI',
+  'DITOLAK',
+  'DIPROSES_TOPSIS',
+  'LAYAK_DIDANAI',
+  'TIDAK_DIDANAI',
+]
+
 
 // ============================================================
 // STATUS RUMAH
@@ -115,6 +178,7 @@ const STATUS_RUMAH_OPTIONS = [
   },
 ]
 
+
 // ============================================================
 // PAGE
 // ============================================================
@@ -132,379 +196,429 @@ export function KuesionerPage() {
 
   const {
     token,
-  } = useAuth()
+  } =
+    useAuth()
+
 
   const [
     kriteria,
     setKriteria,
-  ] = useState<
-    KriteriaApi[]
-  >([])
+  ] =
+    useState<
+      KriteriaApi[]
+    >([])
+
 
   const [
     answers,
     setAnswers,
-  ] = useState<
-    Record<
-      string,
-      string
-    >
-  >({})
+  ] =
+    useState<
+      Record<
+        string,
+        string
+      >
+    >({})
+
 
   const [
     statusRumah,
     setStatusRumah,
-  ] = useState<string>('')
+  ] =
+    useState('')
+
 
   const [
     loading,
     setLoading,
-  ] = useState(true)
+  ] =
+    useState(true)
+
 
   const [
     submitting,
     setSubmitting,
-  ] = useState(false)
+  ] =
+    useState(false)
+
 
   const [
     error,
     setError,
-  ] = useState<
-    string | null
-  >(null)
+  ] =
+    useState<
+      string | null
+    >(null)
+
 
   const [
     submitted,
     setSubmitted,
-  ] = useState(false)
+  ] =
+    useState(false)
+
 
   // ==========================================================
-  // AUTH HEADERS
+  // LOAD DATA
   // ==========================================================
 
-  const authHeaders = {
-    Authorization:
-      `Bearer ${token}`,
-  }
+  useEffect(
+    () => {
+      let mounted = true
 
-  // ==========================================================
-  // LOAD KUESIONER + PENGAJUAN
-  // ==========================================================
+      const load =
+        async () => {
+          if (!token) {
+            if (mounted) {
+              setLoading(false)
+            }
 
-  useEffect(() => {
-    let mounted = true
-
-    const load =
-      async () => {
-        if (!token) {
-          if (mounted) {
-            setLoading(
-              false
-            )
-          }
-
-          return
-        }
-
-        try {
-          setError(null)
-
-          // --------------------------------------------------
-          // Ambil kriteria
-          // --------------------------------------------------
-
-          const kriteriaResponse =
-            await axios.get(
-              `${API_URL}/kuesioner`,
-              {
-                headers:
-                  authHeaders,
-              }
-            )
-
-          const kriteriaData =
-            kriteriaResponse
-              .data
-              ?.data
-              ?.kriteria ||
-            []
-
-          if (!mounted) {
             return
           }
 
-          setKriteria(
-            kriteriaData
-          )
+          try {
+            setLoading(true)
+            setError(null)
 
-          // --------------------------------------------------
-          // Ambil pengajuan terbaru
-          // --------------------------------------------------
+            const headers = {
+              Authorization:
+                `Bearer ${token}`,
+            }
 
-          let currentPengajuan =
-            pengajuan
 
-          if (
-            !currentPengajuan
-          ) {
-            const response =
+            // --------------------------------------------------
+            // LOAD KRITERIA
+            // --------------------------------------------------
+
+            const kriteriaResponse =
               await axios.get(
-                `${API_URL}/pengajuan/me`,
+                `${API_URL}/kuesioner`,
                 {
-                  headers:
-                    authHeaders,
+                  headers,
                 }
               )
 
-            const list =
-              response
+            const kriteriaData =
+              kriteriaResponse
                 .data
                 ?.data
-                ?.pengajuan ||
+                ?.kriteria ||
               []
 
             if (
-              list.length >
-              0
+              mounted
             ) {
-              const sorted =
-                [...list].sort(
-                  (
-                    a: any,
-                    b: any
-                  ) =>
-                    new Date(
-                      b.createdAt ||
-                        b.tanggalPengajuan ||
-                        0
-                    ).getTime() -
-                    new Date(
-                      a.createdAt ||
-                        a.tanggalPengajuan ||
-                        0
-                    ).getTime()
+              setKriteria(
+                kriteriaData
+              )
+            }
+
+
+            // --------------------------------------------------
+            // AMBIL PENGAJUAN
+            // --------------------------------------------------
+
+            let currentPengajuan =
+              pengajuan
+
+            if (
+              !currentPengajuan
+            ) {
+              const response =
+                await axios.get(
+                  `${API_URL}/pengajuan/me`,
+                  {
+                    headers,
+                  }
                 )
 
-              const p =
-                sorted[0]
+              const list =
+                response
+                  .data
+                  ?.data
+                  ?.pengajuan ||
+                []
 
-              currentPengajuan =
-                {
-                  id:
-                    p.id,
+              if (
+                Array.isArray(list) &&
+                list.length > 0
+              ) {
+                const sorted =
+                  [...list].sort(
+                    (
+                      a: any,
+                      b: any
+                    ) =>
+                      new Date(
+                        b.createdAt ||
+                        b.tanggalPengajuan ||
+                        0
+                      ).getTime() -
+                      new Date(
+                        a.createdAt ||
+                        a.tanggalPengajuan ||
+                        0
+                      ).getTime()
+                  )
 
-                  userId:
-                    p.userId,
+                const p =
+                  sorted[0]
 
-                  mustahikId:
-                    p.mustahikId,
+                currentPengajuan =
+                  {
+                    id:
+                      String(
+                        p.id ||
+                        ''
+                      ),
 
-                  namaLengkap:
-                    p.mustahik
-                      ?.namaLengkap ||
-                    '',
+                    userId:
+                      String(
+                        p.userId ||
+                        ''
+                      ),
 
-                  nik:
-                    p.mustahik
-                      ?.nik ||
-                    '',
+                    mustahikId:
+                      String(
+                        p.mustahikId ||
+                        ''
+                      ),
 
-                  status:
-                    p.status,
+                    namaLengkap:
+                      String(
+                        p.mustahik
+                          ?.namaLengkap ||
+                        ''
+                      ),
 
-                  tanggalPengajuan:
-                    p.createdAt
-                      ? new Date(
-                          p.createdAt
-                        )
-                          .toISOString()
-                          .split(
-                            'T'
-                          )[0]
-                      : undefined,
+                    nik:
+                      String(
+                        p.mustahik
+                          ?.nik ||
+                        ''
+                      ),
 
-                  catatan:
-                    p.catatan ||
-                    undefined,
+                    status:
+                      toStatusPengajuan(
+                        p.status
+                      ),
 
-                  tanggalVerifikasi:
-                    p.tanggalVerifikasi
-                      ? new Date(
-                          p.tanggalVerifikasi
-                        )
-                          .toISOString()
-                          .split(
-                            'T'
-                          )[0]
-                      : undefined,
+                    tanggalPengajuan:
+                      p.createdAt
+                        ? new Date(
+                            p.createdAt
+                          )
+                            .toISOString()
+                            .split('T')[0]
+                        : '',
+
+                    catatan:
+                      p.catatan ||
+                      undefined,
+
+                    tanggalVerifikasi:
+                      p.tanggalVerifikasi
+                        ? new Date(
+                            p.tanggalVerifikasi
+                          )
+                            .toISOString()
+                            .split('T')[0]
+                        : undefined,
+                  }
+
+                if (
+                  mounted
+                ) {
+                  setPengajuan(
+                    currentPengajuan
+                  )
                 }
-
-              setPengajuan(
-                currentPengajuan
-              )
-            }
-          }
-
-          // --------------------------------------------------
-          // Kalau tidak ada pengajuan
-          // --------------------------------------------------
-
-          if (
-            !currentPengajuan
-          ) {
-            if (mounted) {
-              setLoading(
-                false
-              )
+              }
             }
 
-            return
-          }
 
-          // --------------------------------------------------
-          // Ambil detail pengajuan
-          // --------------------------------------------------
+            // --------------------------------------------------
+            // BELUM ADA PENGAJUAN
+            // --------------------------------------------------
 
-          const detailResponse =
-            await axios.get(
-              `${API_URL}/pengajuan/${currentPengajuan.id}`,
-              {
-                headers:
-                  authHeaders,
-              }
-            )
+            if (
+              !currentPengajuan
+            ) {
+              return
+            }
 
-          const detail =
-            detailResponse
-              .data
-              ?.data
-              ?.pengajuan
 
-          if (
-            !mounted
-          ) {
-            return
-          }
+            // --------------------------------------------------
+            // LOAD DETAIL PENGAJUAN
+            // --------------------------------------------------
 
-          // --------------------------------------------------
-          // Ambil status rumah dari Mustahik
-          // --------------------------------------------------
+            const detailResponse =
+              await axios.get(
+                `${API_URL}/pengajuan/${currentPengajuan.id}`,
+                {
+                  headers,
+                }
+              )
 
-          if (
-            detail
-              ?.mustahik
-              ?.statusRumah
-          ) {
-            setStatusRumah(
-              detail
-                .mustahik
-                .statusRumah
-            )
-          }
-
-          // --------------------------------------------------
-          // Ambil jawaban yang sudah tersimpan
-          // --------------------------------------------------
-
-          const existingAnswers:
-            ExistingAnswer[] =
-            detail
-              ?.jawaban ||
-            []
-
-          if (
-            existingAnswers.length >
-            0
-          ) {
-            const mappedAnswers:
-              Record<
-                string,
-                string
-              > =
-              {}
-
-            existingAnswers.forEach(
-              (
-                answer
-              ) => {
-                mappedAnswers[
-                  answer.kriteriaId
-                ] =
-                  answer.subKriteriaId
-              }
-            )
-
-            setAnswers(
-              mappedAnswers
-            )
-          }
-
-          // --------------------------------------------------
-          // Cek status lock
-          // --------------------------------------------------
-
-          if (
-            detail &&
-            LOCKED_STATUSES.includes(
-              detail.status
-            )
-          ) {
-            setSubmitted(
-              true
-            )
-          }
-
-        } catch (
-          err: any
-        ) {
-          console.error(
-            'GAGAL MEMUAT KUESIONER:',
-            err
-          )
-
-          if (
-            mounted
-          ) {
-            setError(
-              err.response
+            const detail =
+              detailResponse
+                .data
                 ?.data
-                ?.message ||
-                'Gagal memuat data kuesioner.'
-            )
-          }
-        } finally {
-          if (
-            mounted
+                ?.pengajuan
+
+            if (
+              !mounted
+            ) {
+              return
+            }
+
+
+            // --------------------------------------------------
+            // STATUS RUMAH
+            // --------------------------------------------------
+
+            if (
+              detail
+                ?.mustahik
+                ?.statusRumah
+            ) {
+              setStatusRumah(
+                String(
+                  detail
+                    .mustahik
+                    .statusRumah
+                )
+              )
+            }
+
+
+            // --------------------------------------------------
+            // EXISTING ANSWERS
+            // --------------------------------------------------
+
+            const existingAnswers:
+              ExistingAnswer[] =
+              Array.isArray(
+                detail?.jawaban
+              )
+                ? detail.jawaban
+                : []
+
+            if (
+              existingAnswers.length >
+              0
+            ) {
+              const mappedAnswers:
+                Record<
+                  string,
+                  string
+                > =
+                {}
+
+              existingAnswers.forEach(
+                (
+                  answer: ExistingAnswer
+                ) => {
+                  if (
+                    answer.kriteriaId &&
+                    answer.subKriteriaId
+                  ) {
+                    mappedAnswers[
+                      answer.kriteriaId
+                    ] =
+                      answer.subKriteriaId
+                  }
+                }
+              )
+
+              setAnswers(
+                mappedAnswers
+              )
+            }
+
+
+            // --------------------------------------------------
+            // LOCK
+            // --------------------------------------------------
+
+            const currentStatus =
+              toStatusPengajuan(
+                detail?.status ||
+                currentPengajuan.status
+              )
+
+            if (
+              LOCKED_STATUSES.includes(
+                currentStatus
+              )
+            ) {
+              setSubmitted(true)
+            }
+
+          } catch (
+            err: any
           ) {
-            setLoading(
-              false
+            console.error(
+              'GAGAL MEMUAT KUESIONER:',
+              err
             )
+
+            if (
+              mounted
+            ) {
+              setError(
+                err.response
+                  ?.data
+                  ?.message ||
+                'Gagal memuat data kuesioner.'
+              )
+            }
+
+          } finally {
+            if (
+              mounted
+            ) {
+              setLoading(false)
+            }
           }
         }
+
+      load()
+
+      return () => {
+        mounted = false
       }
+    },
+    [
+      token,
+    ]
+  )
 
-    load()
-
-    return () => {
-      mounted =
-        false
-    }
-  }, [
-    token,
-  ])
 
   // ==========================================================
   // LOCK
   // ==========================================================
+  //
+  // Boolean() PENTING supaya hasilnya benar-benar boolean.
+  // Sebelumnya:
+  //
+  // submitted || (pengajuan && ...)
+  //
+  // menghasilkan boolean | null.
+  //
+  // ==========================================================
 
-  const isLocked =
-    submitted ||
-    (
-      pengajuan &&
-      LOCKED_STATUSES.includes(
-        pengajuan.status
+  const isLocked: boolean =
+    Boolean(
+      submitted ||
+      (
+        pengajuan &&
+        LOCKED_STATUSES.includes(
+          pengajuan.status
+        )
       )
     )
+
 
   // ==========================================================
   // SELECT ANSWER
@@ -533,6 +647,7 @@ export function KuesionerPage() {
       )
     }
 
+
   // ==========================================================
   // SUBMIT
   // ==========================================================
@@ -555,9 +670,10 @@ export function KuesionerPage() {
         return
       }
 
-      // ------------------------------------------------------
-      // Validasi semua kriteria
-      // ------------------------------------------------------
+
+      // --------------------------------------------------------
+      // VALIDASI JAWABAN
+      // --------------------------------------------------------
 
       const unanswered =
         kriteria.filter(
@@ -580,9 +696,10 @@ export function KuesionerPage() {
         return
       }
 
-      // ------------------------------------------------------
-      // Validasi status rumah
-      // ------------------------------------------------------
+
+      // --------------------------------------------------------
+      // VALIDASI STATUS RUMAH
+      // --------------------------------------------------------
 
       if (
         !statusRumah
@@ -594,13 +711,26 @@ export function KuesionerPage() {
         return
       }
 
-      setSubmitting(
-        true
-      )
-
+      setSubmitting(true)
       setError(null)
 
       try {
+
+        // ------------------------------------------------------
+        // PENTING
+        //
+        // answers[item.id]! menggunakan tanda !
+        //
+        // Karena sebelumnya sudah divalidasi semua kriteria
+        // wajib mempunyai jawaban.
+        //
+        // Ini memperbaiki:
+        //
+        // Type 'string | undefined'
+        // is not assignable to type 'string'
+        //
+        // ------------------------------------------------------
+
         const jawaban =
           kriteria.map(
             (
@@ -612,13 +742,14 @@ export function KuesionerPage() {
               subKriteriaId:
                 answers[
                   item.id
-                ],
+                ]!,
             })
           )
 
-        // ----------------------------------------------------
-        // Kirim kuesioner
-        // ----------------------------------------------------
+
+        // ------------------------------------------------------
+        // SUBMIT
+        // ------------------------------------------------------
 
         await axios.post(
           `${API_URL}/kuesioner/jawaban`,
@@ -628,40 +759,43 @@ export function KuesionerPage() {
 
             jawaban,
 
-            // PENTING:
-            // Status rumah ikut dikirim ke backend
             statusRumah,
           },
           {
-            headers:
-              authHeaders,
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
           }
         )
 
-        // ----------------------------------------------------
-        // Tandai LOCK
-        // ----------------------------------------------------
 
-        setSubmitted(
-          true
-        )
+        // ------------------------------------------------------
+        // LOCK
+        // ------------------------------------------------------
 
-        // ----------------------------------------------------
-        // Refresh context
-        // ----------------------------------------------------
+        setSubmitted(true)
+
+
+        // ------------------------------------------------------
+        // REFRESH CONTEXT
+        // ------------------------------------------------------
 
         await refreshPengajuan()
 
-        // ----------------------------------------------------
-        // Ambil detail terbaru
-        // ----------------------------------------------------
+
+        // ------------------------------------------------------
+        // LOAD STATUS TERBARU
+        // ------------------------------------------------------
 
         const detailResponse =
           await axios.get(
             `${API_URL}/pengajuan/${pengajuan.id}`,
             {
-              headers:
-                authHeaders,
+              headers: {
+                Authorization:
+                  `Bearer ${token}`,
+              },
             }
           )
 
@@ -684,7 +818,9 @@ export function KuesionerPage() {
               ),
 
               status:
-                detail.status,
+                toStatusPengajuan(
+                  detail.status
+                ),
 
               tanggalVerifikasi:
                 detail.tanggalVerifikasi
@@ -692,9 +828,7 @@ export function KuesionerPage() {
                       detail.tanggalVerifikasi
                     )
                       .toISOString()
-                      .split(
-                        'T'
-                      )[0]
+                      .split('T')[0]
                   : undefined,
 
               catatan:
@@ -704,9 +838,10 @@ export function KuesionerPage() {
           )
         }
 
-        // ----------------------------------------------------
-        // Setelah submit → pantau hasil
-        // ----------------------------------------------------
+
+        // ------------------------------------------------------
+        // REDIRECT
+        // ------------------------------------------------------
 
         navigate(
           '/pantau-hasil',
@@ -729,9 +864,7 @@ export function KuesionerPage() {
             ?.status ===
           409
         ) {
-          setSubmitted(
-            true
-          )
+          setSubmitted(true)
 
           setError(
             err.response
@@ -749,15 +882,14 @@ export function KuesionerPage() {
           err.response
             ?.data
             ?.message ||
-            'Gagal menyimpan jawaban kuesioner.'
+          'Gagal menyimpan jawaban kuesioner.'
         )
 
       } finally {
-        setSubmitting(
-          false
-        )
+        setSubmitting(false)
       }
     }
+
 
   // ==========================================================
   // LOADING
@@ -767,15 +899,18 @@ export function KuesionerPage() {
     loading
   ) {
     return (
-      <div className="flex items-center justify-center h-48">
-        <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+      <div className="flex h-48 items-center justify-center">
+
+        <Loader2 className="h-6 w-6 animate-spin text-green-600" />
 
         <span className="ml-2 text-sm text-slate-500">
           Memuat kuesioner...
         </span>
+
       </div>
     )
   }
+
 
   // ==========================================================
   // BELUM ADA PENGAJUAN
@@ -786,6 +921,7 @@ export function KuesionerPage() {
   ) {
     return (
       <div className="space-y-6">
+
         <PageHeader
           title="Kuesioner Penilaian"
           description="Kuesioner penilaian mustahik"
@@ -793,10 +929,10 @@ export function KuesionerPage() {
 
         <Card>
           <CardContent className="py-16 text-center">
+
             <p className="text-sm text-slate-500">
-              Silakan isi data pribadi
-              terlebih dahulu sebelum
-              mengisi kuesioner.
+              Silakan isi data pribadi terlebih dahulu
+              sebelum mengisi kuesioner.
             </p>
 
             <Button
@@ -809,11 +945,14 @@ export function KuesionerPage() {
             >
               Isi Data Pribadi
             </Button>
+
           </CardContent>
         </Card>
+
       </div>
     )
   }
+
 
   // ==========================================================
   // PAGE
@@ -831,70 +970,80 @@ export function KuesionerPage() {
         }
       />
 
+
       {/* ======================================================
-          LOCKED INFO
+          LOCK INFO
       ====================================================== */}
 
       {isLocked && (
         <Card className="border-green-200 bg-green-50/50">
           <CardContent className="p-4">
+
             <div className="flex gap-3">
-              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+
+              <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
 
               <div>
                 <p className="font-medium text-green-800">
                   Kuesioner telah dikirim
                 </p>
 
-                <p className="text-sm text-green-700 mt-1">
+                <p className="mt-1 text-sm text-green-700">
                   Jawaban kuesioner tidak dapat diubah kembali
                   dan sedang menunggu proses selanjutnya.
                 </p>
               </div>
+
             </div>
+
           </CardContent>
         </Card>
       )}
 
-      {/* ======================================================
-          ERROR
-      ====================================================== */}
+
+      {/* ERROR */}
 
       {error && (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="p-4">
+
             <p className="text-sm text-red-600">
               {error}
             </p>
+
           </CardContent>
         </Card>
       )}
 
-      {/* ======================================================
-          INFO
-      ====================================================== */}
+
+      {/* INFO */}
 
       {!isLocked && (
         <Card className="border-blue-200 bg-blue-50/50">
           <CardContent className="p-4">
+
             <div className="flex gap-3">
-              <HelpCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+
+              <HelpCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
 
               <div>
                 <p className="font-medium text-blue-800">
                   Petunjuk Pengisian
                 </p>
 
-                <p className="text-sm text-blue-700 mt-1">
+                <p className="mt-1 text-sm text-blue-700">
                   Pilih satu jawaban pada setiap kriteria sesuai
                   kondisi Anda saat ini. Pastikan seluruh pertanyaan
                   telah dijawab sebelum mengirim kuesioner.
                 </p>
               </div>
+
             </div>
+
           </CardContent>
         </Card>
       )}
+
 
       {/* ======================================================
           DATA PENGAJUAN
@@ -908,13 +1057,15 @@ export function KuesionerPage() {
         </CardHeader>
 
         <CardContent>
+
           <div className="grid gap-4 md:grid-cols-2">
+
             <div>
               <p className="text-xs text-slate-500">
                 Nama Lengkap
               </p>
 
-              <p className="font-medium text-slate-800 mt-1">
+              <p className="mt-1 font-medium text-slate-800">
                 {pengajuan.namaLengkap}
               </p>
             </div>
@@ -924,13 +1075,16 @@ export function KuesionerPage() {
                 NIK
               </p>
 
-              <p className="font-medium text-slate-800 mt-1">
+              <p className="mt-1 font-medium text-slate-800">
                 {pengajuan.nik}
               </p>
             </div>
+
           </div>
+
         </CardContent>
       </Card>
+
 
       {/* ======================================================
           STATUS RUMAH
@@ -938,19 +1092,24 @@ export function KuesionerPage() {
 
       <Card>
         <CardHeader>
+
           <CardTitle className="flex items-center gap-2 text-base">
-            <Home className="w-5 h-5 text-green-600" />
+
+            <Home className="h-5 w-5 text-green-600" />
 
             Status Tempat Tinggal
 
             <span className="text-red-500">
               *
             </span>
+
           </CardTitle>
+
         </CardHeader>
 
         <CardContent>
-          <p className="text-sm text-slate-500 mb-4">
+
+          <p className="mb-4 text-sm text-slate-500">
             Pilih status rumah atau tempat tinggal Anda saat ini.
           </p>
 
@@ -993,33 +1152,40 @@ export function KuesionerPage() {
                         'cursor-not-allowed opacity-80'
                     )}
                   >
+
                     <div className="flex items-start justify-between gap-2">
 
                       <div>
+
                         <p className="font-medium text-slate-800">
                           {option.label}
                         </p>
 
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="mt-1 text-xs text-slate-500">
                           {option.description}
                         </p>
+
                       </div>
 
                       {selected && (
-                        <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                        <CheckCircle className="h-5 w-5 shrink-0 text-green-600" />
                       )}
+
                     </div>
+
                   </button>
                 )
               }
             )}
 
           </div>
+
         </CardContent>
       </Card>
 
+
       {/* ======================================================
-          KRITERIA KUESIONER
+          KRITERIA
       ====================================================== */}
 
       <div className="space-y-5">
@@ -1034,14 +1200,17 @@ export function KuesionerPage() {
                 item.id
               }
             >
+
               <CardHeader>
+
                 <CardTitle className="text-base leading-relaxed">
 
-                  <span className="text-green-600 mr-2">
+                  <span className="mr-2 text-green-600">
                     {index + 1}.
                   </span>
 
                   {item.nama}
+
                 </CardTitle>
 
                 {item.deskripsi && (
@@ -1049,9 +1218,11 @@ export function KuesionerPage() {
                     {item.deskripsi}
                   </p>
                 )}
+
               </CardHeader>
 
               <CardContent>
+
                 <div className="space-y-3">
 
                   {item.subKriteria.map(
@@ -1090,6 +1261,7 @@ export function KuesionerPage() {
                               'cursor-not-allowed opacity-80'
                           )}
                         >
+
                           <div className="flex items-start gap-3">
 
                             <div
@@ -1098,109 +1270,113 @@ export function KuesionerPage() {
 
                                 selected
                                   ? 'border-green-600 bg-green-600'
-                                  : 'border-slate-300'
+                                  : 'border-slate-300 bg-white'
                               )}
                             >
+
                               {selected && (
-                                <CheckCircle className="h-4 w-4 text-white" />
+                                <CheckCircle className="h-3.5 w-3.5 text-white" />
                               )}
+
                             </div>
 
                             <div>
+
                               <p className="font-medium text-slate-800">
                                 {sub.nama}
                               </p>
 
                               {sub.keterangan && (
-                                <p className="text-sm text-slate-500 mt-1">
+                                <p className="mt-1 text-sm text-slate-500">
                                   {sub.keterangan}
                                 </p>
                               )}
+
                             </div>
+
                           </div>
+
                         </button>
                       )
                     }
                   )}
 
                 </div>
+
               </CardContent>
+
             </Card>
           )
         )}
 
       </div>
 
+
       {/* ======================================================
           SUBMIT
       ====================================================== */}
 
       {!isLocked && (
-        <div className="flex justify-end">
+        <Card>
 
-          <Button
-            size="lg"
-            disabled={
-              submitting ||
-              kriteria.length === 0
-            }
-            onClick={
-              handleSubmit
-            }
-            className="gap-2"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+          <CardContent className="p-5">
 
-                Mengirim...
-              </>
-            ) : (
-              <>
-                Kirim Kuesioner
+            <Button
+              className="w-full"
+              onClick={
+                handleSubmit
+              }
+              disabled={
+                submitting ||
+                kriteria.length === 0
+              }
+            >
 
-                <Send className="w-4 h-4" />
-              </>
-            )}
-          </Button>
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Mengirim Kuesioner...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Kirim Kuesioner
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
 
-        </div>
+            </Button>
+
+          </CardContent>
+
+        </Card>
       )}
 
+
       {/* ======================================================
-          LOCKED ACTION
+          LOCKED BUTTON
       ====================================================== */}
 
       {isLocked && (
-        <div className="flex justify-end">
+        <Card>
 
-          <Button
-            onClick={() =>
-              navigate(
-                '/pantau-hasil'
-              )
-            }
-            className="gap-2"
-          >
-            Pantau Hasil
+          <CardContent className="p-5">
 
-            <ArrowRight className="w-4 h-4" />
-          </Button>
+            <Button
+              className="w-full"
+              variant="outline"
+              disabled
+            >
 
-        </div>
-      )}
+              <Lock className="mr-2 h-4 w-4" />
 
-      {/* ======================================================
-          FOOTER LOCK INFO
-      ====================================================== */}
+              Kuesioner Terkunci
 
-      {isLocked && (
-        <div className="flex items-center gap-2 text-sm text-slate-500">
+            </Button>
 
-          <Lock className="w-4 h-4" />
+          </CardContent>
 
-          Kuesioner sudah dikunci.
-        </div>
+        </Card>
       )}
 
     </div>
