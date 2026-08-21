@@ -6,15 +6,17 @@ import {
 
 import {
   Download,
-  Printer,
-  Filter,
+  FileText,
   Loader2,
+  Printer,
   RefreshCw,
 } from 'lucide-react'
 
 import {
   Card,
   CardContent,
+  CardHeader,
+  CardTitle,
 } from '@/components/ui/card'
 
 import {
@@ -22,49 +24,143 @@ import {
 } from '@/components/ui/button'
 
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-
-import {
   PageHeader,
 } from '@/components/shared/PageHeader'
-
-import {
-  DataTable,
-} from '@/components/shared/DataTable'
 
 import {
   getAdminTopsisResults,
   type AdminTopsisResult,
 } from '@/lib/adminApi'
 
-import type {
-  Column,
-} from '@/types'
+// ============================================================
+// HELPER
+// ============================================================
+
+function toNumber(
+  value: number | string | null | undefined
+): number {
+  const numberValue =
+    Number(value ?? 0)
+
+  return Number.isFinite(
+    numberValue
+  )
+    ? numberValue
+    : 0
+}
+
+function formatDate(
+  value:
+    | string
+    | Date
+    | null
+    | undefined
+): string {
+  if (!value) {
+    return '-'
+  }
+
+  const date =
+    new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return '-'
+  }
+
+  return new Intl.DateTimeFormat(
+    'id-ID',
+    {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    }
+  ).format(date)
+}
+
+function getMustahikName(
+  result: AdminTopsisResult
+): string {
+  return (
+    result.pengajuan
+      ?.mustahik
+      ?.namaLengkap ||
+    result.mustahik
+      ?.namaLengkap ||
+    result.pengajuan
+      ?.user
+      ?.name ||
+    '-'
+  )
+}
+
+function getNIK(
+  result: AdminTopsisResult
+): string {
+  return (
+    result.pengajuan
+      ?.mustahik
+      ?.nik ||
+    result.mustahik
+      ?.nik ||
+    '-'
+  )
+}
+
+function getStatusLabel(
+  status: string
+): string {
+  switch (status) {
+    case 'LAYAK_DIDANAI':
+      return 'Layak Didanai'
+
+    case 'TIDAK_DIDANAI':
+      return 'Tidak Didanai'
+
+    case 'DIPROSES_TOPSIS':
+      return 'Diproses TOPSIS'
+
+    default:
+      return status
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(
+          /\b\w/g,
+          (letter: string) =>
+            letter.toUpperCase()
+        )
+  }
+}
+
+function getStatusClass(
+  status: string
+): string {
+  switch (status) {
+    case 'LAYAK_DIDANAI':
+      return 'bg-green-100 text-green-700 border-green-200'
+
+    case 'TIDAK_DIDANAI':
+      return 'bg-red-100 text-red-700 border-red-200'
+
+    default:
+      return 'bg-slate-100 text-slate-700 border-slate-200'
+  }
+}
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export function LaporanPage() {
-  // ============================================================
-  // STATE
-  // ============================================================
-
   const [
     results,
     setResults,
-  ] = useState<AdminTopsisResult[]>([])
-
-  const [
-    year,
-    setYear,
-  ] = useState('all')
-
-  const [
-    status,
-    setStatus,
-  ] = useState('all')
+  ] = useState<
+    AdminTopsisResult[]
+  >([])
 
   const [
     loading,
@@ -76,543 +172,487 @@ export function LaporanPage() {
     setError,
   ] = useState('')
 
-  // ============================================================
+  const [
+    selectedYear,
+    setSelectedYear,
+  ] = useState<string>('ALL')
+
+  const [
+    selectedStatus,
+    setSelectedStatus,
+  ] = useState<string>('ALL')
+
+  // ==========================================================
   // LOAD DATA
-  // ============================================================
+  // ==========================================================
 
-  const load = async () => {
-    try {
-      setLoading(true)
-      setError('')
+  const loadData =
+    async () => {
+      try {
+        setLoading(true)
 
-      const result =
-        await getAdminTopsisResults()
+        setError('')
 
-      /*
-       * getAdminTopsisResults() sekarang mengembalikan
-       * AdminTopsisResult[] secara langsung.
-       *
-       * Jadi TIDAK menggunakan:
-       *
-       * result.results
-       *
-       * melainkan langsung:
-       *
-       * result
-       */
+        const data =
+          await getAdminTopsisResults()
 
-      setResults(
-        Array.isArray(result)
-          ? result
-          : []
-      )
-    } catch (error: unknown) {
-      console.error(
-        'GET LAPORAN ERROR:',
-        error
-      )
+        // ------------------------------------------------------
+        // Ambil hanya hasil TOPSIS terbaru
+        // untuk setiap pengajuan
+        // ------------------------------------------------------
 
-      let message =
-        'Gagal mengambil laporan TOPSIS'
+        const latestByPengajuan =
+          new Map<
+            string,
+            AdminTopsisResult
+          >()
 
-      if (
-        error instanceof Error &&
-        error.message
-      ) {
-        message =
-          error.message
-      }
-
-      setError(message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ============================================================
-  // INITIAL LOAD
-  // ============================================================
-
-  useEffect(() => {
-    void load()
-  }, [])
-
-  // ============================================================
-  // YEARS
-  // ============================================================
-
-  const years = useMemo(() => {
-    const yearSet =
-      new Set<string>()
-
-    results.forEach(
-      (item) => {
-        if (
-          !item.tanggalProses
+        for (
+          const result of data
         ) {
-          return
-        }
-
-        const date =
-          new Date(
-            item.tanggalProses
-          )
-
-        if (
-          !Number.isNaN(
-            date.getTime()
-          )
-        ) {
-          yearSet.add(
-            String(
-              date.getFullYear()
+          const existing =
+            latestByPengajuan.get(
+              result.pengajuanId
             )
-          )
-        }
-      }
-    )
 
-    return Array.from(
-      yearSet
-    ).sort(
-      (
-        a,
-        b
-      ) =>
-        Number(b) -
-        Number(a)
-    )
-  }, [results])
+          if (!existing) {
+            latestByPengajuan.set(
+              result.pengajuanId,
+              result
+            )
 
-  // ============================================================
-  // FILTER
-  // ============================================================
-
-  const filtered = useMemo(() => {
-    return results
-      .filter(
-        (item) => {
-          if (
-            year === 'all'
-          ) {
-            return true
+            continue
           }
 
-          if (
-            !item.tanggalProses
-          ) {
-            return false
-          }
-
-          const date =
+          const currentTime =
             new Date(
-              item.tanggalProses
-            )
+              result.tanggalProses
+            ).getTime()
+
+          const existingTime =
+            new Date(
+              existing.tanggalProses
+            ).getTime()
 
           if (
-            Number.isNaN(
-              date.getTime()
+            currentTime >
+            existingTime
+          ) {
+            latestByPengajuan.set(
+              result.pengajuanId,
+              result
             )
-          ) {
-            return false
           }
-
-          return (
-            date.getFullYear() ===
-            Number(year)
-          )
         }
-      )
-      .filter(
-        (item) => {
+
+        const latestResults =
+          Array.from(
+            latestByPengajuan.values()
+          ).sort(
+            (
+              a,
+              b
+            ) =>
+              a.ranking -
+              b.ranking
+          )
+
+        setResults(
+          latestResults
+        )
+      } catch (
+        err: unknown
+      ) {
+        console.error(
+          'GET LAPORAN ERROR:',
+          err
+        )
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Gagal mengambil data laporan.'
+        )
+      } finally {
+        setLoading(false)
+      }
+    }
+
+  // ==========================================================
+  // INITIAL LOAD
+  // ==========================================================
+
+  useEffect(
+    () => {
+      void loadData()
+    },
+    []
+  )
+
+  // ==========================================================
+  // AVAILABLE YEARS
+  // ==========================================================
+
+  const availableYears =
+    useMemo(() => {
+      const years =
+        new Set<string>()
+
+      results.forEach(
+        (
+          result
+        ) => {
           if (
-            status === 'all'
+            result.tanggalProses
           ) {
-            return true
-          }
+            const year =
+              new Date(
+                result.tanggalProses
+              )
+                .getFullYear()
+                .toString()
 
-          return (
-            item.status ===
-            status
-          )
+            if (
+              year !== 'NaN'
+            ) {
+              years.add(year)
+            }
+          }
         }
       )
-      .sort(
+
+      return Array.from(
+        years
+      ).sort(
         (
           a,
           b
         ) =>
-          Number(a.ranking) -
-          Number(b.ranking)
+          Number(b) -
+          Number(a)
       )
-  }, [
-    results,
-    year,
-    status,
-  ])
+    }, [
+      results,
+    ])
 
-  // ============================================================
-  // STATISTICS
-  // ============================================================
+  // ==========================================================
+  // FILTERED RESULTS
+  // ==========================================================
 
-  const layak =
-    filtered.filter(
-      (item) =>
-        item.status ===
-        'LAYAK_DIDANAI'
-    ).length
+  const filteredResults =
+    useMemo(() => {
+      return results.filter(
+        (
+          result
+        ) => {
+          const resultYear =
+            result.tanggalProses
+              ? new Date(
+                  result.tanggalProses
+                )
+                  .getFullYear()
+                  .toString()
+              : ''
 
-  const tidak =
-    filtered.filter(
-      (item) =>
-        item.status ===
-        'TIDAK_DIDANAI'
-    ).length
+          const yearMatch =
+            selectedYear ===
+              'ALL' ||
+            resultYear ===
+              selectedYear
 
-  // ============================================================
-  // FORMAT DATE
-  // ============================================================
+          const statusMatch =
+            selectedStatus ===
+              'ALL' ||
+            result.status ===
+              selectedStatus
 
-  const formatDate = (
-    value?: string | null
-  ) => {
-    if (!value) {
-      return '-'
-    }
-
-    const date =
-      new Date(value)
-
-    if (
-      Number.isNaN(
-        date.getTime()
-      )
-    ) {
-      return '-'
-    }
-
-    return date.toLocaleDateString(
-      'id-ID',
-      {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }
-    )
-  }
-
-  // ============================================================
-  // GET MUSTAHIK NAME
-  // ============================================================
-
-  const getNamaMustahik = (
-    item: AdminTopsisResult
-  ) => {
-    return (
-      item.pengajuan
-        ?.mustahik
-        ?.namaLengkap ||
-      '-'
-    )
-  }
-
-  // ============================================================
-  // GET NIK
-  // ============================================================
-
-  const getNik = (
-    item: AdminTopsisResult
-  ) => {
-    return (
-      item.pengajuan
-        ?.mustahik
-        ?.nik ||
-      '-'
-    )
-  }
-
-  // ============================================================
-  // EXPORT CSV
-  // ============================================================
-
-  const exportCSV = () => {
-    if (
-      filtered.length === 0
-    ) {
-      return
-    }
-
-    const header = [
-      'Ranking',
-      'Nama Mustahik',
-      'NIK',
-      'Nilai TOPSIS',
-      'Keputusan',
-      'Tanggal Proses',
-    ]
-
-    const rows =
-      filtered.map(
-        (item) => [
-          item.ranking,
-
-          getNamaMustahik(
-            item
-          ),
-
-          getNik(
-            item
-          ),
-
-          Number(
-            item.nilaiPreferensi
-          ).toFixed(4),
-
-          item.status,
-
-          formatDate(
-            item.tanggalProses
-          ),
-        ]
-      )
-
-    const csv = [
-      header,
-      ...rows,
-    ]
-      .map(
-        (row) =>
-          row
-            .map(
-              (value) =>
-                `"${String(
-                  value
-                ).replace(
-                  /"/g,
-                  '""'
-                )}"`
-            )
-            .join(',')
-      )
-      .join('\n')
-
-    const blob =
-      new Blob(
-        [csv],
-        {
-          type:
-            'text/csv;charset=utf-8;',
+          return (
+            yearMatch &&
+            statusMatch
+          )
         }
       )
+    }, [
+      results,
+      selectedYear,
+      selectedStatus,
+    ])
 
-    const url =
-      URL.createObjectURL(
-        blob
+  // ==========================================================
+  // STATISTICS
+  // ==========================================================
+
+  const statistics =
+    useMemo(() => {
+      const total =
+        filteredResults.length
+
+      const layak =
+        filteredResults.filter(
+          (
+            result
+          ) =>
+            result.status ===
+            'LAYAK_DIDANAI'
+        ).length
+
+      const tidakLayak =
+        filteredResults.filter(
+          (
+            result
+          ) =>
+            result.status ===
+            'TIDAK_DIDANAI'
+        ).length
+
+      const averagePreference =
+        total === 0
+          ? 0
+          : filteredResults.reduce(
+              (
+                totalValue,
+                result
+              ) =>
+                totalValue +
+                toNumber(
+                  result.nilaiPreferensi
+                ),
+              0
+            ) / total
+
+      return {
+        total,
+        layak,
+        tidakLayak,
+        averagePreference,
+      }
+    }, [
+      filteredResults,
+    ])
+
+  // ==========================================================
+  // EXPORT CSV
+  // ==========================================================
+
+  const handleExportCSV =
+    () => {
+      if (
+        filteredResults.length ===
+        0
+      ) {
+        return
+      }
+
+      const headers = [
+        'Ranking',
+        'Nama Mustahik',
+        'NIK',
+        'Nilai Preferensi',
+        'Status',
+        'Tanggal Proses',
+      ]
+
+      const rows =
+        filteredResults.map(
+          (
+            result
+          ) => [
+            result.ranking,
+            getMustahikName(
+              result
+            ),
+            getNIK(
+              result
+            ),
+            toNumber(
+              result.nilaiPreferensi
+            ).toFixed(6),
+            getStatusLabel(
+              result.status
+            ),
+            formatDate(
+              result.tanggalProses
+            ),
+          ]
+        )
+
+      const csvContent =
+        [
+          headers,
+          ...rows,
+        ]
+          .map(
+            (
+              row
+            ) =>
+              row
+                .map(
+                  (
+                    value
+                  ) =>
+                    `"${String(
+                      value
+                    ).replace(
+                      /"/g,
+                      '""'
+                    )}"`
+                )
+                .join(',')
+          )
+          .join('\n')
+
+      const blob =
+        new Blob(
+          [
+            '\uFEFF' +
+              csvContent,
+          ],
+          {
+            type: 'text/csv;charset=utf-8;',
+          }
+        )
+
+      const url =
+        URL.createObjectURL(
+          blob
+        )
+
+      const link =
+        document.createElement(
+          'a'
+        )
+
+      link.href =
+        url
+
+      link.download =
+        `laporan-topsis-${
+          selectedYear ===
+          'ALL'
+            ? 'semua-tahun'
+            : selectedYear
+        }.csv`
+
+      document.body.appendChild(
+        link
       )
 
-    const link =
-      document.createElement(
-        'a'
+      link.click()
+
+      document.body.removeChild(
+        link
       )
 
-    link.href =
-      url
+      URL.revokeObjectURL(
+        url
+      )
+    }
 
-    link.download =
-      `laporan-topsis-${
-        year === 'all'
-          ? 'semua-tahun'
-          : year
-      }.csv`
+  // ==========================================================
+  // PRINT
+  // ==========================================================
 
-    document.body.appendChild(
-      link
-    )
+  const handlePrint =
+    () => {
+      window.print()
+    }
 
-    link.click()
+  // ==========================================================
+  // LOADING
+  // ==========================================================
 
-    link.remove()
-
-    URL.revokeObjectURL(
-      url
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="w-7 h-7 animate-spin text-green-600" />
+      </div>
     )
   }
 
-  // ============================================================
-  // TABLE COLUMNS
-  // ============================================================
-
-  const columns:
-    Column<AdminTopsisResult>[] =
-    [
-      {
-        key:
-          'ranking',
-
-        header:
-          'Rank',
-
-        render: (
-          row
-        ) => (
-          <span className="font-bold">
-            #
-            {
-              row.ranking
-            }
-          </span>
-        ),
-      },
-
-      {
-        key:
-          'namaLengkap',
-
-        header:
-          'Nama Mustahik',
-
-        render: (
-          row
-        ) => (
-          <span className="font-semibold">
-            {
-              getNamaMustahik(
-                row
-              )
-            }
-          </span>
-        ),
-      },
-
-      {
-        key:
-          'nilaiPreferensi',
-
-        header:
-          'Nilai TOPSIS',
-
-        render: (
-          row
-        ) => (
-          <span className="font-mono font-bold text-green-700">
-            {Number(
-              row.nilaiPreferensi
-            ).toFixed(4)}
-          </span>
-        ),
-      },
-
-      {
-        key:
-          'status',
-
-        header:
-          'Keputusan',
-
-        render: (
-          row
-        ) => (
-          <span
-            className={
-              `px-2.5 py-1 rounded-full text-xs font-semibold ${
-                row.status ===
-                'LAYAK_DIDANAI'
-                  ? 'bg-green-100 text-green-700 border border-green-300'
-                  : 'bg-red-50 text-red-700 border border-red-200'
-              }`
-            }
-          >
-            {row.status ===
-            'LAYAK_DIDANAI'
-              ? 'LAYAK DIDANAI'
-              : 'TIDAK DIDANAI'}
-          </span>
-        ),
-      },
-
-      {
-        key:
-          'tanggalProses',
-
-        header:
-          'Tgl Keputusan',
-
-        render: (
-          row
-        ) =>
-          formatDate(
-            row.tanggalProses
-          ),
-      },
-    ]
-
-  // ============================================================
+  // ==========================================================
   // RENDER
-  // ============================================================
+  // ==========================================================
 
   return (
     <div className="space-y-6">
+      <div className="print:hidden">
+        <PageHeader
+          title="Laporan Hasil Seleksi"
+          description="Laporan hasil perangkingan mustahik menggunakan metode TOPSIS."
+        >
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                void loadData()
+              }}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+
+              Muat Ulang
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={
+                handlePrint
+              }
+              disabled={
+                filteredResults.length ===
+                0
+              }
+            >
+              <Printer className="w-4 h-4 mr-2" />
+
+              Cetak
+            </Button>
+
+            <Button
+              onClick={
+                handleExportCSV
+              }
+              disabled={
+                filteredResults.length ===
+                0
+              }
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Download className="w-4 h-4 mr-2" />
+
+              Export CSV
+            </Button>
+          </div>
+        </PageHeader>
+      </div>
+
       {/* ======================================================
-          HEADER
+          PRINT HEADER
       ====================================================== */}
 
-      <PageHeader
-        title="Laporan & Rekapitulasi"
-        description="Cetak dan ekspor laporan kelayakan mustahik berdasarkan hasil TOPSIS"
-      >
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              window.print()
-            }
-          >
-            <Printer className="w-4 h-4 mr-2" />
+      <div className="hidden print:block">
+        <div className="text-center border-b pb-4 mb-6">
+          <h1 className="text-xl font-bold">
+            LAPORAN HASIL SELEKSI
+          </h1>
 
-            Cetak PDF
-          </Button>
+          <p className="text-sm mt-1">
+            Sistem Pendukung Keputusan
+            Penerima Bantuan
+          </p>
 
-          <Button
-            size="sm"
-            onClick={
-              exportCSV
-            }
-            disabled={
-              loading ||
-              filtered.length ===
-                0
-            }
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            <Download className="w-4 h-4 mr-2" />
-
-            Export Excel
-          </Button>
+          <p className="text-sm">
+            Metode TOPSIS
+          </p>
         </div>
-      </PageHeader>
+      </div>
 
       {/* ======================================================
           ERROR
       ====================================================== */}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex justify-between items-center gap-4">
-          <span>
-            {error}
-          </span>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              void load()
-            }
-          >
-            <RefreshCw className="w-4 h-4 mr-1" />
-
-            Coba Lagi
-          </Button>
+        <div className="print:hidden rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
         </div>
       )}
 
@@ -620,130 +660,138 @@ export function LaporanPage() {
           FILTER
       ====================================================== */}
 
-      <Card>
-        <CardContent className="py-4 flex flex-col sm:flex-row gap-4">
-          <div className="flex items-center gap-2 flex-1">
-            <Filter className="w-4 h-4 text-slate-400" />
+      <Card className="print:hidden">
+        <CardContent className="pt-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium">
+                Tahun
+              </label>
 
-            <span className="text-sm font-semibold">
-              Filter Laporan:
-            </span>
+              <select
+                value={
+                  selectedYear
+                }
+                onChange={(
+                  event
+                ) =>
+                  setSelectedYear(
+                    event.target.value
+                  )
+                }
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="ALL">
+                  Semua Tahun
+                </option>
+
+                {availableYears.map(
+                  (
+                    year
+                  ) => (
+                    <option
+                      key={year}
+                      value={year}
+                    >
+                      {year}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">
+                Status
+              </label>
+
+              <select
+                value={
+                  selectedStatus
+                }
+                onChange={(
+                  event
+                ) =>
+                  setSelectedStatus(
+                    event.target.value
+                  )
+                }
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="ALL">
+                  Semua Status
+                </option>
+
+                <option value="LAYAK_DIDANAI">
+                  Layak Didanai
+                </option>
+
+                <option value="TIDAK_DIDANAI">
+                  Tidak Didanai
+                </option>
+              </select>
+            </div>
           </div>
-
-          {/* YEAR */}
-
-          <Select
-            value={year}
-            onValueChange={
-              setYear
-            }
-          >
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue />
-            </SelectTrigger>
-
-            <SelectContent>
-              <SelectItem value="all">
-                Semua Tahun
-              </SelectItem>
-
-              {years.map(
-                (item) => (
-                  <SelectItem
-                    key={
-                      item
-                    }
-                    value={
-                      item
-                    }
-                  >
-                    Tahun{' '}
-                    {
-                      item
-                    }
-                  </SelectItem>
-                )
-              )}
-            </SelectContent>
-          </Select>
-
-          {/* STATUS */}
-
-          <Select
-            value={status}
-            onValueChange={
-              setStatus
-            }
-          >
-            <SelectTrigger className="w-full sm:w-44">
-              <SelectValue />
-            </SelectTrigger>
-
-            <SelectContent>
-              <SelectItem value="all">
-                Semua Status
-              </SelectItem>
-
-              <SelectItem value="LAYAK_DIDANAI">
-                Layak Didanai
-              </SelectItem>
-
-              <SelectItem value="TIDAK_DIDANAI">
-                Tidak Didanai
-              </SelectItem>
-            </SelectContent>
-          </Select>
         </CardContent>
       </Card>
 
       {/* ======================================================
-          SUMMARY
+          STATISTICS
       ====================================================== */}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* TOTAL */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate-500">
+              Total Data
+            </p>
+
+            <p className="text-3xl font-bold mt-2">
+              {
+                statistics.total
+              }
+            </p>
+          </CardContent>
+        </Card>
 
         <Card>
-          <CardContent className="py-4 text-center">
-            <p className="text-xs text-slate-500">
-              Total Dievaluasi
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate-500">
+              Layak Didanai
             </p>
 
-            <p className="text-2xl font-bold mt-1">
+            <p className="text-3xl font-bold text-green-600 mt-2">
               {
-                filtered.length
-              }{' '}
-              Mustahik
+                statistics.layak
+              }
             </p>
           </CardContent>
         </Card>
 
-        {/* LAYAK */}
-
-        <Card className="border-green-200 bg-green-50/30">
-          <CardContent className="py-4 text-center">
-            <p className="text-xs text-green-700 font-medium">
-              Lolos & Layak Didanai
-            </p>
-
-            <p className="text-2xl font-bold text-green-700 mt-1">
-              {layak}{' '}
-              Mustahik
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* TIDAK */}
-
-        <Card className="border-red-200 bg-red-50/30">
-          <CardContent className="py-4 text-center">
-            <p className="text-xs text-red-700 font-medium">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate-500">
               Tidak Didanai
             </p>
 
-            <p className="text-2xl font-bold text-red-700 mt-1">
-              {tidak}{' '}
-              Mustahik
+            <p className="text-3xl font-bold text-red-600 mt-2">
+              {
+                statistics.tidakLayak
+              }
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate-500">
+              Rata-rata Preferensi
+            </p>
+
+            <p className="text-3xl font-bold mt-2">
+              {statistics.averagePreference.toFixed(
+                4
+              )}
             </p>
           </CardContent>
         </Card>
@@ -753,25 +801,176 @@ export function LaporanPage() {
           TABLE
       ====================================================== */}
 
-      <Card>
-        <CardContent className="p-0 overflow-x-auto">
-          {loading ? (
-            <div className="py-16 flex justify-center items-center">
-              <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+      <Card className="print:border-none print:shadow-none">
+        <CardHeader className="print:px-0">
+          <CardTitle>
+            Hasil Perangkingan Mustahik
+          </CardTitle>
+
+          <p className="text-sm text-slate-500">
+            Data berdasarkan hasil
+            perhitungan metode TOPSIS.
+          </p>
+        </CardHeader>
+
+        <CardContent className="overflow-x-auto print:px-0">
+          {filteredResults.length ===
+          0 ? (
+            <div className="flex flex-col items-center justify-center py-14 text-center print:hidden">
+              <FileText className="w-10 h-10 text-slate-400" />
+
+              <h3 className="mt-4 font-semibold">
+                Tidak Ada Data
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Belum ada hasil yang sesuai
+                dengan filter yang dipilih.
+              </p>
             </div>
           ) : (
-            <DataTable
-              columns={
-                columns
-              }
-              data={
-                filtered
-              }
-              emptyMessage="Belum ada hasil TOPSIS di database"
-            />
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b bg-slate-50 print:bg-transparent">
+                  <th className="border px-3 py-3 text-center">
+                    Ranking
+                  </th>
+
+                  <th className="border px-3 py-3 text-left">
+                    Nama Mustahik
+                  </th>
+
+                  <th className="border px-3 py-3 text-left">
+                    NIK
+                  </th>
+
+                  <th className="border px-3 py-3 text-center">
+                    Nilai Preferensi
+                  </th>
+
+                  <th className="border px-3 py-3 text-center">
+                    Status
+                  </th>
+
+                  <th className="border px-3 py-3 text-left">
+                    Tanggal Proses
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredResults.map(
+                  (
+                    result
+                  ) => (
+                    <tr
+                      key={
+                        result.id
+                      }
+                      className="border-b"
+                    >
+                      <td className="border px-3 py-3 text-center font-bold">
+                        #
+                        {
+                          result.ranking
+                        }
+                      </td>
+
+                      <td className="border px-3 py-3 font-medium">
+                        {getMustahikName(
+                          result
+                        )}
+                      </td>
+
+                      <td className="border px-3 py-3 font-mono text-xs">
+                        {getNIK(
+                          result
+                        )}
+                      </td>
+
+                      <td className="border px-3 py-3 text-center font-mono font-bold">
+                        {toNumber(
+                          result.nilaiPreferensi
+                        ).toFixed(
+                          6
+                        )}
+                      </td>
+
+                      <td className="border px-3 py-3 text-center">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium print:border-none print:bg-transparent ${getStatusClass(
+                            result.status
+                          )}`}
+                        >
+                          {getStatusLabel(
+                            result.status
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="border px-3 py-3">
+                        {formatDate(
+                          result.tanggalProses
+                        )}
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+            </table>
           )}
         </CardContent>
       </Card>
+
+      {/* ======================================================
+          PRINT FOOTER
+      ====================================================== */}
+
+      <div className="hidden print:block mt-10">
+        <div className="flex justify-between text-sm">
+          <div>
+            <p>
+              Total Mustahik:
+              {' '}
+              {
+                statistics.total
+              }
+            </p>
+
+            <p>
+              Layak Didanai:
+              {' '}
+              {
+                statistics.layak
+              }
+            </p>
+
+            <p>
+              Tidak Didanai:
+              {' '}
+              {
+                statistics.tidakLayak
+              }
+            </p>
+          </div>
+
+          <div className="text-center">
+            <p>
+              Samarinda,
+              {' '}
+              {formatDate(
+                new Date()
+              )}
+            </p>
+
+            <div className="h-20" />
+
+            <p>
+              Admin
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
