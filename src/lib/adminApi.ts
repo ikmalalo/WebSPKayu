@@ -40,9 +40,7 @@ api.interceptors.request.use(
     return config
   },
 
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
 // ============================================================
@@ -51,7 +49,7 @@ api.interceptors.request.use(
 
 function getData<T>(
   response: {
-    data: any
+    data: unknown
   }
 ): T {
   const body = response.data
@@ -61,7 +59,11 @@ function getData<T>(
     typeof body === 'object' &&
     'data' in body
   ) {
-    return body.data as T
+    return (
+      body as {
+        data: T
+      }
+    ).data
   }
 
   return body as T
@@ -76,8 +78,13 @@ function getErrorMessage(
   fallback: string
 ): string {
   if (axios.isAxiosError(error)) {
+    const data =
+      error.response?.data as {
+        message?: string
+      } | undefined
+
     return (
-      error.response?.data?.message ||
+      data?.message ||
       fallback
     )
   }
@@ -93,6 +100,34 @@ function getErrorMessage(
 }
 
 // ============================================================
+// COMMON TYPES
+// ============================================================
+
+export type PengajuanStatus =
+  | 'DRAFT'
+  | 'MENUNGGU_VERIFIKASI'
+  | 'SEDANG_DIVERIFIKASI'
+  | 'PERLU_PERBAIKAN'
+  | 'LOLOS_VERIFIKASI'
+  | 'DITOLAK'
+  | 'DIPROSES_TOPSIS'
+  | 'LAYAK_DIDANAI'
+  | 'TIDAK_DIDANAI'
+
+export type KriteriaTipe =
+  | 'BENEFIT'
+  | 'COST'
+
+export type IndikatorTipe =
+  | 'POSITIF'
+  | 'NEGATIF'
+
+export type VerificationStatus =
+  | 'LOLOS'
+  | 'PERLU_PERBAIKAN'
+  | 'DITOLAK'
+
+// ============================================================
 // USER
 // ============================================================
 
@@ -105,6 +140,29 @@ export interface AdminUser {
 }
 
 // ============================================================
+// INDIKATOR
+// ============================================================
+
+export interface AdminIndikator {
+  id: string
+  kode: string
+  nama: string
+
+  deskripsi?: string | null
+
+  tipe: IndikatorTipe
+
+  urutan: number
+
+  aktif?: boolean
+
+  kriteriaId?: string
+
+  createdAt?: string
+  updatedAt?: string
+}
+
+// ============================================================
 // MUSTAHIK
 // ============================================================
 
@@ -112,6 +170,7 @@ export interface AdminMustahik {
   id: string
   userId: string
   nik: string
+
   namaLengkap: string
 
   tempatLahir?: string | null
@@ -126,9 +185,11 @@ export interface AdminMustahik {
 
   noHp?: string | null
   statusPernikahan?: string | null
+
   pekerjaan?: string | null
 
   penghasilan?: number | string | null
+
   jumlahTanggungan?: number | null
 
   statusRumah?: string | null
@@ -139,7 +200,44 @@ export interface AdminMustahik {
   updatedAt?: string
 
   user?: AdminUser
+
   pengajuan?: AdminPengajuan[]
+}
+
+// ============================================================
+// JAWABAN KUESIONER
+// ============================================================
+
+export interface AdminJawaban {
+  id: string
+
+  pengajuanId: string
+
+  // Sistem lama
+  kriteriaId?: string | null
+  subKriteriaId?: string | null
+
+  // Sistem baru
+  indikatorId?: string | null
+
+  nilai: number | string
+
+  kriteria?: {
+    id: string
+    kode: string
+    nama: string
+    bobot: number | string
+    tipe: KriteriaTipe
+  } | null
+
+  subKriteria?: {
+    id: string
+    nama: string
+    nilai: number | string
+    keterangan?: string | null
+  } | null
+
+  indikator?: AdminIndikator | null
 }
 
 // ============================================================
@@ -148,10 +246,12 @@ export interface AdminMustahik {
 
 export interface AdminPengajuan {
   id: string
+
   userId: string
   mustahikId: string
 
-  status: string
+  status: PengajuanStatus
+
   catatan?: string | null
 
   tanggalPengajuan?: string | null
@@ -161,53 +261,19 @@ export interface AdminPengajuan {
   updatedAt?: string
 
   user?: AdminUser
+
   mustahik?: AdminMustahik
 
   jawaban?: AdminJawaban[]
+
   verifications?: AdminVerifikasi[]
+
   topsisResults?: AdminTopsisResult[]
-}
-
-// ============================================================
-// JAWABAN
-// ============================================================
-
-export interface AdminJawaban {
-  id: string
-
-  pengajuanId: string
-  kriteriaId: string
-  subKriteriaId: string
-
-  nilai: number | string
-
-  kriteria?: {
-    id: string
-    kode: string
-    nama: string
-    bobot: number | string
-
-    tipe:
-      | 'BENEFIT'
-      | 'COST'
-  }
-
-  subKriteria?: {
-    id: string
-    nama: string
-    nilai: number | string
-    keterangan?: string | null
-  }
 }
 
 // ============================================================
 // VERIFIKASI
 // ============================================================
-
-export type VerificationStatus =
-  | 'LOLOS'
-  | 'PERLU_PERBAIKAN'
-  | 'DITOLAK'
 
 export interface AdminVerifikasi {
   id: string
@@ -216,12 +282,17 @@ export interface AdminVerifikasi {
   adminId: string
 
   status: VerificationStatus
+
   catatan?: string | null
 
   createdAt?: string
   updatedAt?: string
 
   admin?: AdminUser
+
+  pengajuan?: AdminPengajuan
+
+  mustahik?: AdminMustahik
 }
 
 // ============================================================
@@ -232,18 +303,22 @@ export interface AdminVerificationDetail {
   id: string
 
   pengajuanId: string
+
   adminId?: string | null
 
   status?: VerificationStatus
+
   catatan?: string | null
 
   createdAt?: string
   updatedAt?: string
 
   pengajuan: AdminPengajuan
+
   mustahik: AdminMustahik
 
   verifications?: AdminVerifikasi[]
+
   jawaban?: AdminJawaban[]
 }
 
@@ -253,18 +328,19 @@ export interface AdminVerificationDetail {
 
 export interface AdminKriteria {
   id: string
+
   kode: string
   nama: string
 
   bobot: number | string
 
-  tipe:
-    | 'BENEFIT'
-    | 'COST'
+  tipe: KriteriaTipe
 
   deskripsi?: string | null
 
   aktif: boolean
+
+  indikator?: AdminIndikator[]
 
   subKriteria?: AdminSubKriteria[]
 
@@ -278,9 +354,11 @@ export interface AdminKriteria {
 
 export interface AdminSubKriteria {
   id: string
+
   kriteriaId: string
 
   nama: string
+
   nilai: number | string
 
   keterangan?: string | null
@@ -303,11 +381,22 @@ export interface AdminTopsisDetail {
   id: string
 
   topsisResultId: string
+
   kriteriaId: string
 
   nilaiAwal: number | string
+
   nilaiNormalisasi: number | string
+
   nilaiTerbobot: number | string
+
+  kode?: string
+
+  nama?: string
+
+  bobot?: number | string
+
+  tipe?: KriteriaTipe
 
   kriteria?: AdminKriteria
 }
@@ -327,9 +416,7 @@ export interface AdminTopsisResult {
 
   ranking: number
 
-  status:
-    | 'LAYAK_DIDANAI'
-    | 'TIDAK_DIDANAI'
+  status: PengajuanStatus
 
   tanggalProses: string
 
@@ -338,7 +425,27 @@ export interface AdminTopsisResult {
 
   pengajuan?: AdminPengajuan
 
+  mustahik?: AdminMustahik
+
   details?: AdminTopsisDetail[]
+}
+
+// ============================================================
+// TOPSIS CANDIDATE JAWABAN
+// ============================================================
+
+export interface AdminTopsisCandidateJawaban {
+  id?: string
+
+  indikatorId?: string | null
+
+  kode: string | null
+
+  nama: string | null
+
+  tipe: IndikatorTipe | null
+
+  nilai: number | string
 }
 
 // ============================================================
@@ -346,29 +453,39 @@ export interface AdminTopsisResult {
 // ============================================================
 
 export interface AdminTopsisCandidate {
-  pengajuanId: string
+  id: string
+
+  userId: string
+
+  mustahikId: string
 
   status:
     | 'LOLOS_VERIFIKASI'
     | 'DIPROSES_TOPSIS'
-    | 'LAYAK_DIDANAI'
-    | 'TIDAK_DIDANAI'
 
-  mustahik: {
+  tanggalPengajuan?: string | null
+
+  user?: AdminUser
+
+  mustahik: AdminMustahik
+
+  jumlahJawaban?: number
+
+  jawaban: AdminTopsisCandidateJawaban[]
+
+  hasilTopsis?: {
     id: string
-    namaLengkap: string
-    nik: string
-  }
 
-  jawaban: {
-    kriteriaId: string
-    kode: string
-    nama: string
-
-    nilai:
+    nilaiPreferensi:
       | number
       | string
-  }[]
+
+    ranking: number
+
+    status: PengajuanStatus
+
+    tanggalProses: string
+  } | null
 }
 
 // ============================================================
@@ -445,28 +562,39 @@ export async function getAdminMustahik(
       )
 
     const data =
-      getData<any>(
+      getData<unknown>(
         response
       )
 
     if (Array.isArray(data)) {
-      return data
+      return data as AdminMustahik[]
     }
 
     if (
-      Array.isArray(
-        data?.mustahik
-      )
+      data &&
+      typeof data === 'object'
     ) {
-      return data.mustahik
-    }
+      const objectData =
+        data as {
+          mustahik?: AdminMustahik[]
+          items?: AdminMustahik[]
+        }
 
-    if (
-      Array.isArray(
-        data?.items
-      )
-    ) {
-      return data.items
+      if (
+        Array.isArray(
+          objectData.mustahik
+        )
+      ) {
+        return objectData.mustahik
+      }
+
+      if (
+        Array.isArray(
+          objectData.items
+        )
+      ) {
+        return objectData.items
+      }
     }
 
     return []
@@ -481,7 +609,7 @@ export async function getAdminMustahik(
 }
 
 // ============================================================
-// FETCH RAW DETAIL MUSTAHIK
+// FETCH DETAIL MUSTAHIK
 // ============================================================
 
 async function fetchAdminMustahikDetail(
@@ -492,24 +620,32 @@ async function fetchAdminMustahikDetail(
       `/admin/mustahik/${id}`
     )
 
-  const body =
-    response.data
-
   const data =
-    body?.data ??
-    body
+    getData<unknown>(
+      response
+    )
 
   if (
-    data?.mustahik
+    data &&
+    typeof data === 'object'
   ) {
-    return data.mustahik
-  }
+    const objectData =
+      data as {
+        mustahik?: AdminMustahik
+      }
 
-  if (
-    data?.id &&
-    data?.namaLengkap
-  ) {
-    return data as AdminMustahik
+    if (
+      objectData.mustahik
+    ) {
+      return objectData.mustahik
+    }
+
+    if (
+      'id' in objectData &&
+      'namaLengkap' in objectData
+    ) {
+      return data as AdminMustahik
+    }
   }
 
   throw new Error(
@@ -575,14 +711,23 @@ export async function updateAdminMustahik(
       )
 
     const data =
-      getData<any>(
+      getData<unknown>(
         response
       )
 
-    return (
-      data?.mustahik ||
-      data
-    ) as AdminMustahik
+    if (
+      data &&
+      typeof data === 'object' &&
+      'mustahik' in data
+    ) {
+      return (
+        data as {
+          mustahik: AdminMustahik
+        }
+      ).mustahik
+    }
+
+    return data as AdminMustahik
   } catch (error) {
     throw new Error(
       getErrorMessage(
@@ -633,28 +778,39 @@ export async function getAdminVerifikasi(
       )
 
     const data =
-      getData<any>(
+      getData<unknown>(
         response
       )
 
     if (Array.isArray(data)) {
-      return data
+      return data as AdminPengajuan[]
     }
 
     if (
-      Array.isArray(
-        data?.pengajuan
-      )
+      data &&
+      typeof data === 'object'
     ) {
-      return data.pengajuan
-    }
+      const objectData =
+        data as {
+          pengajuan?: AdminPengajuan[]
+          items?: AdminPengajuan[]
+        }
 
-    if (
-      Array.isArray(
-        data?.items
-      )
-    ) {
-      return data.items
+      if (
+        Array.isArray(
+          objectData.pengajuan
+        )
+      ) {
+        return objectData.pengajuan
+      }
+
+      if (
+        Array.isArray(
+          objectData.items
+        )
+      ) {
+        return objectData.items
+      }
     }
 
     return []
@@ -681,48 +837,31 @@ export async function getAdminVerifikasiDetail(
         `/admin/verifikasi/${id}`
       )
 
-    const body =
-      response.data
-
     const data =
-      body?.data ??
-      body
+      getData<any>(
+        response
+      )
 
     const detail =
       data?.detail ??
       data?.verifikasi ??
       data
 
-    if (!detail) {
-      throw new Error(
-        'Detail verifikasi tidak ditemukan.'
-      )
-    }
-
     const pengajuan =
-      detail.pengajuan ??
+      detail?.pengajuan ??
       data?.pengajuan
 
     const mustahik =
-      detail.mustahik ??
+      detail?.mustahik ??
       pengajuan?.mustahik
 
-    const verifications =
-      detail.verifications ??
-      pengajuan?.verifications ??
-      []
-
-    const jawaban =
-      detail.jawaban ??
-      pengajuan?.jawaban ??
-      []
-
     if (
+      !detail ||
       !pengajuan ||
       !mustahik
     ) {
       throw new Error(
-        'Data pengajuan atau mustahik pada detail verifikasi tidak ditemukan.'
+        'Data detail verifikasi tidak ditemukan.'
       )
     }
 
@@ -730,8 +869,16 @@ export async function getAdminVerifikasiDetail(
       ...detail,
       pengajuan,
       mustahik,
-      verifications,
-      jawaban,
+
+      verifications:
+        detail?.verifications ??
+        pengajuan?.verifications ??
+        [],
+
+      jawaban:
+        detail?.jawaban ??
+        pengajuan?.jawaban ??
+        [],
     } as AdminVerificationDetail
   } catch (error) {
     throw new Error(
@@ -779,7 +926,7 @@ export async function submitAdminVerifikasi(
       )
 
     return (
-      data?.verifikasi ||
+      data?.verifikasi ??
       data
     ) as AdminVerifikasi
   } catch (error) {
@@ -833,7 +980,7 @@ export async function updateAdminVerifikasi(
       )
 
     return (
-      data?.verifikasi ||
+      data?.verifikasi ??
       data
     ) as AdminVerifikasi
   } catch (error) {
@@ -868,23 +1015,12 @@ export async function getAdminKriteria(): Promise<
       return data
     }
 
-    if (
-      Array.isArray(
-        data?.kriteria
-      )
-    ) {
-      return data.kriteria
-    }
-
-    if (
-      Array.isArray(
-        data?.items
-      )
-    ) {
-      return data.items
-    }
-
-    return []
+    return (
+      data?.kriteria ??
+      data?.criteria ??
+      data?.items ??
+      []
+    )
   } catch (error) {
     throw new Error(
       getErrorMessage(
@@ -904,11 +1040,7 @@ export async function createAdminKriteria(
     kode: string
     nama: string
     bobot: number
-
-    tipe:
-      | 'BENEFIT'
-      | 'COST'
-
+    tipe: KriteriaTipe
     deskripsi?: string
     aktif?: boolean
   }
@@ -926,7 +1058,7 @@ export async function createAdminKriteria(
       )
 
     return (
-      data?.kriteria ||
+      data?.kriteria ??
       data
     ) as AdminKriteria
   } catch (error) {
@@ -949,11 +1081,7 @@ export async function updateAdminKriteria(
     kode: string
     nama: string
     bobot: number
-
-    tipe:
-      | 'BENEFIT'
-      | 'COST'
-
+    tipe: KriteriaTipe
     deskripsi: string
     aktif: boolean
   }>
@@ -971,7 +1099,7 @@ export async function updateAdminKriteria(
       )
 
     return (
-      data?.kriteria ||
+      data?.kriteria ??
       data
     ) as AdminKriteria
   } catch (error) {
@@ -1035,31 +1163,12 @@ export async function getAdminSubKriteria(
       return data
     }
 
-    if (
-      Array.isArray(
-        data?.subKriteria
-      )
-    ) {
-      return data.subKriteria
-    }
-
-    if (
-      Array.isArray(
-        data?.subkriteria
-      )
-    ) {
-      return data.subkriteria
-    }
-
-    if (
-      Array.isArray(
-        data?.items
-      )
-    ) {
-      return data.items
-    }
-
-    return []
+    return (
+      data?.subKriteria ??
+      data?.subkriteria ??
+      data?.items ??
+      []
+    )
   } catch (error) {
     throw new Error(
       getErrorMessage(
@@ -1095,8 +1204,8 @@ export async function createAdminSubKriteria(
       )
 
     return (
-      data?.subKriteria ||
-      data?.subkriteria ||
+      data?.subKriteria ??
+      data?.subkriteria ??
       data
     ) as AdminSubKriteria
   } catch (error) {
@@ -1135,8 +1244,8 @@ export async function updateAdminSubKriteria(
       )
 
     return (
-      data?.subKriteria ||
-      data?.subkriteria ||
+      data?.subKriteria ??
+      data?.subkriteria ??
       data
     ) as AdminSubKriteria
   } catch (error) {
@@ -1172,11 +1281,14 @@ export async function deleteAdminSubKriteria(
 
 // ============================================================
 // TOPSIS CANDIDATES
+//
+// GET /admin/topsis/candidates
 // ============================================================
 
 export async function getAdminTopsisCandidates(): Promise<{
   criteria: AdminKriteria[]
   candidates: AdminTopsisCandidate[]
+  total: number
 }> {
   try {
     const response =
@@ -1190,13 +1302,28 @@ export async function getAdminTopsisCandidates(): Promise<{
       )
 
     return {
+      // Backend TOPSIS terbaru tidak lagi
+      // mengirim criteria pada endpoint candidates.
       criteria:
-        data?.criteria ??
-        [],
+        Array.isArray(
+          data?.criteria
+        )
+          ? data.criteria
+          : [],
 
       candidates:
-        data?.candidates ??
-        [],
+        Array.isArray(
+          data?.candidates
+        )
+          ? data.candidates
+          : [],
+
+      total:
+        Number(
+          data?.total ??
+          data?.candidates?.length ??
+          0
+        ),
     }
   } catch (error) {
     throw new Error(
@@ -1210,22 +1337,36 @@ export async function getAdminTopsisCandidates(): Promise<{
 
 // ============================================================
 // PROCESS TOPSIS
+//
+// POST /admin/topsis/process
+//
+// Parameter layakThreshold dibuat optional sementara
+// agar halaman frontend lama tidak langsung TypeScript error.
+//
+// Nilai tersebut TIDAK dikirim ke backend karena
+// controller TOPSIS terbaru tidak menggunakan threshold.
 // ============================================================
 
 export async function processAdminTopsis(
-  layakThreshold: number
+  _layakThreshold?: number
 ): Promise<{
-  threshold: number
-  jumlahAlternatif: number
-  results: AdminTopsisResult[]
+  totalKandidat: number
+  hasil: Array<{
+    pengajuanId: string
+    nilaiPreferensi: number
+    ranking: number
+    status: PengajuanStatus
+  }>
+
+  // Kompatibilitas frontend lama
+  threshold?: number
+  jumlahAlternatif?: number
+  results?: AdminTopsisResult[]
 }> {
   try {
     const response =
       await api.post(
-        '/admin/topsis/process',
-        {
-          layakThreshold,
-        }
+        '/admin/topsis/process'
       )
 
     const data =
@@ -1233,22 +1374,31 @@ export async function processAdminTopsis(
         response
       )
 
+    const hasil =
+      Array.isArray(
+        data?.hasil
+      )
+        ? data.hasil
+        : []
+
     return {
-      threshold:
+      totalKandidat:
         Number(
-          data?.threshold ??
-          layakThreshold
+          data?.totalKandidat ??
+          hasil.length
         ),
 
+      hasil,
+
+      // Alias sementara untuk
+      // ProcessTopsisPage versi lama.
       jumlahAlternatif:
         Number(
-          data?.jumlahAlternatif ??
-          0
+          data?.totalKandidat ??
+          hasil.length
         ),
 
-      results:
-        data?.results ??
-        [],
+      results: [],
     }
   } catch (error) {
     throw new Error(
@@ -1262,6 +1412,8 @@ export async function processAdminTopsis(
 
 // ============================================================
 // GET TOPSIS RESULTS
+//
+// GET /admin/topsis/results
 // ============================================================
 
 export async function getAdminTopsisResults(): Promise<
@@ -1303,6 +1455,8 @@ export async function getAdminTopsisResults(): Promise<
 
 // ============================================================
 // GET DETAIL TOPSIS
+//
+// GET /admin/topsis/results/:id
 // ============================================================
 
 export async function getAdminTopsisResultById(
@@ -1319,10 +1473,17 @@ export async function getAdminTopsisResultById(
         response
       )
 
-    return (
-      data?.result ||
+    const result =
+      data?.result ??
       data
-    ) as AdminTopsisResult
+
+    if (!result) {
+      throw new Error(
+        'Detail hasil TOPSIS tidak ditemukan.'
+      )
+    }
+
+    return result as AdminTopsisResult
   } catch (error) {
     throw new Error(
       getErrorMessage(
