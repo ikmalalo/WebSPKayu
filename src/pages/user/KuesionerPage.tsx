@@ -93,8 +93,7 @@ interface KriteriaApi {
 
   deskripsi?: string | null
 
-  indikator:
-    IndikatorApi[]
+  indikator: IndikatorApi[]
 }
 
 
@@ -104,6 +103,194 @@ interface ExistingAnswer {
   nilai:
     | number
     | string
+}
+
+
+// ============================================================
+// NORMALISASI RESPONSE KUESIONER
+// ============================================================
+//
+// Fungsi ini penting agar frontend tidak crash apabila:
+//
+// - indikator tidak ada
+// - indikator bernilai null
+// - response backend belum lengkap
+//
+// Semua kriteria yang masuk akan selalu memiliki:
+//
+// indikator: []
+//
+// sehingga .map() dan .length aman digunakan.
+// ============================================================
+
+function normalizeKriteria(
+  value: unknown
+): KriteriaApi[] {
+  if (
+    !Array.isArray(value)
+  ) {
+    return []
+  }
+
+  return value
+    .map(
+      (
+        item: unknown
+      ): KriteriaApi | null => {
+        if (
+          !item ||
+          typeof item !== 'object'
+        ) {
+          return null
+        }
+
+        const data =
+          item as Record<string, unknown>
+
+        const rawIndikator =
+          data.indikator
+
+        const indikator: IndikatorApi[] =
+          Array.isArray(
+            rawIndikator
+          )
+            ? rawIndikator
+                .filter(
+                  (
+                    indikatorItem: unknown
+                  ) =>
+                    indikatorItem &&
+                    typeof indikatorItem ===
+                      'object' &&
+                    Boolean(
+                      (
+                        indikatorItem as
+                        Record<string, unknown>
+                      ).id
+                    )
+                )
+                .map(
+                  (
+                    indikatorItem: unknown
+                  ): IndikatorApi => {
+                    const indikatorData =
+                      indikatorItem as
+                      Record<string, unknown>
+
+                    return {
+                      id:
+                        String(
+                          indikatorData.id ||
+                          ''
+                        ),
+
+                      kode:
+                        String(
+                          indikatorData.kode ||
+                          ''
+                        ),
+
+                      nama:
+                        String(
+                          indikatorData.nama ||
+                          indikatorData.kode ||
+                          'Indikator'
+                        ),
+
+                      deskripsi:
+                        indikatorData.deskripsi
+                          ? String(
+                              indikatorData.deskripsi
+                            )
+                          : null,
+
+                      tipe:
+                        indikatorData.tipe ===
+                        'NEGATIF'
+                          ? 'NEGATIF'
+                          : 'POSITIF',
+
+                      urutan:
+                        Number(
+                          indikatorData.urutan
+                        ) || 0,
+                    }
+                  }
+                )
+                .sort(
+                  (
+                    a,
+                    b
+                  ) =>
+                    a.urutan -
+                    b.urutan
+                )
+            : []
+
+        return {
+          id:
+            String(
+              data.id ||
+              ''
+            ),
+
+          kode:
+            String(
+              data.kode ||
+              ''
+            ),
+
+          nama:
+            String(
+              data.nama ||
+              ''
+            ),
+
+          bobot:
+            typeof data.bobot ===
+              'number' ||
+            typeof data.bobot ===
+              'string'
+              ? data.bobot
+              : 0,
+
+          tipe:
+            data.tipe ===
+            'COST'
+              ? 'COST'
+              : 'BENEFIT',
+
+          deskripsi:
+            data.deskripsi
+              ? String(
+                  data.deskripsi
+                )
+              : null,
+
+          indikator,
+        }
+      }
+    )
+    .filter(
+      (
+        item
+      ): item is KriteriaApi =>
+        item !== null &&
+        item.id.length > 0
+    )
+    .sort(
+      (
+        a,
+        b
+      ) =>
+        a.kode.localeCompare(
+          b.kode,
+          undefined,
+          {
+            numeric: true,
+          }
+        )
+    )
 }
 
 
@@ -193,13 +380,6 @@ const STATUS_RUMAH_OPTIONS = [
 // ============================================================
 // NILAI JAWABAN
 // ============================================================
-//
-// Backend menggunakan nilai numerik 1 sampai 5.
-//
-// Nilai ditampilkan langsung agar sementara tetap
-// generik sampai seluruh teks pertanyaan dan skala
-// dari Excel client diterapkan.
-// ============================================================
 
 const NILAI_OPTIONS = [
   {
@@ -261,20 +441,6 @@ export function KuesionerPage() {
 
   // ==========================================================
   // STATE JAWABAN
-  // ==========================================================
-  //
-  // Format:
-  //
-  // {
-  //   indikatorId: nilai
-  // }
-  //
-  // Contoh:
-  //
-  // {
-  //   "indikator-id-1": 4,
-  //   "indikator-id-2": 3
-  // }
   // ==========================================================
 
   const [
@@ -340,17 +506,28 @@ export function KuesionerPage() {
 
       const load =
         async () => {
-          if (!token) {
-            if (mounted) {
-              setLoading(false)
+          if (
+            !token
+          ) {
+            if (
+              mounted
+            ) {
+              setLoading(
+                false
+              )
             }
 
             return
           }
 
           try {
-            setLoading(true)
-            setError(null)
+            setLoading(
+              true
+            )
+
+            setError(
+              null
+            )
 
             const headers = {
               Authorization:
@@ -377,15 +554,43 @@ export function KuesionerPage() {
                 ?.kriteria ||
               []
 
+            const normalizedKriteria =
+              normalizeKriteria(
+                kriteriaData
+              )
+
             if (
               mounted
             ) {
               setKriteria(
-                Array.isArray(
-                  kriteriaData
-                )
-                  ? kriteriaData
-                  : []
+                normalizedKriteria
+              )
+            }
+
+            if (
+              normalizedKriteria.length === 0
+            ) {
+              throw new Error(
+                'Data kriteria kuesioner tidak ditemukan.'
+              )
+            }
+
+            const totalIndikator =
+              normalizedKriteria.reduce(
+                (
+                  total,
+                  item
+                ) =>
+                  total +
+                  item.indikator.length,
+                0
+              )
+
+            if (
+              totalIndikator === 0
+            ) {
+              throw new Error(
+                'Data indikator kuesioner belum tersedia. Pastikan backend dan database sudah menggunakan data kriteria terbaru.'
               )
             }
 
@@ -424,23 +629,43 @@ export function KuesionerPage() {
                 const sorted =
                   [...list].sort(
                     (
-                      a: any,
-                      b: any
+                      a: Record<string, unknown>,
+                      b: Record<string, unknown>
                     ) =>
                       new Date(
-                        b.createdAt ||
-                        b.tanggalPengajuan ||
-                        0
+                        String(
+                          b.createdAt ||
+                          b.tanggalPengajuan ||
+                          0
+                        )
                       ).getTime() -
                       new Date(
-                        a.createdAt ||
-                        a.tanggalPengajuan ||
-                        0
+                        String(
+                          a.createdAt ||
+                          a.tanggalPengajuan ||
+                          0
+                        )
                       ).getTime()
                   )
 
                 const p =
-                  sorted[0]
+                  sorted[0] as Record<
+                    string,
+                    unknown
+                  >
+
+                const mustahik =
+                  (
+                    p.mustahik &&
+                    typeof p.mustahik ===
+                      'object'
+                  )
+                    ? p.mustahik as
+                        Record<
+                          string,
+                          unknown
+                        >
+                    : {}
 
                 currentPengajuan =
                   {
@@ -464,15 +689,13 @@ export function KuesionerPage() {
 
                     namaLengkap:
                       String(
-                        p.mustahik
-                          ?.namaLengkap ||
+                        mustahik.namaLengkap ||
                         ''
                       ),
 
                     nik:
                       String(
-                        p.mustahik
-                          ?.nik ||
+                        mustahik.nik ||
                         ''
                       ),
 
@@ -484,23 +707,34 @@ export function KuesionerPage() {
                     tanggalPengajuan:
                       p.createdAt
                         ? new Date(
-                            p.createdAt
+                            String(
+                              p.createdAt
+                            )
                           )
                             .toISOString()
-                            .split('T')[0]
+                            .split(
+                              'T'
+                            )[0]
                         : '',
 
                     catatan:
-                      p.catatan ||
-                      undefined,
+                      p.catatan
+                        ? String(
+                            p.catatan
+                          )
+                        : undefined,
 
                     tanggalVerifikasi:
                       p.tanggalVerifikasi
                         ? new Date(
-                            p.tanggalVerifikasi
+                            String(
+                              p.tanggalVerifikasi
+                            )
                           )
                             .toISOString()
-                            .split('T')[0]
+                            .split(
+                              'T'
+                            )[0]
                         : undefined,
                   }
 
@@ -583,8 +817,7 @@ export function KuesionerPage() {
                 : []
 
             if (
-              existingAnswers.length >
-              0
+              existingAnswers.length > 0
             ) {
               const mappedAnswers:
                 Record<
@@ -640,11 +873,13 @@ export function KuesionerPage() {
                 currentStatus
               )
             ) {
-              setSubmitted(true)
+              setSubmitted(
+                true
+              )
             }
 
           } catch (
-            err: any
+            err: unknown
           ) {
             console.error(
               'GAGAL MEMUAT KUESIONER:',
@@ -654,19 +889,37 @@ export function KuesionerPage() {
             if (
               mounted
             ) {
-              setError(
-                err.response
-                  ?.data
-                  ?.message ||
-                'Gagal memuat data kuesioner.'
-              )
+              if (
+                axios.isAxiosError(
+                  err
+                )
+              ) {
+                setError(
+                  err.response
+                    ?.data
+                    ?.message ||
+                  'Gagal memuat data kuesioner.'
+                )
+              } else if (
+                err instanceof Error
+              ) {
+                setError(
+                  err.message
+                )
+              } else {
+                setError(
+                  'Gagal memuat data kuesioner.'
+                )
+              }
             }
 
           } finally {
             if (
               mounted
             ) {
-              setLoading(false)
+              setLoading(
+                false
+              )
             }
           }
         }
@@ -674,7 +927,8 @@ export function KuesionerPage() {
       load()
 
       return () => {
-        mounted = false
+        mounted =
+          false
       }
     },
     [
@@ -736,8 +990,7 @@ export function KuesionerPage() {
       (
         item
       ) =>
-        item.indikator ||
-        []
+        item.indikator
     )
 
 
@@ -765,6 +1018,21 @@ export function KuesionerPage() {
 
 
       // --------------------------------------------------------
+      // VALIDASI JUMLAH INDIKATOR
+      // --------------------------------------------------------
+
+      if (
+        allIndikator.length === 0
+      ) {
+        setError(
+          'Data indikator kuesioner belum tersedia.'
+        )
+
+        return
+      }
+
+
+      // --------------------------------------------------------
       // VALIDASI JAWABAN
       // --------------------------------------------------------
 
@@ -779,8 +1047,7 @@ export function KuesionerPage() {
         )
 
       if (
-        unanswered.length >
-        0
+        unanswered.length > 0
       ) {
         setError(
           `Masih ada ${unanswered.length} pertanyaan yang belum dijawab.`
@@ -804,8 +1071,14 @@ export function KuesionerPage() {
         return
       }
 
-      setSubmitting(true)
-      setError(null)
+
+      setSubmitting(
+        true
+      )
+
+      setError(
+        null
+      )
 
       try {
 
@@ -824,7 +1097,7 @@ export function KuesionerPage() {
               nilai:
                 answers[
                   indikator.id
-                ]!,
+                ],
             })
           )
 
@@ -856,7 +1129,9 @@ export function KuesionerPage() {
         // LOCK
         // ------------------------------------------------------
 
-        setSubmitted(true)
+        setSubmitted(
+          true
+        )
 
 
         // ------------------------------------------------------
@@ -910,7 +1185,9 @@ export function KuesionerPage() {
                       detail.tanggalVerifikasi
                     )
                       .toISOString()
-                      .split('T')[0]
+                      .split(
+                        'T'
+                      )[0]
                   : undefined,
 
               catatan:
@@ -934,7 +1211,7 @@ export function KuesionerPage() {
         )
 
       } catch (
-        err: any
+        err: unknown
       ) {
         console.error(
           'GAGAL MENGIRIM KUESIONER:',
@@ -942,33 +1219,58 @@ export function KuesionerPage() {
         )
 
         if (
-          err.response
-            ?.status ===
-          409
+          axios.isAxiosError(
+            err
+          )
         ) {
-          setSubmitted(true)
+          if (
+            err.response
+              ?.status === 409
+          ) {
+            setSubmitted(
+              true
+            )
+
+            setError(
+              err.response
+                ?.data
+                ?.message ||
+              'Kuesioner sudah pernah dikirim dan tidak dapat dikirim ulang.'
+            )
+
+            await refreshPengajuan()
+
+            return
+          }
 
           setError(
             err.response
               ?.data
               ?.message ||
-              'Kuesioner sudah pernah dikirim dan tidak dapat dikirim ulang.'
+            'Gagal menyimpan jawaban kuesioner.'
           )
 
-          await refreshPengajuan()
+          return
+        }
+
+        if (
+          err instanceof Error
+        ) {
+          setError(
+            err.message
+          )
 
           return
         }
 
         setError(
-          err.response
-            ?.data
-            ?.message ||
           'Gagal menyimpan jawaban kuesioner.'
         )
 
       } finally {
-        setSubmitting(false)
+        setSubmitting(
+          false
+        )
       }
     }
 
@@ -1010,6 +1312,7 @@ export function KuesionerPage() {
         />
 
         <Card>
+
           <CardContent className="py-16 text-center">
 
             <p className="text-sm text-slate-500">
@@ -1029,6 +1332,7 @@ export function KuesionerPage() {
             </Button>
 
           </CardContent>
+
         </Card>
 
       </div>
@@ -1057,6 +1361,7 @@ export function KuesionerPage() {
 
       {isLocked && (
         <Card className="border-green-200 bg-green-50/50">
+
           <CardContent className="p-4">
 
             <div className="flex gap-3">
@@ -1079,6 +1384,7 @@ export function KuesionerPage() {
             </div>
 
           </CardContent>
+
         </Card>
       )}
 
