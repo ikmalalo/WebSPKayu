@@ -27,7 +27,7 @@ import {
 
 import {
   useAuth,
-} from '@/contexts/AuthContext'
+} from '@/context/AuthContext'
 
 type AdminLayoutProps = {
   children?: ReactNode
@@ -84,8 +84,7 @@ export function AdminLayout({
   const navigate = useNavigate()
 
   const {
-    user,
-    logout,
+    token,
   } = useAuth()
 
   const [
@@ -100,27 +99,26 @@ export function AdminLayout({
 
   useEffect(() => {
     setSidebarOpen(false)
-  }, [location.pathname])
+  }, [
+    location.pathname,
+  ])
 
   const handleLogout = () => {
-    logout()
+    localStorage.removeItem('token')
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('user')
 
-    navigate('/login')
+    navigate('/login', {
+      replace: true,
+    })
+
+    window.location.reload()
   }
 
-  if (!user) {
+  if (!token) {
     return (
       <Navigate
         to="/login"
-        replace
-      />
-    )
-  }
-
-  if (user.role !== 'ADMIN') {
-    return (
-      <Navigate
-        to="/dashboard"
         replace
       />
     )
@@ -136,8 +134,6 @@ export function AdminLayout({
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* MOBILE OVERLAY */}
-
       {sidebarOpen && (
         <button
           type="button"
@@ -149,16 +145,12 @@ export function AdminLayout({
         />
       )}
 
-      {/* SIDEBAR */}
-
       <aside
         className={`
           fixed inset-y-0 left-0 z-50
           flex flex-col
-          border-r
-          bg-white
-          transition-all
-          duration-300
+          border-r bg-white
+          transition-all duration-300
           ${
             collapsed
               ? 'w-20'
@@ -172,8 +164,6 @@ export function AdminLayout({
           lg:translate-x-0
         `}
       >
-        {/* LOGO */}
-
         <div className="flex h-20 items-center justify-between border-b px-4">
           {!collapsed && (
             <div className="flex items-center gap-3">
@@ -209,8 +199,6 @@ export function AdminLayout({
             <X size={20} />
           </button>
         </div>
-
-        {/* NAVIGATION */}
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {menuItems.map(
@@ -261,21 +249,15 @@ export function AdminLayout({
           )}
         </nav>
 
-        {/* USER */}
-
         <div className="border-t p-3">
           {!collapsed && (
             <div className="mb-3 rounded-xl bg-slate-50 p-3">
-              <p className="truncate text-sm font-semibold text-slate-800">
-                {user.name}
-              </p>
-
-              <p className="truncate text-xs text-slate-500">
-                {user.email}
-              </p>
-
-              <p className="mt-1 text-xs font-medium text-green-600">
+              <p className="text-sm font-semibold text-slate-800">
                 Administrator
+              </p>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Panel Pengelolaan Sistem
               </p>
             </div>
           )}
@@ -312,8 +294,6 @@ export function AdminLayout({
           </button>
         </div>
 
-        {/* COLLAPSE DESKTOP */}
-
         <button
           type="button"
           onClick={() =>
@@ -336,13 +316,10 @@ export function AdminLayout({
         </button>
       </aside>
 
-      {/* MAIN AREA */}
-
       <div
         className={`
           min-h-screen
-          transition-all
-          duration-300
+          transition-all duration-300
           ${
             collapsed
               ? 'lg:pl-20'
@@ -350,8 +327,6 @@ export function AdminLayout({
           }
         `}
       >
-        {/* TOPBAR */}
-
         <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b bg-white px-4 lg:px-8">
           <div className="flex items-center gap-3">
             <button
@@ -378,7 +353,7 @@ export function AdminLayout({
           <div className="flex items-center gap-3">
             <div className="hidden text-right sm:block">
               <p className="text-sm font-medium text-slate-800">
-                {user.name}
+                Administrator
               </p>
 
               <p className="text-xs text-slate-500">
@@ -387,16 +362,10 @@ export function AdminLayout({
             </div>
 
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 font-semibold text-green-700">
-              {user.name
-                ? user.name
-                    .charAt(0)
-                    .toUpperCase()
-                : 'A'}
+              A
             </div>
           </div>
         </header>
-
-        {/* PAGE CONTENT */}
 
         <main className="p-4 lg:p-8">
           {renderContent()}
