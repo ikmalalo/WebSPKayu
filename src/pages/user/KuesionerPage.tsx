@@ -64,12 +64,17 @@ const API_URL =
 // TYPES
 // ============================================================
 
-interface SubKriteriaApi {
+interface IndikatorApi {
   id: string
-  kriteriaId: string
+  kode: string
   nama: string
-  nilai: number | string
-  keterangan?: string | null
+  deskripsi?: string | null
+
+  tipe:
+    | 'POSITIF'
+    | 'NEGATIF'
+
+  urutan: number
 }
 
 
@@ -77,7 +82,10 @@ interface KriteriaApi {
   id: string
   kode: string
   nama: string
-  bobot: number | string
+
+  bobot:
+    | number
+    | string
 
   tipe:
     | 'BENEFIT'
@@ -85,14 +93,17 @@ interface KriteriaApi {
 
   deskripsi?: string | null
 
-  subKriteria:
-    SubKriteriaApi[]
+  indikator:
+    IndikatorApi[]
 }
 
 
 interface ExistingAnswer {
-  kriteriaId: string
-  subKriteriaId: string
+  indikatorId?: string | null
+
+  nilai:
+    | number
+    | string
 }
 
 
@@ -139,7 +150,7 @@ function toStatusPengajuan(
 
 
 // ============================================================
-// STATUS YANG TIDAK BOLEH EDIT
+// STATUS YANG TERKUNCI
 // ============================================================
 
 const LOCKED_STATUSES: StatusPengajuan[] = [
@@ -180,6 +191,41 @@ const STATUS_RUMAH_OPTIONS = [
 
 
 // ============================================================
+// NILAI JAWABAN
+// ============================================================
+//
+// Backend menggunakan nilai numerik 1 sampai 5.
+//
+// Nilai ditampilkan langsung agar sementara tetap
+// generik sampai seluruh teks pertanyaan dan skala
+// dari Excel client diterapkan.
+// ============================================================
+
+const NILAI_OPTIONS = [
+  {
+    value: 1,
+    label: '1',
+  },
+  {
+    value: 2,
+    label: '2',
+  },
+  {
+    value: 3,
+    label: '3',
+  },
+  {
+    value: 4,
+    label: '4',
+  },
+  {
+    value: 5,
+    label: '5',
+  },
+]
+
+
+// ============================================================
 // PAGE
 // ============================================================
 
@@ -200,6 +246,10 @@ export function KuesionerPage() {
     useAuth()
 
 
+  // ==========================================================
+  // STATE KRITERIA
+  // ==========================================================
+
   const [
     kriteria,
     setKriteria,
@@ -209,6 +259,24 @@ export function KuesionerPage() {
     >([])
 
 
+  // ==========================================================
+  // STATE JAWABAN
+  // ==========================================================
+  //
+  // Format:
+  //
+  // {
+  //   indikatorId: nilai
+  // }
+  //
+  // Contoh:
+  //
+  // {
+  //   "indikator-id-1": 4,
+  //   "indikator-id-2": 3
+  // }
+  // ==========================================================
+
   const [
     answers,
     setAnswers,
@@ -216,10 +284,14 @@ export function KuesionerPage() {
     useState<
       Record<
         string,
-        string
+        number
       >
     >({})
 
+
+  // ==========================================================
+  // STATUS RUMAH
+  // ==========================================================
 
   const [
     statusRumah,
@@ -287,7 +359,7 @@ export function KuesionerPage() {
 
 
             // --------------------------------------------------
-            // LOAD KRITERIA
+            // LOAD KRITERIA + INDIKATOR
             // --------------------------------------------------
 
             const kriteriaResponse =
@@ -309,7 +381,11 @@ export function KuesionerPage() {
               mounted
             ) {
               setKriteria(
-                kriteriaData
+                Array.isArray(
+                  kriteriaData
+                )
+                  ? kriteriaData
+                  : []
               )
             }
 
@@ -340,7 +416,9 @@ export function KuesionerPage() {
                 []
 
               if (
-                Array.isArray(list) &&
+                Array.isArray(
+                  list
+                ) &&
                 list.length > 0
               ) {
                 const sorted =
@@ -511,22 +589,32 @@ export function KuesionerPage() {
               const mappedAnswers:
                 Record<
                   string,
-                  string
+                  number
                 > =
                 {}
 
               existingAnswers.forEach(
                 (
-                  answer: ExistingAnswer
+                  answer
                 ) => {
                   if (
-                    answer.kriteriaId &&
-                    answer.subKriteriaId
+                    answer.indikatorId
                   ) {
-                    mappedAnswers[
-                      answer.kriteriaId
-                    ] =
-                      answer.subKriteriaId
+                    const nilai =
+                      Number(
+                        answer.nilai
+                      )
+
+                    if (
+                      Number.isFinite(
+                        nilai
+                      )
+                    ) {
+                      mappedAnswers[
+                        answer.indikatorId
+                      ] =
+                        nilai
+                    }
                   }
                 }
               )
@@ -598,15 +686,6 @@ export function KuesionerPage() {
   // ==========================================================
   // LOCK
   // ==========================================================
-  //
-  // Boolean() PENTING supaya hasilnya benar-benar boolean.
-  // Sebelumnya:
-  //
-  // submitted || (pengajuan && ...)
-  //
-  // menghasilkan boolean | null.
-  //
-  // ==========================================================
 
   const isLocked: boolean =
     Boolean(
@@ -621,13 +700,13 @@ export function KuesionerPage() {
 
 
   // ==========================================================
-  // SELECT ANSWER
+  // PILIH JAWABAN
   // ==========================================================
 
   const handleSelectAnswer =
     (
-      kriteriaId: string,
-      subKriteriaId: string
+      indikatorId: string,
+      nilai: number
     ) => {
       if (
         isLocked
@@ -641,11 +720,25 @@ export function KuesionerPage() {
         ) => ({
           ...previous,
 
-          [kriteriaId]:
-            subKriteriaId,
+          [indikatorId]:
+            nilai,
         })
       )
     }
+
+
+  // ==========================================================
+  // AMBIL SEMUA INDIKATOR
+  // ==========================================================
+
+  const allIndikator =
+    kriteria.flatMap(
+      (
+        item
+      ) =>
+        item.indikator ||
+        []
+    )
 
 
   // ==========================================================
@@ -676,13 +769,13 @@ export function KuesionerPage() {
       // --------------------------------------------------------
 
       const unanswered =
-        kriteria.filter(
+        allIndikator.filter(
           (
-            item
+            indikator
           ) =>
-            !answers[
-              item.id
-            ]
+            answers[
+              indikator.id
+            ] === undefined
         )
 
       if (
@@ -717,31 +810,20 @@ export function KuesionerPage() {
       try {
 
         // ------------------------------------------------------
-        // PENTING
-        //
-        // answers[item.id]! menggunakan tanda !
-        //
-        // Karena sebelumnya sudah divalidasi semua kriteria
-        // wajib mempunyai jawaban.
-        //
-        // Ini memperbaiki:
-        //
-        // Type 'string | undefined'
-        // is not assignable to type 'string'
-        //
+        // BENTUK DATA JAWABAN
         // ------------------------------------------------------
 
         const jawaban =
-          kriteria.map(
+          allIndikator.map(
             (
-              item
+              indikator
             ) => ({
-              kriteriaId:
-                item.id,
+              indikatorId:
+                indikator.id,
 
-              subKriteriaId:
+              nilai:
                 answers[
-                  item.id
+                  indikator.id
                 ]!,
             })
           )
@@ -971,9 +1053,7 @@ export function KuesionerPage() {
       />
 
 
-      {/* ======================================================
-          LOCK INFO
-      ====================================================== */}
+      {/* INFO TERKUNCI */}
 
       {isLocked && (
         <Card className="border-green-200 bg-green-50/50">
@@ -984,6 +1064,7 @@ export function KuesionerPage() {
               <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
 
               <div>
+
                 <p className="font-medium text-green-800">
                   Kuesioner telah dikirim
                 </p>
@@ -992,6 +1073,7 @@ export function KuesionerPage() {
                   Jawaban kuesioner tidak dapat diubah kembali
                   dan sedang menunggu proses selanjutnya.
                 </p>
+
               </div>
 
             </div>
@@ -1005,6 +1087,7 @@ export function KuesionerPage() {
 
       {error && (
         <Card className="border-red-200 bg-red-50">
+
           <CardContent className="p-4">
 
             <p className="text-sm text-red-600">
@@ -1012,14 +1095,16 @@ export function KuesionerPage() {
             </p>
 
           </CardContent>
+
         </Card>
       )}
 
 
-      {/* INFO */}
+      {/* PETUNJUK */}
 
       {!isLocked && (
         <Card className="border-blue-200 bg-blue-50/50">
+
           <CardContent className="p-4">
 
             <div className="flex gap-3">
@@ -1027,33 +1112,37 @@ export function KuesionerPage() {
               <HelpCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
 
               <div>
+
                 <p className="font-medium text-blue-800">
                   Petunjuk Pengisian
                 </p>
 
                 <p className="mt-1 text-sm text-blue-700">
-                  Pilih satu jawaban pada setiap kriteria sesuai
-                  kondisi Anda saat ini. Pastikan seluruh pertanyaan
-                  telah dijawab sebelum mengirim kuesioner.
+                  Jawab seluruh pertanyaan berdasarkan kondisi
+                  Anda saat ini. Setiap pertanyaan menggunakan
+                  skala nilai 1 sampai 5.
                 </p>
+
               </div>
 
             </div>
 
           </CardContent>
+
         </Card>
       )}
 
 
-      {/* ======================================================
-          DATA PENGAJUAN
-      ====================================================== */}
+      {/* DATA PENGAJUAN */}
 
       <Card>
+
         <CardHeader>
+
           <CardTitle className="text-base">
             Data Pengajuan
           </CardTitle>
+
         </CardHeader>
 
         <CardContent>
@@ -1061,6 +1150,7 @@ export function KuesionerPage() {
           <div className="grid gap-4 md:grid-cols-2">
 
             <div>
+
               <p className="text-xs text-slate-500">
                 Nama Lengkap
               </p>
@@ -1068,9 +1158,11 @@ export function KuesionerPage() {
               <p className="mt-1 font-medium text-slate-800">
                 {pengajuan.namaLengkap}
               </p>
+
             </div>
 
             <div>
+
               <p className="text-xs text-slate-500">
                 NIK
               </p>
@@ -1078,19 +1170,20 @@ export function KuesionerPage() {
               <p className="mt-1 font-medium text-slate-800">
                 {pengajuan.nik}
               </p>
+
             </div>
 
           </div>
 
         </CardContent>
+
       </Card>
 
 
-      {/* ======================================================
-          STATUS RUMAH
-      ====================================================== */}
+      {/* STATUS RUMAH */}
 
       <Card>
+
         <CardHeader>
 
           <CardTitle className="flex items-center gap-2 text-base">
@@ -1181,19 +1274,17 @@ export function KuesionerPage() {
           </div>
 
         </CardContent>
+
       </Card>
 
 
-      {/* ======================================================
-          KRITERIA
-      ====================================================== */}
+      {/* KRITERIA DAN INDIKATOR */}
 
       <div className="space-y-5">
 
         {kriteria.map(
           (
-            item,
-            index
+            item
           ) => (
             <Card
               key={
@@ -1206,7 +1297,7 @@ export function KuesionerPage() {
                 <CardTitle className="text-base leading-relaxed">
 
                   <span className="mr-2 text-green-600">
-                    {index + 1}.
+                    {item.kode}
                   </span>
 
                   {item.nama}
@@ -1223,82 +1314,89 @@ export function KuesionerPage() {
 
               <CardContent>
 
-                <div className="space-y-3">
+                <div className="space-y-5">
 
-                  {item.subKriteria.map(
+                  {item.indikator.map(
                     (
-                      sub
-                    ) => {
-                      const selected =
-                        answers[
-                          item.id
-                        ] ===
-                        sub.id
+                      indikator
+                    ) => (
+                      <div
+                        key={
+                          indikator.id
+                        }
+                        className="rounded-lg border border-slate-200 p-4"
+                      >
 
-                      return (
-                        <button
-                          key={
-                            sub.id
-                          }
-                          type="button"
-                          disabled={
-                            isLocked
-                          }
-                          onClick={() =>
-                            handleSelectAnswer(
-                              item.id,
-                              sub.id
-                            )
-                          }
-                          className={cn(
-                            'w-full rounded-lg border p-4 text-left transition-all',
+                        <div className="mb-4">
 
-                            selected
-                              ? 'border-green-600 bg-green-50 ring-1 ring-green-600'
-                              : 'border-slate-200 hover:border-green-400 hover:bg-slate-50',
+                          <p className="font-medium text-slate-800">
 
-                            isLocked &&
-                              'cursor-not-allowed opacity-80'
+                            <span className="mr-2 text-green-600">
+                              {indikator.kode}
+                            </span>
+
+                            {indikator.nama}
+
+                          </p>
+
+                          {indikator.deskripsi && (
+                            <p className="mt-1 text-sm text-slate-500">
+                              {indikator.deskripsi}
+                            </p>
                           )}
-                        >
 
-                          <div className="flex items-start gap-3">
+                        </div>
 
-                            <div
-                              className={cn(
-                                'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
+                        <div className="grid grid-cols-5 gap-2">
 
-                                selected
-                                  ? 'border-green-600 bg-green-600'
-                                  : 'border-slate-300 bg-white'
-                              )}
-                            >
+                          {NILAI_OPTIONS.map(
+                            (
+                              option
+                            ) => {
+                              const selected =
+                                answers[
+                                  indikator.id
+                                ] ===
+                                option.value
 
-                              {selected && (
-                                <CheckCircle className="h-3.5 w-3.5 text-white" />
-                              )}
+                              return (
+                                <button
+                                  key={
+                                    option.value
+                                  }
+                                  type="button"
+                                  disabled={
+                                    isLocked
+                                  }
+                                  onClick={() =>
+                                    handleSelectAnswer(
+                                      indikator.id,
+                                      option.value
+                                    )
+                                  }
+                                  className={cn(
+                                    'flex min-h-12 items-center justify-center rounded-lg border text-sm font-medium transition-all',
 
-                            </div>
+                                    selected
+                                      ? 'border-green-600 bg-green-600 text-white'
+                                      : 'border-slate-200 bg-white text-slate-700 hover:border-green-400 hover:bg-green-50',
 
-                            <div>
+                                    isLocked &&
+                                      'cursor-not-allowed opacity-80'
+                                  )}
+                                >
 
-                              <p className="font-medium text-slate-800">
-                                {sub.nama}
-                              </p>
+                                  {option.label}
 
-                              {sub.keterangan && (
-                                <p className="mt-1 text-sm text-slate-500">
-                                  {sub.keterangan}
-                                </p>
-                              )}
+                                </button>
+                              )
+                            }
+                          )}
 
-                            </div>
+                        </div>
 
-                          </div>
-
-                        </button>
-                      )
-                    }
+                      </div>
+                    )
                   )}
 
                 </div>
@@ -1312,9 +1410,7 @@ export function KuesionerPage() {
       </div>
 
 
-      {/* ======================================================
-          SUBMIT
-      ====================================================== */}
+      {/* SUBMIT */}
 
       {!isLocked && (
         <Card>
@@ -1328,7 +1424,7 @@ export function KuesionerPage() {
               }
               disabled={
                 submitting ||
-                kriteria.length === 0
+                allIndikator.length === 0
               }
             >
 
@@ -1353,9 +1449,7 @@ export function KuesionerPage() {
       )}
 
 
-      {/* ======================================================
-          LOCKED BUTTON
-      ====================================================== */}
+      {/* LOCKED BUTTON */}
 
       {isLocked && (
         <Card>
