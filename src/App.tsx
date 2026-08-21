@@ -20,7 +20,7 @@ import { PantauHasilPage } from '@/pages/user/PantauHasilPage'
 import { DetailHasilPage } from '@/pages/user/DetailHasilPage'
 import { ProfilPage } from '@/pages/user/ProfilPage'
 
-import AdminDashboardPage from '@/pages/admin/AdminDashboardPage'
+import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
 import DataMustahikPage from '@/pages/admin/DataMustahikPage'
 import { DetailMustahikPage } from '@/pages/admin/DetailMustahikPage'
 import { VerifikasiPage } from '@/pages/admin/VerifikasiPage'
