@@ -1,9 +1,36 @@
-import { Router } from 'express';
-import { createJawaban, getKuesioner, updateJawaban } from '../controllers/kuesioner.controller';
-import { authenticate } from '../middleware/auth.middleware';
-import { asyncHandler } from '../utils/async-handler';
-export const kuesionerRouter = Router();
-kuesionerRouter.use(authenticate);
-kuesionerRouter.get('/', asyncHandler(getKuesioner));
-kuesionerRouter.post('/jawaban', asyncHandler(createJawaban));
-kuesionerRouter.put('/jawaban', asyncHandler(updateJawaban));
+import { Router } from 'express'
+
+import {
+  getKuesioner,
+  createJawaban,
+  updateJawaban,
+} from '../controllers/kuesioner.controller'
+
+import {
+  auth,
+} from '../middleware/auth.middleware'
+
+const router = Router()
+
+// GET /api/kuesioner
+router.get(
+  '/',
+  auth,
+  getKuesioner
+)
+
+// POST /api/kuesioner/jawaban
+router.post(
+  '/jawaban',
+  auth,
+  createJawaban
+)
+
+// PUT /api/kuesioner/jawaban
+router.put(
+  '/jawaban',
+  auth,
+  updateJawaban
+)
+
+export default router

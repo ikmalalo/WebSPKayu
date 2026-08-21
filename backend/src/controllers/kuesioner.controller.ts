@@ -17,7 +17,33 @@ import {
 } from '../utils/api-response'
 
 // ============================================================
+// TYPE JAWABAN KUESIONER
+// ============================================================
+
+type JawabanInput = {
+  indikatorId: string
+  nilai: number
+}
+
+// ============================================================
 // GET KUESIONER
+// ============================================================
+//
+// Mengambil 5 kriteria dan 15 indikator aktif.
+//
+// Struktur:
+//
+// C1
+// ├── ID1
+// ├── ID2
+// └── ID3
+//
+// C2
+// ├── ID4
+// ├── ID5
+// └── ID6
+//
+// dan seterusnya.
 // ============================================================
 
 export async function getKuesioner(
@@ -32,9 +58,22 @@ export async function getKuesioner(
         },
 
         include: {
-          subKriteria: {
+          indikator: {
+            where: {
+              aktif: true,
+            },
+
             orderBy: {
-              nilai: 'asc',
+              urutan: 'asc',
+            },
+
+            select: {
+              id: true,
+              kode: true,
+              nama: true,
+              deskripsi: true,
+              tipe: true,
+              urutan: true,
             },
           },
         },
@@ -68,144 +107,197 @@ export async function getKuesioner(
 // ============================================================
 // VALIDASI JAWABAN
 // ============================================================
+//
+// Validasi:
+//
+// 1. Semua indikator aktif wajib dijawab.
+// 2. Tidak boleh ada indikator duplikat.
+// 3. indikatorId harus valid.
+// 4. Nilai harus berupa angka.
+// 5. Nilai harus berada pada rentang 1 sampai 5.
+// ============================================================
 
 async function validateAnswers(
-  jawaban: Array<{
-    kriteriaId: string
-    subKriteriaId: string
-  }>
+  jawaban: JawabanInput[]
 ) {
   // ----------------------------------------------------------
-  // Ambil semua kriteria aktif
+  // Ambil seluruh indikator aktif
   // ----------------------------------------------------------
 
-  const kriteria =
-    await prisma.kriteria.findMany({
+  const indikator =
+    await prisma.indikator.findMany({
       where: {
         aktif: true,
+
+        kriteria: {
+          aktif: true,
+        },
       },
 
       select: {
         id: true,
+        kode: true,
+        kriteriaId: true,
+        urutan: true,
+      },
+
+      orderBy: {
+        urutan: 'asc',
       },
     })
 
   // ----------------------------------------------------------
-  // Semua kriteria wajib dijawab
+  // Pastikan indikator tersedia
   // ----------------------------------------------------------
 
-  const kriteriaIds =
-    kriteria.map(
+  if (
+    indikator.length === 0
+  ) {
+    throw new Error(
+      'Data indikator kuesioner belum tersedia'
+    )
+  }
+
+  // ----------------------------------------------------------
+  // Ambil semua indikator yang seharusnya dijawab
+  // ----------------------------------------------------------
+
+  const indikatorIds =
+    indikator.map(
       (item) =>
         item.id
     )
 
-  const answeredCriteria =
+  // ----------------------------------------------------------
+  // Ambil indikator yang dijawab user
+  // ----------------------------------------------------------
+
+  const answeredIndikatorIds =
     jawaban.map(
       (item) =>
-        item.kriteriaId
+        item.indikatorId
     )
 
-  const missingCriteria =
-    kriteriaIds.filter(
+  // ----------------------------------------------------------
+  // Semua indikator wajib dijawab
+  // ----------------------------------------------------------
+
+  const missingIndikator =
+    indikatorIds.filter(
       (id) =>
-        !answeredCriteria.includes(
+        !answeredIndikatorIds.includes(
           id
         )
     )
 
   if (
-    missingCriteria.length >
-    0
+    missingIndikator.length > 0
   ) {
+    const missingCodes =
+      indikator
+        .filter(
+          (item) =>
+            missingIndikator.includes(
+              item.id
+            )
+        )
+        .map(
+          (item) =>
+            item.kode
+        )
+
     throw new Error(
-      'Semua pertanyaan kuesioner wajib dijawab'
+      `Semua pertanyaan wajib dijawab. Jawaban belum ditemukan untuk: ${missingCodes.join(
+        ', '
+      )}`
     )
   }
 
   // ----------------------------------------------------------
-  // Tidak boleh ada duplikat kriteria
+  // Tidak boleh ada indikator duplikat
   // ----------------------------------------------------------
 
-  const uniqueCriteria =
+  const uniqueIndikator =
     new Set(
-      answeredCriteria
+      answeredIndikatorIds
     )
 
   if (
-    uniqueCriteria.size !==
-    answeredCriteria.length
+    uniqueIndikator.size !==
+    answeredIndikatorIds.length
   ) {
     throw new Error(
-      'Terdapat jawaban kuesioner yang duplikat'
+      'Terdapat jawaban indikator yang duplikat'
     )
   }
 
   // ----------------------------------------------------------
-  // Ambil subkriteria
-  // ----------------------------------------------------------
-
-  const subKriteriaIds =
-    jawaban.map(
-      (item) =>
-        item.subKriteriaId
-    )
-
-  const subs =
-    await prisma.subKriteria.findMany(
-      {
-        where: {
-          id: {
-            in:
-              subKriteriaIds,
-          },
-        },
-      }
-    )
-
-  // ----------------------------------------------------------
-  // Jumlah harus sama
+  // Jumlah jawaban harus sama dengan indikator aktif
   // ----------------------------------------------------------
 
   if (
-    subs.length !==
-    subKriteriaIds.length
+    jawaban.length !==
+    indikator.length
   ) {
     throw new Error(
-      'Terdapat subkriteria yang tidak valid'
+      `Jumlah jawaban tidak sesuai. Kuesioner harus berisi ${indikator.length} jawaban.`
     )
   }
 
   // ----------------------------------------------------------
-  // Pastikan subkriteria memang milik kriteria
+  // Pastikan setiap indikatorId valid
+  // ----------------------------------------------------------
+
+  const invalidIndikatorIds =
+    answeredIndikatorIds.filter(
+      (id) =>
+        !indikatorIds.includes(
+          id
+        )
+    )
+
+  if (
+    invalidIndikatorIds.length > 0
+  ) {
+    throw new Error(
+      'Terdapat indikator yang tidak valid'
+    )
+  }
+
+  // ----------------------------------------------------------
+  // Validasi nilai
+  //
+  // Saat ini menggunakan skala 1-5.
   // ----------------------------------------------------------
 
   for (
-    const answer of jawaban
+    const item of jawaban
   ) {
-    const sub =
-      subs.find(
-        (
-          item
-        ) =>
-          item.id ===
-          answer.subKriteriaId
-      )
+    const nilai =
+      Number(item.nilai)
 
     if (
-      !sub ||
-      sub.kriteriaId !==
-        answer.kriteriaId
+      !Number.isFinite(
+        nilai
+      )
     ) {
       throw new Error(
-        'Subkriteria tidak sesuai dengan kriteria'
+        'Nilai jawaban harus berupa angka'
+      )
+    }
+
+    if (
+      nilai < 1 ||
+      nilai > 5
+    ) {
+      throw new Error(
+        'Nilai jawaban harus berada pada rentang 1 sampai 5'
       )
     }
   }
 
   return {
-    kriteria,
-    subs,
+    indikator,
   }
 }
 
@@ -213,13 +305,15 @@ async function validateAnswers(
 // SIMPAN JAWABAN
 // ============================================================
 //
-// PENTING:
+// Kuesioner hanya dapat dikirim SATU KALI.
 //
-// Fungsi ini hanya boleh dijalankan SATU KALI.
+// Setelah berhasil:
+// DRAFT
+//   ↓
+// MENUNGGU_VERIFIKASI
 //
-// Setelah pengajuan tidak lagi DRAFT,
-// user tidak boleh mengirim kuesioner lagi.
-//
+// Setelah status bukan DRAFT,
+// user tidak dapat mengirim ulang.
 // ============================================================
 
 async function saveAnswers(
@@ -236,10 +330,7 @@ async function saveAnswers(
       req.body as {
         pengajuanId?: string
 
-        jawaban?: Array<{
-          kriteriaId: string
-          subKriteriaId: string
-        }>
+        jawaban?: JawabanInput[]
 
         statusRumah?:
           | 'milik_sendiri'
@@ -265,8 +356,7 @@ async function saveAnswers(
       !Array.isArray(
         jawaban
       ) ||
-      jawaban.length ===
-        0
+      jawaban.length === 0
     ) {
       return fail(
         res,
@@ -274,6 +364,10 @@ async function saveAnswers(
         422
       )
     }
+
+    // ========================================================
+    // VALIDASI STATUS RUMAH
+    // ========================================================
 
     const validStatusRumah = [
       'milik_sendiri',
@@ -299,18 +393,19 @@ async function saveAnswers(
     // ========================================================
 
     const pengajuan =
-      await prisma.pengajuan.findUnique(
-        {
-          where: {
-            id:
-              pengajuanId,
-          },
+      await prisma.pengajuan.findUnique({
+        where: {
+          id: pengajuanId,
+        },
 
-          include: {
-            jawaban: true,
+        include: {
+          jawaban: {
+            select: {
+              id: true,
+            },
           },
-        }
-      )
+        },
+      })
 
     if (
       !pengajuan
@@ -323,12 +418,26 @@ async function saveAnswers(
     }
 
     // ========================================================
-    // CEK KEPEMILIKAN
+    // CEK AUTH
+    // ========================================================
+
+    if (
+      !req.auth
+    ) {
+      return fail(
+        res,
+        'Token autentikasi diperlukan',
+        401
+      )
+    }
+
+    // ========================================================
+    // CEK KEPEMILIKAN PENGAJUAN
     // ========================================================
 
     if (
       pengajuan.userId !==
-      req.auth!.userId
+      req.auth.userId
     ) {
       return fail(
         res,
@@ -338,7 +447,9 @@ async function saveAnswers(
     }
 
     // ========================================================
-    // CEK PENGAJUAN SUDAH PERNAH DIKIRIM
+    // CEK STATUS
+    //
+    // Kuesioner hanya dapat dikirim ketika DRAFT.
     // ========================================================
 
     if (
@@ -353,13 +464,11 @@ async function saveAnswers(
     }
 
     // ========================================================
-    // CEK DATABASE
+    // CEK JAWABAN YANG SUDAH ADA
     // ========================================================
 
     if (
-      pengajuan.jawaban &&
-      pengajuan.jawaban.length >
-        0
+      pengajuan.jawaban.length > 0
     ) {
       return fail(
         res,
@@ -369,16 +478,13 @@ async function saveAnswers(
     }
 
     // ========================================================
-    // VALIDASI JAWABAN
+    // VALIDASI SELURUH JAWABAN
     // ========================================================
 
-    let validated
-
     try {
-      validated =
-        await validateAnswers(
-          jawaban
-        )
+      await validateAnswers(
+        jawaban
+      )
     } catch (
       validationError
     ) {
@@ -392,10 +498,6 @@ async function saveAnswers(
       )
     }
 
-    const {
-      subs,
-    } = validated
-
     // ========================================================
     // SIMPAN DALAM SATU TRANSACTION
     // ========================================================
@@ -406,53 +508,37 @@ async function saveAnswers(
       ) => {
 
         // ----------------------------------------------------
-        // Simpan semua jawaban TOPSIS
+        // Simpan 15 jawaban indikator
         // ----------------------------------------------------
 
-        for (
-          const item of jawaban
-        ) {
-          const sub =
-            subs.find(
-              (
-                value
-              ) =>
-                value.id ===
-                item.subKriteriaId
-            )
-
-          if (
-            !sub
-          ) {
-            throw new Error(
-              'Subkriteria tidak ditemukan'
-            )
-          }
-
-          await tx.jawabanKuesioner.create(
-            {
-              data: {
+        await tx.jawabanKuesioner.createMany({
+          data:
+            jawaban.map(
+              (item) => ({
                 pengajuanId,
-                kriteriaId:
-                  item.kriteriaId,
-                subKriteriaId:
-                  item.subKriteriaId,
+
+                indikatorId:
+                  item.indikatorId,
+
                 nilai:
-                  sub.nilai,
-              },
-            }
-          )
-        }
+                  Number(
+                    item.nilai
+                  ),
+              })
+            ),
+        })
 
         // ----------------------------------------------------
-        // Simpan Status Rumah ke Mustahik.
+        // Simpan status rumah.
         //
-        // Status Rumah BUKAN kriteria TOPSIS.
+        // Status rumah bukan bagian dari
+        // perhitungan TOPSIS baru.
         // ----------------------------------------------------
 
         await tx.mustahik.update({
           where: {
-            id: pengajuan.mustahikId,
+            id:
+              pengajuan.mustahikId,
           },
 
           data: {
@@ -461,25 +547,26 @@ async function saveAnswers(
         })
 
         // ----------------------------------------------------
-        // Setelah semua data berhasil disimpan,
-        // baru ubah status pengajuan.
+        // Ubah status pengajuan
+        //
+        // DRAFT
+        //   ↓
+        // MENUNGGU_VERIFIKASI
         // ----------------------------------------------------
 
-        await tx.pengajuan.update(
-          {
-            where: {
-              id:
-                pengajuanId,
-            },
+        await tx.pengajuan.update({
+          where: {
+            id: pengajuanId,
+          },
 
-            data: {
-              status:
-                PengajuanStatus.MENUNGGU_VERIFIKASI,
+          data: {
+            status:
+              PengajuanStatus.MENUNGGU_VERIFIKASI,
 
-              catatan: null,
-            },
-          }
-        )
+            catatan:
+              null,
+          },
+        })
       }
     )
 
@@ -517,7 +604,6 @@ async function saveAnswers(
 // CREATE JAWABAN
 // ============================================================
 //
-// Endpoint:
 // POST /kuesioner/jawaban
 //
 // Hanya untuk pengiriman pertama.
@@ -537,10 +623,12 @@ export const createJawaban = (
 // UPDATE JAWABAN
 // ============================================================
 //
-// Endpoint ini tetap dipertahankan supaya route lama
-// tidak rusak.
+// Endpoint dipertahankan agar route lama tidak rusak.
 //
-// Namun kuesioner tidak dapat diubah lagi setelah submit.
+// Namun karena saveAnswers hanya menerima
+// pengajuan dengan status DRAFT, setelah submit
+// endpoint ini otomatis tidak dapat digunakan
+// untuk mengubah jawaban.
 // ============================================================
 
 export const updateJawaban = (
