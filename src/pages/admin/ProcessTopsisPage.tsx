@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useState,
 } from 'react'
 
@@ -33,14 +34,11 @@ import {
 } from '@/components/ui/tabs'
 
 import {
-  Input,
-} from '@/components/ui/input'
-
-import {
   PageHeader,
 } from '@/components/shared/PageHeader'
 
 import {
+  getAdminKriteria,
   getAdminTopsisCandidates,
   getAdminTopsisResults,
   processAdminTopsis,
@@ -48,6 +46,25 @@ import {
   type AdminTopsisCandidate,
   type AdminTopsisResult,
 } from '@/lib/adminApi'
+
+// ============================================================
+// HELPER
+// ============================================================
+
+function toNumber(
+  value: number | string | null | undefined
+): number {
+  const numberValue =
+    Number(value ?? 0)
+
+  return Number.isFinite(numberValue)
+    ? numberValue
+    : 0
+}
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export function ProcessTopsisPage() {
   const navigate =
@@ -66,8 +83,6 @@ export function ProcessTopsisPage() {
 
   // ==========================================================
   // STATE KANDIDAT
-  //
-  // Ini digunakan untuk Matriks X sebelum proses TOPSIS.
   // ==========================================================
 
   const [
@@ -78,9 +93,7 @@ export function ProcessTopsisPage() {
   >([])
 
   // ==========================================================
-  // STATE HASIL TOPSIS
-  //
-  // Ini baru terisi setelah admin menghitung TOPSIS.
+  // STATE HASIL
   // ==========================================================
 
   const [
@@ -91,22 +104,8 @@ export function ProcessTopsisPage() {
   >([])
 
   // ==========================================================
-  // THRESHOLD
-  // ==========================================================
-
-  const [
-    threshold,
-    setThreshold,
-  ] = useState(0.6)
-
-  // ==========================================================
   // LOADING
   // ==========================================================
-
-  const [
-    processing,
-    setProcessing,
-  ] = useState(false)
 
   const [
     loading,
@@ -114,9 +113,60 @@ export function ProcessTopsisPage() {
   ] = useState(true)
 
   const [
+    processing,
+    setProcessing,
+  ] = useState(false)
+
+  const [
     error,
     setError,
   ] = useState('')
+
+  // ==========================================================
+  // KRITERIA SORTED
+  // ==========================================================
+
+  const sortedKriteria =
+    useMemo(
+      () =>
+        [...kriteria].sort(
+          (
+            a,
+            b
+          ) => {
+            const getOrder =
+              (
+                kode: string
+              ) => {
+                const number =
+                  Number(
+                    kode.replace(
+                      /\D/g,
+                      ''
+                    )
+                  )
+
+                return Number.isFinite(
+                  number
+                )
+                  ? number
+                  : 0
+              }
+
+            return (
+              getOrder(
+                a.kode
+              ) -
+              getOrder(
+                b.kode
+              )
+            )
+          }
+        ),
+      [
+        kriteria,
+      ]
+    )
 
   // ==========================================================
   // LOAD DATA
@@ -131,48 +181,27 @@ export function ProcessTopsisPage() {
 
         setError('')
 
-        // ------------------------------------------------------
-        // Kandidat TOPSIS dan hasil TOPSIS diambil terpisah.
-        //
-        // Kandidat:
-        // Pengajuan + Jawaban Kuesioner
-        //
-        // Hasil:
-        // TopsisResult
-        // ------------------------------------------------------
-
         const [
+          kriteriaData,
           candidateData,
           resultData,
         ] =
           await Promise.all([
+            getAdminKriteria(),
             getAdminTopsisCandidates(),
             getAdminTopsisResults(),
           ])
 
-        // ------------------------------------------------------
-        // KRITERIA
-        // ------------------------------------------------------
-
         setKriteria(
-          candidateData.criteria
+          kriteriaData
         )
-
-        // ------------------------------------------------------
-        // KANDIDAT
-        //
-        // IKmal akan muncul di sini meskipun belum ada
-        // TopsisResult.
-        // ------------------------------------------------------
 
         setCandidates(
           candidateData.candidates
         )
 
         // ------------------------------------------------------
-        // HASIL TOPSIS
-        //
-        // Ambil hasil terbaru untuk setiap pengajuan.
+        // Ambil hanya hasil terbaru setiap pengajuan
         // ------------------------------------------------------
 
         const latestByPengajuan =
@@ -182,25 +211,25 @@ export function ProcessTopsisPage() {
           >()
 
         for (
-          const item of resultData
+          const result of resultData
         ) {
           const existing =
             latestByPengajuan.get(
-              item.pengajuanId
+              result.pengajuanId
             )
 
           if (
             !existing ||
             new Date(
-              item.tanggalProses
+              result.tanggalProses
             ).getTime() >
               new Date(
                 existing.tanggalProses
               ).getTime()
           ) {
             latestByPengajuan.set(
-              item.pengajuanId,
-              item
+              result.pengajuanId,
+              result
             )
           }
         }
@@ -221,7 +250,7 @@ export function ProcessTopsisPage() {
           latestResults
         )
       } catch (
-        err: any
+        err: unknown
       ) {
         console.error(
           'GET TOPSIS PAGE ERROR:',
@@ -229,9 +258,9 @@ export function ProcessTopsisPage() {
         )
 
         setError(
-          err.response
-            ?.data?.message ||
-            'Gagal mengambil data TOPSIS.'
+          err instanceof Error
+            ? err.message
+            : 'Gagal mengambil data TOPSIS.'
         )
       } finally {
         setLoading(
@@ -246,60 +275,244 @@ export function ProcessTopsisPage() {
 
   useEffect(
     () => {
-      load()
+      void load()
     },
     []
   )
 
   // ==========================================================
-  // HELPER HASIL
+  // GET DETAIL TOPSIS
   // ==========================================================
 
-  const getDetail = (
-    result: AdminTopsisResult,
-    kriteriaId: string
-  ) =>
-    result.details?.find(
-      (detail) =>
-        detail.kriteriaId ===
-        kriteriaId
+  const getDetail =
+    (
+      result: AdminTopsisResult,
+      kriteriaId: string
+    ) =>
+      result.details?.find(
+        (
+          detail
+        ) =>
+          detail.kriteriaId ===
+          kriteriaId
+      )
+
+  // ==========================================================
+  // GET CANDIDATE NAME
+  // ==========================================================
+
+  const getCandidateName =
+    (
+      candidate: AdminTopsisCandidate
+    ) =>
+      candidate.mustahik
+        ?.namaLengkap ||
+      candidate.user
+        ?.name ||
+      '-'
+
+  // ==========================================================
+  // GET RESULT NAME
+  // ==========================================================
+
+  const getResultName =
+    (
+      result: AdminTopsisResult
+    ) =>
+      result.pengajuan
+        ?.mustahik
+        ?.namaLengkap ||
+      result.mustahik
+        ?.namaLengkap ||
+      result.pengajuan
+        ?.user
+        ?.name ||
+      '-'
+
+  // ==========================================================
+  // MATRIKS X
+  //
+  // Sistem baru memiliki:
+  //
+  // 15 indikator:
+  // ID1 - ID15
+  //
+  // yang dibentuk menjadi:
+  //
+  // C1 - C5
+  //
+  // Untuk tampilan sebelum proses, nilai C1-C5
+  // diambil dari rata-rata indikator yang termasuk
+  // ke masing-masing kriteria.
+  // ==========================================================
+
+  const getCandidateCriterionValue =
+    (
+      candidate: AdminTopsisCandidate,
+      criterion: AdminKriteria
+    ): number => {
+      const indikatorIds =
+        criterion.indikator?.map(
+          (
+            indikator
+          ) =>
+            indikator.id
+        ) ?? []
+
+      const indikatorCodes =
+        criterion.indikator?.map(
+          (
+            indikator
+          ) =>
+            indikator.kode
+        ) ?? []
+
+      const answers =
+        candidate.jawaban.filter(
+          (
+            answer
+          ) => {
+            if (
+              answer.indikatorId &&
+              indikatorIds.includes(
+                answer.indikatorId
+              )
+            ) {
+              return true
+            }
+
+            if (
+              answer.kode &&
+              indikatorCodes.includes(
+                answer.kode
+              )
+            ) {
+              return true
+            }
+
+            return false
+          }
+        )
+
+      if (
+        answers.length === 0
+      ) {
+        return 0
+      }
+
+      const total =
+        answers.reduce(
+          (
+            sum,
+            answer
+          ) => {
+            const nilai =
+              toNumber(
+                answer.nilai
+              )
+
+            return (
+              sum +
+              nilai
+            )
+          },
+          0
+        )
+
+      return (
+        total /
+        answers.length
+      )
+    }
+
+  // ==========================================================
+  // MATRIKS X KANDIDAT
+  // ==========================================================
+
+  const candidateMatrix =
+    useMemo(
+      () =>
+        candidates.map(
+          (
+            candidate
+          ) =>
+            sortedKriteria.map(
+              (
+                criterion
+              ) =>
+                getCandidateCriterionValue(
+                  candidate,
+                  criterion
+                )
+            )
+        ),
+      [
+        candidates,
+        sortedKriteria,
+      ]
     )
 
   // ==========================================================
-  // MATRIX X DARI HASIL TOPSIS
-  //
-  // Dipakai setelah TOPSIS sudah dihitung.
+  // MATRIKS NORMALISASI
   // ==========================================================
 
-  const resultWeightedMatrix =
+  const normalizedMatrix =
     results.map(
-      (result) =>
-        kriteria.map(
-          (criterion) =>
-            Number(
+      (
+        result
+      ) =>
+        sortedKriteria.map(
+          (
+            criterion
+          ) =>
+            toNumber(
               getDetail(
                 result,
                 criterion.id
               )
-                ?.nilaiTerbobot ??
-                0
+                ?.nilaiNormalisasi
             )
         )
     )
 
   // ==========================================================
-  // IDEAL POSITIVE
+  // MATRIKS TERBOBOT
+  // ==========================================================
+
+  const weightedMatrix =
+    results.map(
+      (
+        result
+      ) =>
+        sortedKriteria.map(
+          (
+            criterion
+          ) =>
+            toNumber(
+              getDetail(
+                result,
+                criterion.id
+              )
+                ?.nilaiTerbobot
+            )
+        )
+    )
+
+  // ==========================================================
+  // IDEAL POSITIVE A+
   // ==========================================================
 
   const idealPositive =
-    kriteria.map(
+    sortedKriteria.map(
       (
         criterion,
         index
       ) => {
         const values =
-          resultWeightedMatrix.map(
-            (row) =>
+          weightedMatrix.map(
+            (
+              row
+            ) =>
               row[index]
           )
 
@@ -309,30 +522,36 @@ export function ProcessTopsisPage() {
           return 0
         }
 
-        return criterion.tipe ===
+        if (
+          criterion.tipe ===
           'BENEFIT'
-          ? Math.max(
-              ...values
-            )
-          : Math.min(
-              ...values
-            )
+        ) {
+          return Math.max(
+            ...values
+          )
+        }
+
+        return Math.min(
+          ...values
+        )
       }
     )
 
   // ==========================================================
-  // IDEAL NEGATIVE
+  // IDEAL NEGATIVE A-
   // ==========================================================
 
   const idealNegative =
-    kriteria.map(
+    sortedKriteria.map(
       (
         criterion,
         index
       ) => {
         const values =
-          resultWeightedMatrix.map(
-            (row) =>
+          weightedMatrix.map(
+            (
+              row
+            ) =>
               row[index]
           )
 
@@ -342,34 +561,41 @@ export function ProcessTopsisPage() {
           return 0
         }
 
-        return criterion.tipe ===
+        if (
+          criterion.tipe ===
           'BENEFIT'
-          ? Math.min(
-              ...values
-            )
-          : Math.max(
-              ...values
-            )
+        ) {
+          return Math.min(
+            ...values
+          )
+        }
+
+        return Math.max(
+          ...values
+        )
       }
     )
 
   // ==========================================================
-  // DISTANCES
+  // DISTANCE D+ D-
   // ==========================================================
 
   const distances =
     results.map(
-      (result) => {
+      (
+        result
+      ) => {
         const weighted =
-          kriteria.map(
-            (criterion) =>
-              Number(
+          sortedKriteria.map(
+            (
+              criterion
+            ) =>
+              toNumber(
                 getDetail(
                   result,
                   criterion.id
                 )
-                  ?.nilaiTerbobot ??
-                  0
+                  ?.nilaiTerbobot
               )
           )
 
@@ -419,8 +645,10 @@ export function ProcessTopsisPage() {
           0
             ? 0
             : dMinus /
-              (dPlus +
-                dMinus)
+              (
+                dPlus +
+                dMinus
+              )
 
         return {
           result,
@@ -444,40 +672,25 @@ export function ProcessTopsisPage() {
 
         setError('')
 
-        // ------------------------------------------------------
-        // Backend akan mengambil SEMUA alternatif lengkap
-        // dan menghitungnya dalam satu matriks.
-        // ------------------------------------------------------
-
-        await processAdminTopsis(
-          threshold
-        )
-
-        // ------------------------------------------------------
-        // Reload agar kandidat + hasil terbaru masuk.
-        // ------------------------------------------------------
+        await processAdminTopsis()
 
         await load()
-
-        // ------------------------------------------------------
-        // Setelah berhasil langsung ke ranking.
-        // ------------------------------------------------------
 
         navigate(
           '/admin/ranking'
         )
       } catch (
-        err: any
+        err: unknown
       ) {
         console.error(
-          'PROCESS TOPSIS PAGE ERROR:',
+          'PROCESS TOPSIS ERROR:',
           err
         )
 
         setError(
-          err.response
-            ?.data?.message ||
-            'Gagal menjalankan TOPSIS.'
+          err instanceof Error
+            ? err.message
+            : 'Gagal menjalankan perhitungan TOPSIS.'
         )
       } finally {
         setProcessing(
@@ -506,38 +719,32 @@ export function ProcessTopsisPage() {
     <div className="space-y-6">
       <PageHeader
         title="Proses Perhitungan TOPSIS"
-        description="Perhitungan dilakukan oleh backend menggunakan data kuesioner dari database"
+        description="Perhitungan dilakukan menggunakan 15 indikator yang dibentuk menjadi 5 kriteria TOPSIS."
       >
         <div className="flex items-center gap-2">
-          <Input
-            type="number"
-            min="0"
-            max="1"
-            step="0.01"
-            className="w-24"
-            value={
-              threshold
+          <Button
+            variant="outline"
+            onClick={() => {
+              void load()
+            }}
+            disabled={
+              loading ||
+              processing
             }
-            onChange={(
-              event
-            ) =>
-              setThreshold(
-                Number(
-                  event.target
-                    .value
-                )
-              )
-            }
-          />
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+
+            Muat Ulang
+          </Button>
 
           <Button
-            onClick={
-              handleProcess
-            }
+            onClick={() => {
+              void handleProcess()
+            }}
             disabled={
               processing ||
-              candidates.length <
-                2
+              candidates.length === 0 ||
+              sortedKriteria.length === 0
             }
             className="bg-green-600 hover:bg-green-700 text-white"
           >
@@ -569,37 +776,70 @@ export function ProcessTopsisPage() {
       <Card className="border-green-300 bg-green-50/40">
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-green-600 mt-0.5" />
+            <Info className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
 
             <div>
               <p className="text-sm font-semibold">
-                TOPSIS dihitung di Backend
+                Perhitungan TOPSIS
               </p>
 
               <p className="text-xs text-slate-600 mt-1">
-                Sistem menggunakan seluruh
-                pengajuan yang sudah lolos
-                verifikasi dan memiliki
-                jawaban kuesioner lengkap
-                sebagai alternatif TOPSIS.
+                Sistem menggunakan 15 indikator
+                kuesioner yang dikelompokkan
+                menjadi 5 kriteria, kemudian
+                proses normalisasi, pembobotan,
+                solusi ideal, jarak, dan nilai
+                preferensi dihitung oleh backend.
               </p>
 
-              <p className="text-xs text-slate-600 mt-1">
-                Jumlah alternatif siap diproses:{' '}
-                <strong>
-                  {
-                    candidates.length
-                  }{' '}
-                  mustahik
-                </strong>
-              </p>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-xs text-slate-600">
+                <p>
+                  Kriteria:{' '}
+                  <strong>
+                    {
+                      sortedKriteria.length
+                    }
+                  </strong>
+                </p>
 
-              <p className="text-xs text-slate-600 mt-1">
-                Threshold kelayakan:{' '}
-                <strong>
-                  {threshold}
-                </strong>
-              </p>
+                <p>
+                  Indikator:{' '}
+                  <strong>
+                    {sortedKriteria.reduce(
+                      (
+                        total,
+                        criterion
+                      ) =>
+                        total +
+                        (
+                          criterion
+                            .indikator
+                            ?.length ??
+                          0
+                        ),
+                      0
+                    )}
+                  </strong>
+                </p>
+
+                <p>
+                  Alternatif siap diproses:{' '}
+                  <strong>
+                    {
+                      candidates.length
+                    }
+                  </strong>
+                </p>
+
+                <p>
+                  Hasil tersimpan:{' '}
+                  <strong>
+                    {
+                      results.length
+                    }
+                  </strong>
+                </p>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -648,7 +888,8 @@ export function ProcessTopsisPage() {
               0 ? (
                 <div className="py-10 text-center text-slate-500">
                   Belum ada pengajuan yang
-                  memenuhi syarat TOPSIS.
+                  memenuhi syarat untuk
+                  diproses dengan TOPSIS.
                 </div>
               ) : (
                 <table className="data-table w-full">
@@ -662,17 +903,17 @@ export function ProcessTopsisPage() {
                         Status
                       </th>
 
-                      {kriteria.map(
+                      {sortedKriteria.map(
                         (
-                          item
+                          criterion
                         ) => (
                           <th
                             key={
-                              item.id
+                              criterion.id
                             }
                           >
                             {
-                              item.kode
+                              criterion.kode
                             }
                           </th>
                         )
@@ -683,19 +924,18 @@ export function ProcessTopsisPage() {
                   <tbody>
                     {candidates.map(
                       (
-                        candidate
+                        candidate,
+                        candidateIndex
                       ) => (
                         <tr
                           key={
-                            candidate.pengajuanId
+                            candidate.id
                           }
                         >
                           <td className="font-semibold">
-                            {
+                            {getCandidateName(
                               candidate
-                                .mustahik
-                                .namaLengkap
-                            }
+                            )}
                           </td>
 
                           <td>
@@ -706,34 +946,26 @@ export function ProcessTopsisPage() {
                             </span>
                           </td>
 
-                          {kriteria.map(
+                          {candidateMatrix[
+                            candidateIndex
+                          ]?.map(
                             (
-                              criterion
-                            ) => {
-                              const answer =
-                                candidate.jawaban.find(
-                                  (
-                                    item
-                                  ) =>
-                                    item.kriteriaId ===
-                                    criterion.id
-                                )
-
-                              return (
-                                <td
-                                  key={
-                                    criterion.id
-                                  }
-                                  className="text-center font-mono"
-                                >
-                                  {
-                                    answer
-                                      ?.nilai ??
-                                      0
-                                  }
-                                </td>
-                              )
-                            }
+                              value,
+                              index
+                            ) => (
+                              <td
+                                key={
+                                  sortedKriteria[
+                                    index
+                                  ]?.id
+                                }
+                                className="text-center font-mono"
+                              >
+                                {value.toFixed(
+                                  4
+                                )}
+                              </td>
+                            )
                           )}
                         </tr>
                       )
@@ -772,17 +1004,17 @@ export function ProcessTopsisPage() {
                         Mustahik
                       </th>
 
-                      {kriteria.map(
+                      {sortedKriteria.map(
                         (
-                          item
+                          criterion
                         ) => (
                           <th
                             key={
-                              item.id
+                              criterion.id
                             }
                           >
                             {
-                              item.kode
+                              criterion.kode
                             }
                           </th>
                         )
@@ -793,7 +1025,8 @@ export function ProcessTopsisPage() {
                   <tbody>
                     {results.map(
                       (
-                        result
+                        result,
+                        resultIndex
                       ) => (
                         <tr
                           key={
@@ -801,33 +1034,28 @@ export function ProcessTopsisPage() {
                           }
                         >
                           <td className="font-semibold">
-                            {
+                            {getResultName(
                               result
-                                .pengajuan
-                                ?.mustahik
-                                ?.namaLengkap
-                            }
+                            )}
                           </td>
 
-                          {kriteria.map(
+                          {normalizedMatrix[
+                            resultIndex
+                          ]?.map(
                             (
-                              criterion
+                              value,
+                              index
                             ) => (
                               <td
                                 key={
-                                  criterion.id
+                                  sortedKriteria[
+                                    index
+                                  ]?.id
                                 }
                                 className="text-center font-mono"
                               >
-                                {Number(
-                                  getDetail(
-                                    result,
-                                    criterion.id
-                                  )
-                                    ?.nilaiNormalisasi ??
-                                    0
-                                ).toFixed(
-                                  4
+                                {value.toFixed(
+                                  6
                                 )}
                               </td>
                             )
@@ -850,7 +1078,7 @@ export function ProcessTopsisPage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                Matriks Terbobot (Y)
+                Matriks Normalisasi Terbobot (Y)
               </CardTitle>
             </CardHeader>
 
@@ -869,17 +1097,17 @@ export function ProcessTopsisPage() {
                         Mustahik
                       </th>
 
-                      {kriteria.map(
+                      {sortedKriteria.map(
                         (
-                          item
+                          criterion
                         ) => (
                           <th
                             key={
-                              item.id
+                              criterion.id
                             }
                           >
                             {
-                              item.kode
+                              criterion.kode
                             }
                           </th>
                         )
@@ -890,7 +1118,8 @@ export function ProcessTopsisPage() {
                   <tbody>
                     {results.map(
                       (
-                        result
+                        result,
+                        resultIndex
                       ) => (
                         <tr
                           key={
@@ -898,33 +1127,28 @@ export function ProcessTopsisPage() {
                           }
                         >
                           <td className="font-semibold">
-                            {
+                            {getResultName(
                               result
-                                .pengajuan
-                                ?.mustahik
-                                ?.namaLengkap
-                            }
+                            )}
                           </td>
 
-                          {kriteria.map(
+                          {weightedMatrix[
+                            resultIndex
+                          ]?.map(
                             (
-                              criterion
+                              value,
+                              index
                             ) => (
                               <td
                                 key={
-                                  criterion.id
+                                  sortedKriteria[
+                                    index
+                                  ]?.id
                                 }
                                 className="text-center font-mono"
                               >
-                                {Number(
-                                  getDetail(
-                                    result,
-                                    criterion.id
-                                  )
-                                    ?.nilaiTerbobot ??
-                                    0
-                                ).toFixed(
-                                  4
+                                {value.toFixed(
+                                  6
                                 )}
                               </td>
                             )
@@ -940,7 +1164,7 @@ export function ProcessTopsisPage() {
         </TabsContent>
 
         {/* ====================================================
-            4. SOLUSI IDEAL + JARAK
+            4. SOLUSI IDEAL
         ==================================================== */}
 
         <TabsContent value="solusi">
@@ -1010,30 +1234,30 @@ export function ProcessTopsisPage() {
                               }
                             >
                               <td className="font-semibold">
-                                {
-                                  item
-                                    .result
-                                    .pengajuan
-                                    ?.mustahik
-                                    ?.namaLengkap
-                                }
+                                {getResultName(
+                                  item.result
+                                )}
                               </td>
 
                               <td className="font-mono">
                                 {item.dPlus.toFixed(
-                                  4
+                                  6
                                 )}
                               </td>
 
                               <td className="font-mono">
                                 {item.dMinus.toFixed(
-                                  4
+                                  6
                                 )}
                               </td>
 
                               <td className="font-mono font-bold text-green-700">
-                                {item.preference.toFixed(
-                                  4
+                                {toNumber(
+                                  item
+                                    .result
+                                    .nilaiPreferensi
+                                ).toFixed(
+                                  6
                                 )}
                               </td>
 
@@ -1051,9 +1275,9 @@ export function ProcessTopsisPage() {
                     </tbody>
                   </table>
 
-                  {/* ==================================================
+                  {/* ==========================================
                       A+
-                  ================================================== */}
+                  =========================================== */}
 
                   <div className="mt-5 p-4 rounded-lg bg-slate-50 border">
                     <p className="text-sm font-semibold">
@@ -1061,7 +1285,7 @@ export function ProcessTopsisPage() {
                     </p>
 
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
-                      {kriteria.map(
+                      {sortedKriteria.map(
                         (
                           criterion,
                           index
@@ -1079,12 +1303,10 @@ export function ProcessTopsisPage() {
                             </p>
 
                             <p className="font-mono font-bold">
-                              {Number(
-                                idealPositive[
-                                  index
-                                ]
-                              ).toFixed(
-                                4
+                              {idealPositive[
+                                index
+                              ]?.toFixed(
+                                6
                               )}
                             </p>
                           </div>
@@ -1092,16 +1314,16 @@ export function ProcessTopsisPage() {
                       )}
                     </div>
 
-                    {/* ================================================
+                    {/* ========================================
                         A-
-                    ================================================= */}
+                    ========================================= */}
 
                     <p className="text-sm font-semibold mt-5">
                       Solusi Ideal Negatif (A-)
                     </p>
 
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
-                      {kriteria.map(
+                      {sortedKriteria.map(
                         (
                           criterion,
                           index
@@ -1119,12 +1341,10 @@ export function ProcessTopsisPage() {
                             </p>
 
                             <p className="font-mono font-bold">
-                              {Number(
-                                idealNegative[
-                                  index
-                                ]
-                              ).toFixed(
-                                4
+                              {idealNegative[
+                                index
+                              ]?.toFixed(
+                                6
                               )}
                             </p>
                           </div>
