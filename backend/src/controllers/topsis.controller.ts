@@ -5,41 +5,210 @@ import type {
 
 import {
   PengajuanStatus,
+  KriteriaTipe,
+  Prisma,
 } from '@prisma/client'
 
-import { prisma } from '../config/prisma'
+import {
+  prisma,
+} from '../config/prisma'
 
 import {
   fail,
   success,
 } from '../utils/api-response'
 
-import {
-  calculateTopsis,
-} from '../services/topsis/topsis.service'
+// ============================================================
+// TYPES
+// ============================================================
+
+type NilaiKriteria = {
+  kriteriaId: string
+  kode: string
+  nilai: number
+  bobot: number
+  tipe: KriteriaTipe
+}
+
+type MatriksNilai = {
+  pengajuanId: string
+  nilai: Record<string, number>
+}
+
+type HasilPerhitungan = {
+  pengajuanId: string
+  nilaiPreferensi: number
+  ranking: number
+  status: PengajuanStatus
+  details: Array<{
+    kriteriaId: string
+    nilaiAwal: number
+    nilaiNormalisasi: number
+    nilaiTerbobot: number
+  }>
+}
 
 // ============================================================
-// GET KANDIDAT TOPSIS
+// HELPER
+// ============================================================
+
+function decimal(
+  value: number
+): Prisma.Decimal {
+  return new Prisma.Decimal(
+    value.toFixed(8)
+  )
+}
+
+function round(
+  value: number,
+  digits = 6
+): number {
+  if (
+    !Number.isFinite(value)
+  ) {
+    return 0
+  }
+
+  const factor =
+    Math.pow(10, digits)
+
+  return (
+    Math.round(
+      (value + Number.EPSILON) *
+      factor
+    ) / factor
+  )
+}
+
+// ============================================================
+// PEMBENTUKAN NILAI KRITERIA C1 - C5
 // ============================================================
 //
-// Endpoint:
+// Struktur:
 //
-// GET /api/admin/topsis/candidates
+// C1 = rata-rata ID1, ID2, ID3
+// C2 = rata-rata ID4, ID5, ID6*
+// C3 = rata-rata ID7, ID8, ID9
+// C4 = rata-rata ID10, ID11, ID12
+// C5 = rata-rata ID13, ID14, ID15
 //
-// Fungsi:
+// Untuk indikator NEGATIF:
 //
-// Mengambil calon alternatif TOPSIS berdasarkan data:
+// nilai dibalik dengan:
 //
-// Pengajuan
-//     +
-// JawabanKuesioner
+// 6 - nilai
 //
-// Jadi halaman Proses TOPSIS tidak bergantung kepada
-// TopsisResult.
+// Contoh:
+// nilai 5 -> 1
+// nilai 4 -> 2
+// nilai 3 -> 3
+// nilai 2 -> 4
+// nilai 1 -> 5
 //
-// Ini penting karena sebelum tombol "Hitung TOPSIS"
-// ditekan, TopsisResult memang belum ada.
+// Dengan demikian seluruh nilai kriteria
+// berada pada orientasi yang sama:
+// semakin besar semakin baik.
+// ============================================================
+
+function hitungNilaiKriteria(
+  kriteria: Array<{
+    id: string
+    kode: string
+    bobot: Prisma.Decimal
+    tipe: KriteriaTipe
+    indikator: Array<{
+      id: string
+      tipe: 'POSITIF' | 'NEGATIF'
+    }>
+  }>,
+  jawabanMap: Map<
+    string,
+    number
+  >
+): NilaiKriteria[] {
+  return kriteria.map(
+    (item) => {
+      const nilaiIndikator =
+        item.indikator.map(
+          (indikator) => {
+            const nilai =
+              jawabanMap.get(
+                indikator.id
+              ) ?? 0
+
+            // ----------------------------------------------
+            // Indikator negatif
+            // ----------------------------------------------
+
+            if (
+              indikator.tipe ===
+              'NEGATIF'
+            ) {
+              return 6 - nilai
+            }
+
+            return nilai
+          }
+        )
+
+      // ----------------------------------------------
+      // Nilai C1 - C5
+      // ----------------------------------------------
+
+      const total =
+        nilaiIndikator.reduce(
+          (
+            sum,
+            nilai
+          ) =>
+            sum + nilai,
+          0
+        )
+
+      const nilai =
+        nilaiIndikator.length > 0
+          ? total /
+            nilaiIndikator.length
+          : 0
+
+      return {
+        kriteriaId:
+          item.id,
+
+        kode:
+          item.kode,
+
+        nilai:
+          round(
+            nilai,
+            6
+          ),
+
+        bobot:
+          Number(
+            item.bobot
+          ),
+
+        tipe:
+          item.tipe,
+      }
+    }
+  )
+}
+
+// ============================================================
+// GET PENGAJUAN YANG SIAP DIPROSES TOPSIS
+// ============================================================
 //
+// Endpoint ini mengambil pengajuan:
+//
+// LOLOS_VERIFIKASI
+// atau
+// DIPROSES_TOPSIS
+//
+// agar admin dapat melihat kandidat
+// sebelum dan sesudah perhitungan.
 // ============================================================
 
 export async function getTopsisCandidates(
@@ -47,75 +216,13 @@ export async function getTopsisCandidates(
   res: Response
 ) {
   try {
-    // ========================================================
-    // 1. AMBIL KRITERIA AKTIF
-    // ========================================================
-
-    const criteria =
-      await prisma.kriteria.findMany({
-        where: {
-          aktif: true,
-        },
-
-        orderBy: {
-          kode: 'asc',
-        },
-
-        select: {
-          id: true,
-          kode: true,
-          nama: true,
-          bobot: true,
-          tipe: true,
-          deskripsi: true,
-          aktif: true,
-        },
-      })
-
-    if (
-      criteria.length === 0
-    ) {
-      return success(
-        res,
-        'Belum ada kriteria aktif.',
-        {
-          criteria: [],
-          candidates: [],
-        }
-      )
-    }
-
-    // ========================================================
-    // 2. AMBIL PENGAJUAN YANG MASUK ALUR TOPSIS
-    // ========================================================
-    //
-    // LOLOS_VERIFIKASI
-    //     -> baru masuk proses TOPSIS
-    //
-    // DIPROSES_TOPSIS
-    //     -> sedang menunggu / siap dihitung
-    //
-    // LAYAK_DIDANAI
-    // TIDAK_DIDANAI
-    //     -> sudah pernah dihitung
-    //
-    // Status final tetap dimasukkan agar seluruh alternatif
-    // tetap konsisten jika admin melakukan perhitungan ulang.
-    //
-    // ========================================================
-
     const pengajuan =
       await prisma.pengajuan.findMany({
         where: {
           status: {
             in: [
               PengajuanStatus.LOLOS_VERIFIKASI,
-
               PengajuanStatus.DIPROSES_TOPSIS,
-
-              PengajuanStatus.LAYAK_DIDANAI,
-
-              PengajuanStatus.TIDAK_DIDANAI,
             ],
           },
         },
@@ -126,116 +233,127 @@ export async function getTopsisCandidates(
               id: true,
               namaLengkap: true,
               nik: true,
+              alamat: true,
+              noHp: true,
             },
           },
 
           jawaban: {
             include: {
-              kriteria: {
+              indikator: {
                 select: {
                   id: true,
                   kode: true,
                   nama: true,
-                },
-              },
-
-              subKriteria: {
-                select: {
-                  id: true,
-                  nama: true,
-                  nilai: true,
-                  keterangan: true,
+                  tipe: true,
+                  urutan: true,
                 },
               },
             },
 
             orderBy: {
-              createdAt: 'asc',
+              indikator: {
+                urutan: 'asc',
+              },
+            },
+          },
+
+          topsisResults: {
+            orderBy: {
+              createdAt: 'desc',
+            },
+
+            take: 1,
+
+            select: {
+              id: true,
+              nilaiPreferensi: true,
+              ranking: true,
+              status: true,
+              tanggalProses: true,
             },
           },
         },
 
         orderBy: {
-          createdAt: 'asc',
+          tanggalPengajuan: 'asc',
         },
       })
 
-    // ========================================================
-    // 3. HANYA AMBIL YANG KUESIONERNYA LENGKAP
-    // ========================================================
-
     const candidates =
-      pengajuan
-        .filter(
-          (item) =>
-            criteria.every(
-              (criterion) =>
-                item.jawaban.some(
-                  (answer) =>
-                    answer.kriteriaId ===
-                    criterion.id
-                )
-            )
-        )
-        .map(
-          (item) => ({
-            pengajuanId:
-              item.id,
+      pengajuan.map(
+        (item) => ({
+          id: item.id,
 
-            status:
-              item.status,
+          status:
+            item.status,
 
-            mustahik: {
-              id:
-                item.mustahik.id,
+          tanggalPengajuan:
+            item.tanggalPengajuan,
 
-              namaLengkap:
-                item.mustahik.namaLengkap,
+          mustahik:
+            item.mustahik,
 
-              nik:
-                item.mustahik.nik,
-            },
+          jumlahJawaban:
+            item.jawaban.length,
 
-            jawaban:
-              criteria.map(
-                (criterion) => {
-                  const answer =
-                    item.jawaban.find(
-                      (itemAnswer) =>
-                        itemAnswer.kriteriaId ===
-                        criterion.id
-                    )
+          jawaban:
+            item.jawaban.map(
+              (jawaban) => ({
+                indikatorId:
+                  jawaban.indikatorId,
 
-                  return {
-                    kriteriaId:
-                      criterion.id,
+                kode:
+                  jawaban.indikator
+                    ?.kode ??
+                  null,
 
-                    kode:
-                      criterion.kode,
+                nama:
+                  jawaban.indikator
+                    ?.nama ??
+                  null,
 
-                    nama:
-                      criterion.nama,
+                nilai:
+                  Number(
+                    jawaban.nilai
+                  ),
+              })
+            ),
 
-                    nilai:
-                      Number(
-                        answer?.nilai ??
-                        0
-                      ),
-                  }
+          hasilTopsis:
+            item
+              .topsisResults[0]
+              ? {
+                  nilaiPreferensi:
+                    Number(
+                      item
+                        .topsisResults[0]
+                        .nilaiPreferensi
+                    ),
+
+                  ranking:
+                    item
+                      .topsisResults[0]
+                      .ranking,
+
+                  status:
+                    item
+                      .topsisResults[0]
+                      .status,
+
+                  tanggalProses:
+                    item
+                      .topsisResults[0]
+                      .tanggalProses,
                 }
-              ),
-          })
-        )
-
-    // ========================================================
-    // 4. RESPONSE
-    // ========================================================
+              : null,
+        })
+      )
 
     return success(
       res,
-      'Kandidat TOPSIS berhasil diambil.',
+      'Data kandidat TOPSIS berhasil diambil',
       {
-        criteria,
         candidates,
       }
     )
@@ -247,396 +365,826 @@ export async function getTopsisCandidates(
 
     return fail(
       res,
-      'Gagal mengambil kandidat TOPSIS.',
+      'Gagal mengambil kandidat TOPSIS',
       500
     )
   }
 }
 
 // ============================================================
-// PROCESS TOPSIS
+// HITUNG TOPSIS
+// ============================================================
+//
+// Alur:
+//
+// 1. Ambil semua pengajuan LOLOS_VERIFIKASI
+// 2. Validasi 15 jawaban
+// 3. Bentuk nilai C1-C5
+// 4. Buat matriks keputusan
+// 5. Normalisasi
+// 6. Pembobotan
+// 7. Solusi ideal positif
+// 8. Solusi ideal negatif
+// 9. Jarak D+ dan D-
+// 10. Nilai preferensi V
+// 11. Ranking
+// 12. Tentukan layak/tidak layak
 // ============================================================
 
-export async function processTopsis(
-  req: Request,
+export async function hitungTopsis(
+  _req: Request,
   res: Response
 ) {
   try {
     // ========================================================
-    // 1. THRESHOLD
+    // AMBIL KRITERIA
     // ========================================================
 
-    const threshold =
-      Number(
-        req.body.layakThreshold
-      )
-
-    if (
-      !Number.isFinite(
-        threshold
-      ) ||
-      threshold < 0 ||
-      threshold > 1
-    ) {
-      return fail(
-        res,
-        'layakThreshold harus berupa angka antara 0 sampai 1.',
-        422
-      )
-    }
-
-    // ========================================================
-    // 2. AMBIL KRITERIA AKTIF
-    // ========================================================
-
-    const criteria =
+    const kriteria =
       await prisma.kriteria.findMany({
         where: {
           aktif: true,
         },
 
-        orderBy: {
-          kode: 'asc',
-        },
-
         include: {
-          subKriteria: true,
-        },
-      })
+          indikator: {
+            where: {
+              aktif: true,
+            },
 
-    if (
-      criteria.length === 0
-    ) {
-      return fail(
-        res,
-        'Belum ada kriteria aktif.',
-        422
-      )
-    }
+            orderBy: {
+              urutan: 'asc',
+            },
 
-    // ========================================================
-    // 3. AMBIL SEMUA ALTERNATIF TOPSIS
-    // ========================================================
-    //
-    // Jangan hanya DIPROSES_TOPSIS.
-    //
-    // Karena hasil TOPSIS sebelumnya mengubah status menjadi:
-    //
-    // LAYAK_DIDANAI
-    // atau
-    // TIDAK_DIDANAI
-    //
-    // Jika admin menghitung ulang, mereka tetap harus masuk
-    // ke matriks yang sama.
-    //
-    // ========================================================
-
-    const eligibleStatuses = [
-      PengajuanStatus.LOLOS_VERIFIKASI,
-
-      PengajuanStatus.DIPROSES_TOPSIS,
-
-      PengajuanStatus.LAYAK_DIDANAI,
-
-      PengajuanStatus.TIDAK_DIDANAI,
-    ]
-
-    const pengajuan =
-      await prisma.pengajuan.findMany({
-        where: {
-          status: {
-            in: eligibleStatuses,
-          },
-        },
-
-        include: {
-          mustahik: true,
-
-          jawaban: {
-            include: {
-              kriteria: true,
-              subKriteria: true,
+            select: {
+              id: true,
+              kode: true,
+              tipe: true,
+              urutan: true,
             },
           },
         },
 
         orderBy: {
-          createdAt: 'asc',
+          kode: 'asc',
         },
       })
 
-    // ========================================================
-    // 4. FILTER KUESIONER LENGKAP
-    // ========================================================
-
-    const ready =
-      pengajuan.filter(
-        (item) =>
-          criteria.every(
-            (criterion) =>
-              item.jawaban.some(
-                (answer) =>
-                  answer.kriteriaId ===
-                  criterion.id
-              )
-          )
-      )
-
     if (
-      ready.length < 2
+      kriteria.length !== 5
     ) {
       return fail(
         res,
-        'Minimal dua pengajuan dengan jawaban kuesioner lengkap diperlukan untuk menghitung TOPSIS.',
+        'Data TOPSIS harus memiliki tepat 5 kriteria aktif',
+        422
+      )
+    }
+
+    const totalIndikator =
+      kriteria.reduce(
+        (
+          total,
+          item
+        ) =>
+          total +
+          item.indikator.length,
+        0
+      )
+
+    if (
+      totalIndikator !== 15
+    ) {
+      return fail(
+        res,
+        'Data TOPSIS harus memiliki tepat 15 indikator aktif',
         422
       )
     }
 
     // ========================================================
-    // 5. MATRKS X
+    // VALIDASI BOBOT
     // ========================================================
 
-    const alternatives =
-      ready.map(
-        (item) => ({
-          pengajuanId:
-            item.id,
-
-          values:
-            criteria.map(
-              (criterion) => {
-                const answer =
-                  item.jawaban.find(
-                    (itemAnswer) =>
-                      itemAnswer.kriteriaId ===
-                      criterion.id
-                  )
-
-                return Number(
-                  answer?.nilai ?? 0
-                )
-              }
-            ),
-        })
-      )
-
-    // ========================================================
-    // 6. VALIDASI NILAI
-    // ========================================================
-
-    const invalidAlternative =
-      alternatives.find(
-        (alternative) =>
-          alternative.values.length !==
-            criteria.length ||
-          alternative.values.some(
-            (value) =>
-              !Number.isFinite(
-                value
-              )
-          )
+    const totalBobot =
+      kriteria.reduce(
+        (
+          total,
+          item
+        ) =>
+          total +
+          Number(
+            item.bobot
+          ),
+        0
       )
 
     if (
-      invalidAlternative
+      Math.abs(
+        totalBobot - 1
+      ) > 0.0001
     ) {
       return fail(
         res,
-        'Terdapat data kuesioner yang tidak valid.',
+        `Total bobot kriteria harus 1. Saat ini: ${totalBobot}`,
         422
       )
     }
 
     // ========================================================
-    // 7. HITUNG TOPSIS
+    // AMBIL KANDIDAT
     // ========================================================
 
-    const results =
-      calculateTopsis(
-        alternatives,
+    const pengajuan =
+      await prisma.pengajuan.findMany({
+        where: {
+          status:
+            PengajuanStatus.LOLOS_VERIFIKASI,
+        },
 
-        criteria.map(
-          (criterion) =>
-            Number(
-              criterion.bobot
+        include: {
+          jawaban: {
+            select: {
+              indikatorId: true,
+              nilai: true,
+            },
+          },
+
+          mustahik: {
+            select: {
+              namaLengkap: true,
+              nik: true,
+            },
+          },
+        },
+
+        orderBy: {
+          tanggalPengajuan: 'asc',
+        },
+      })
+
+    if (
+      pengajuan.length === 0
+    ) {
+      return fail(
+        res,
+        'Tidak ada pengajuan yang siap diproses TOPSIS',
+        404
+      )
+    }
+
+    // ========================================================
+    // VALIDASI 15 JAWABAN SETIAP KANDIDAT
+    // ========================================================
+
+    const validIndikatorIds =
+      new Set(
+        kriteria.flatMap(
+          (item) =>
+            item.indikator.map(
+              (
+                indikator
+              ) =>
+                indikator.id
             )
-        ),
-
-        criteria.map(
-          (criterion) =>
-            criterion.tipe
         )
       )
 
-    // ========================================================
-    // 8. SIMPAN HASIL
-    // ========================================================
-
-    const persisted =
-      await prisma.$transaction(
-        async (tx) => {
-          const pengajuanIds =
-            ready.map(
-              (item) =>
-                item.id
+    for (
+      const item of pengajuan
+    ) {
+      const jawabanValid =
+        item.jawaban.filter(
+          (
+            jawaban
+          ) =>
+            jawaban.indikatorId &&
+            validIndikatorIds.has(
+              jawaban.indikatorId
             )
+        )
 
-          // --------------------------------------------------
-          // Hapus hasil lama
-          // --------------------------------------------------
+      if (
+        jawabanValid.length !==
+        totalIndikator
+      ) {
+        return fail(
+          res,
+          `Pengajuan ${item.mustahik.namaLengkap} belum memiliki ${totalIndikator} jawaban indikator`,
+          422
+        )
+      }
 
-          await tx.topsisResult.deleteMany(
-            {
-              where: {
-                pengajuanId: {
-                  in:
-                    pengajuanIds,
-                },
-              },
+      const indikatorSet =
+        new Set(
+          jawabanValid.map(
+            (
+              jawaban
+            ) =>
+              jawaban.indikatorId
+          )
+        )
+
+      if (
+        indikatorSet.size !==
+        totalIndikator
+      ) {
+        return fail(
+          res,
+          `Jawaban indikator pengajuan ${item.mustahik.namaLengkap} tidak lengkap atau duplikat`,
+          422
+        )
+      }
+    }
+
+    // ========================================================
+    // BENTUK NILAI C1 - C5
+    // ========================================================
+
+    const matriksAwal:
+      MatriksNilai[] =
+      pengajuan.map(
+        (
+          item
+        ) => {
+          const jawabanMap =
+            new Map<
+              string,
+              number
+            >()
+
+          item.jawaban.forEach(
+            (
+              jawaban
+            ) => {
+              if (
+                jawaban.indikatorId
+              ) {
+                jawabanMap.set(
+                  jawaban.indikatorId,
+                  Number(
+                    jawaban.nilai
+                  )
+                )
+              }
             }
           )
 
-          const output: any[] =
-            []
-
-          // --------------------------------------------------
-          // Simpan hasil baru
-          // --------------------------------------------------
-
-          for (
-            const result of results
-          ) {
-            const status =
-              result.preference >=
-              threshold
-                ? PengajuanStatus.LAYAK_DIDANAI
-                : PengajuanStatus.TIDAK_DIDANAI
-
-            const item =
-              await tx.topsisResult.create(
-                {
-                  data: {
-                    pengajuanId:
-                      result.pengajuanId,
-
-                    nilaiPreferensi:
-                      result.preference,
-
-                    ranking:
-                      result.ranking,
-
-                    status,
-
-                    details: {
-                      create:
-                        criteria.map(
-                          (
-                            criterion,
-                            index
-                          ) => ({
-                            kriteriaId:
-                              criterion.id,
-
-                            nilaiAwal:
-                              result
-                                .values[
-                                index
-                              ],
-
-                            nilaiNormalisasi:
-                              result
-                                .normalized[
-                                index
-                              ],
-
-                            nilaiTerbobot:
-                              result
-                                .weighted[
-                                index
-                              ],
-                          })
-                        ),
-                    },
-                  },
-
-                  include: {
-                    pengajuan: {
-                      include: {
-                        mustahik:
-                          true,
-                      },
-                    },
-
-                    details: {
-                      include: {
-                        kriteria:
-                          true,
-                      },
-                    },
-                  },
-                }
-              )
-
-            // ------------------------------------------------
-            // Update status pengajuan
-            // ------------------------------------------------
-
-            await tx.pengajuan.update(
-              {
-                where: {
-                  id:
-                    result.pengajuanId,
-                },
-
-                data: {
-                  status,
-                },
-              }
+          const nilaiKriteria =
+            hitungNilaiKriteria(
+              kriteria,
+              jawabanMap
             )
 
-            output.push(
-              item
-            )
+          const nilai:
+            Record<
+              string,
+              number
+            > =
+            {}
+
+          nilaiKriteria.forEach(
+            (
+              itemNilai
+            ) => {
+              nilai[
+                itemNilai.kriteriaId
+              ] =
+                itemNilai.nilai
+            }
+          )
+
+          return {
+            pengajuanId:
+              item.id,
+
+            nilai,
           }
-
-          return output
         }
       )
 
     // ========================================================
-    // 9. RESPONSE
+    // PEMBAGI NORMALISASI
+    //
+    // akar(sum(x^2))
     // ========================================================
+
+    const pembagi:
+      Record<
+        string,
+        number
+      > =
+      {}
+
+    for (
+      const criterion of
+        kriteria
+    ) {
+      const jumlahKuadrat =
+        matriksAwal.reduce(
+          (
+            total,
+            item
+          ) => {
+            const nilai =
+              item.nilai[
+                criterion.id
+              ] ?? 0
+
+            return (
+              total +
+              Math.pow(
+                nilai,
+                2
+              )
+            )
+          },
+          0
+        )
+
+      pembagi[
+        criterion.id
+      ] =
+        Math.sqrt(
+          jumlahKuadrat
+        )
+    }
+
+    // ========================================================
+    // NORMALISASI + PEMBOBOTAN
+    // ========================================================
+
+    const matriksTerbobot:
+      Record<
+        string,
+        Record<
+          string,
+          number
+        >
+      > =
+      {}
+
+    const detailPerhitungan:
+      Record<
+        string,
+        Array<{
+          kriteriaId: string
+          nilaiAwal: number
+          nilaiNormalisasi: number
+          nilaiTerbobot: number
+        }>
+      > =
+      {}
+
+    for (
+      const item of
+        matriksAwal
+    ) {
+      matriksTerbobot[
+        item.pengajuanId
+      ] =
+        {}
+
+      detailPerhitungan[
+        item.pengajuanId
+      ] =
+        []
+
+      for (
+        const criterion of
+          kriteria
+      ) {
+        const nilaiAwal =
+          item.nilai[
+            criterion.id
+          ] ?? 0
+
+        const pembagiKriteria =
+          pembagi[
+            criterion.id
+          ]
+
+        const nilaiNormalisasi =
+          pembagiKriteria > 0
+            ? nilaiAwal /
+              pembagiKriteria
+            : 0
+
+        const nilaiTerbobot =
+          nilaiNormalisasi *
+          Number(
+            criterion.bobot
+          )
+
+        matriksTerbobot[
+          item.pengajuanId
+        ][
+          criterion.id
+        ] =
+          nilaiTerbobot
+
+        detailPerhitungan[
+          item.pengajuanId
+        ].push({
+          kriteriaId:
+            criterion.id,
+
+          nilaiAwal:
+            round(
+              nilaiAwal,
+              6
+            ),
+
+          nilaiNormalisasi:
+            round(
+              nilaiNormalisasi,
+              8
+            ),
+
+          nilaiTerbobot:
+            round(
+              nilaiTerbobot,
+              8
+            ),
+        })
+      }
+    }
+
+    // ========================================================
+    // SOLUSI IDEAL
+    // ========================================================
+
+    const idealPositif:
+      Record<
+        string,
+        number
+      > =
+      {}
+
+    const idealNegatif:
+      Record<
+        string,
+        number
+      > =
+      {}
+
+    for (
+      const criterion of
+        kriteria
+    ) {
+      const nilai =
+        pengajuan.map(
+          (
+            item
+          ) =>
+            matriksTerbobot[
+              item.id
+            ][
+              criterion.id
+            ] ?? 0
+        )
+
+      if (
+        criterion.tipe ===
+        KriteriaTipe.BENEFIT
+      ) {
+        idealPositif[
+          criterion.id
+        ] =
+          Math.max(
+            ...nilai
+          )
+
+        idealNegatif[
+          criterion.id
+        ] =
+          Math.min(
+            ...nilai
+          )
+      } else {
+        idealPositif[
+          criterion.id
+        ] =
+          Math.min(
+            ...nilai
+          )
+
+        idealNegatif[
+          criterion.id
+        ] =
+          Math.max(
+            ...nilai
+          )
+      }
+    }
+
+    // ========================================================
+    // HITUNG NILAI PREFERENSI
+    //
+    // V = D- / (D+ + D-)
+    // ========================================================
+
+    const hasilSementara =
+      pengajuan.map(
+        (
+          item
+        ) => {
+          let jumlahPositif = 0
+          let jumlahNegatif = 0
+
+          for (
+            const criterion of
+              kriteria
+          ) {
+            const nilai =
+              matriksTerbobot[
+                item.id
+              ][
+                criterion.id
+              ] ?? 0
+
+            jumlahPositif +=
+              Math.pow(
+                nilai -
+                  idealPositif[
+                    criterion.id
+                  ],
+                2
+              )
+
+            jumlahNegatif +=
+              Math.pow(
+                nilai -
+                  idealNegatif[
+                    criterion.id
+                  ],
+                2
+              )
+          }
+
+          const jarakPositif =
+            Math.sqrt(
+              jumlahPositif
+            )
+
+          const jarakNegatif =
+            Math.sqrt(
+              jumlahNegatif
+            )
+
+          const totalJarak =
+            jarakPositif +
+            jarakNegatif
+
+          const nilaiPreferensi =
+            totalJarak > 0
+              ? jarakNegatif /
+                totalJarak
+              : 0
+
+          return {
+            pengajuanId:
+              item.id,
+
+            nilaiPreferensi:
+              round(
+                nilaiPreferensi,
+                6
+              ),
+
+            details:
+              detailPerhitungan[
+                item.id
+              ],
+          }
+        }
+      )
+
+    // ========================================================
+    // RANKING
+    // ========================================================
+
+    hasilSementara.sort(
+      (
+        a,
+        b
+      ) =>
+        b.nilaiPreferensi -
+        a.nilaiPreferensi
+    )
+
+    // ========================================================
+    // MENENTUKAN KELAYAKAN
+    // ========================================================
+    //
+    // Sementara:
+    //
+    // Ranking 1 sampai 50% kandidat = LAYAK_DIDANAI
+    // Sisanya = TIDAK_DIDANAI
+    //
+    // Jika Excel client memiliki batas kelayakan
+    // berbeda, bagian ini harus disesuaikan.
+    // ========================================================
+
+    const jumlahLayak =
+      Math.max(
+        1,
+        Math.ceil(
+          hasilSementara.length *
+          0.5
+        )
+      )
+
+    const hasil:
+      HasilPerhitungan[] =
+      hasilSementara.map(
+        (
+          item,
+          index
+        ) => ({
+          pengajuanId:
+            item.pengajuanId,
+
+          nilaiPreferensi:
+            item.nilaiPreferensi,
+
+          ranking:
+            index + 1,
+
+          status:
+            index <
+            jumlahLayak
+              ? PengajuanStatus.LAYAK_DIDANAI
+              : PengajuanStatus.TIDAK_DIDANAI,
+
+          details:
+            item.details,
+        })
+      )
+
+    // ========================================================
+    // SIMPAN HASIL
+    // ========================================================
+
+    await prisma.$transaction(
+      async (
+        tx
+      ) => {
+
+        // ----------------------------------------------------
+        // Hapus hasil TOPSIS lama untuk kandidat
+        // ----------------------------------------------------
+
+        await tx.topsisResult.deleteMany({
+          where: {
+            pengajuanId: {
+              in:
+                hasil.map(
+                  (
+                    item
+                  ) =>
+                    item.pengajuanId
+                ),
+            },
+          },
+        })
+
+        // ----------------------------------------------------
+        // Simpan hasil baru
+        // ----------------------------------------------------
+
+        for (
+          const item of
+          hasil
+        ) {
+          const topsisResult =
+            await tx.topsisResult.create({
+              data: {
+                pengajuanId:
+                  item.pengajuanId,
+
+                nilaiPreferensi:
+                  decimal(
+                    item.nilaiPreferensi
+                  ),
+
+                ranking:
+                  item.ranking,
+
+                status:
+                  item.status,
+
+                tanggalProses:
+                  new Date(),
+
+                details: {
+                  create:
+                    item.details.map(
+                      (
+                        detail
+                      ) => ({
+                        kriteriaId:
+                          detail.kriteriaId,
+
+                        nilaiAwal:
+                          decimal(
+                            detail.nilaiAwal
+                          ),
+
+                        nilaiNormalisasi:
+                          decimal(
+                            detail.nilaiNormalisasi
+                          ),
+
+                        nilaiTerbobot:
+                          decimal(
+                            detail.nilaiTerbobot
+                          ),
+                      })
+                    ),
+                },
+              },
+            })
+
+          await tx.pengajuan.update({
+            where: {
+              id:
+                item.pengajuanId,
+            },
+
+            data: {
+              status:
+                item.status,
+            },
+          })
+
+          console.log(
+            `TOPSIS BERHASIL: ${item.pengajuanId} | Ranking ${item.ranking} | Preferensi ${item.nilaiPreferensi} | Result ${topsisResult.id}`
+          )
+        }
+      }
+    )
 
     return success(
       res,
-      'Proses TOPSIS berhasil.',
+      'Perhitungan TOPSIS berhasil dilakukan',
       {
-        threshold,
+        totalKandidat:
+          hasil.length,
 
-        jumlahAlternatif:
-          ready.length,
+        totalLayak:
+          hasil.filter(
+            (
+              item
+            ) =>
+              item.status ===
+              PengajuanStatus.LAYAK_DIDANAI
+          ).length,
 
-        results:
-          persisted,
-      },
-      201
+        totalTidakLayak:
+          hasil.filter(
+            (
+              item
+            ) =>
+              item.status ===
+              PengajuanStatus.TIDAK_DIDANAI
+          ).length,
+
+        hasil:
+          hasil.map(
+            (
+              item
+            ) => ({
+              pengajuanId:
+                item.pengajuanId,
+
+              nilaiPreferensi:
+                item.nilaiPreferensi,
+
+              ranking:
+                item.ranking,
+
+              status:
+                item.status,
+            })
+          ),
+      }
     )
   } catch (error) {
     console.error(
-      'PROCESS TOPSIS ERROR:',
+      'HITUNG TOPSIS ERROR:',
       error
     )
 
     return fail(
       res,
-      'Gagal menjalankan proses TOPSIS.',
+      'Gagal melakukan perhitungan TOPSIS',
       500
     )
   }
 }
 
 // ============================================================
-// GET SEMUA HASIL TOPSIS
+// GET HASIL TOPSIS
 // ============================================================
 
 export async function getTopsisResults(
@@ -645,41 +1193,128 @@ export async function getTopsisResults(
 ) {
   try {
     const results =
-      await prisma.topsisResult.findMany(
-        {
-          include: {
-            pengajuan: {
-              include: {
-                mustahik: true,
-              },
-            },
-
-            details: {
-              include: {
-                kriteria: true,
+      await prisma.topsisResult.findMany({
+        include: {
+          pengajuan: {
+            include: {
+              mustahik: {
+                select: {
+                  id: true,
+                  namaLengkap: true,
+                  nik: true,
+                  alamat: true,
+                  noHp: true,
+                },
               },
             },
           },
 
-          orderBy: [
-            {
-              tanggalProses:
-                'desc',
+          details: {
+            include: {
+              kriteria: {
+                select: {
+                  id: true,
+                  kode: true,
+                  nama: true,
+                  bobot: true,
+                  tipe: true,
+                },
+              },
             },
 
-            {
-              ranking:
-                'asc',
+            orderBy: {
+              kriteria: {
+                kode: 'asc',
+              },
             },
-          ],
-        }
-      )
+          },
+        },
+
+        orderBy: {
+          ranking: 'asc',
+        },
+      })
 
     return success(
       res,
-      'Hasil TOPSIS berhasil diambil.',
+      'Hasil TOPSIS berhasil diambil',
       {
-        results,
+        results:
+          results.map(
+            (
+              item
+            ) => ({
+              id:
+                item.id,
+
+              pengajuanId:
+                item.pengajuanId,
+
+              nilaiPreferensi:
+                Number(
+                  item.nilaiPreferensi
+                ),
+
+              ranking:
+                item.ranking,
+
+              status:
+                item.status,
+
+              tanggalProses:
+                item.tanggalProses,
+
+              mustahik:
+                item.pengajuan
+                  .mustahik,
+
+              details:
+                item.details.map(
+                  (
+                    detail
+                  ) => ({
+                    kriteriaId:
+                      detail.kriteriaId,
+
+                    kode:
+                      detail.kriteria.kode,
+
+                    nama:
+                      detail.kriteria.nama,
+
+                    bobot:
+                      Number(
+                        detail
+                          .kriteria
+                          .bobot
+                      ),
+
+                    tipe:
+                      detail
+                        .kriteria
+                        .tipe,
+
+                    nilaiAwal:
+                      Number(
+                        detail
+                          .nilaiAwal
+                      ),
+
+                    nilaiNormalisasi:
+                      Number(
+                        detail
+                          .nilaiNormalisasi
+                      ),
+
+                    nilaiTerbobot:
+                      Number(
+                        detail
+                          .nilaiTerbobot
+                      ),
+                  })
+                ),
+            })
+          ),
       }
     )
   } catch (error) {
@@ -690,69 +1325,7 @@ export async function getTopsisResults(
 
     return fail(
       res,
-      'Gagal mengambil hasil TOPSIS.',
-      500
-    )
-  }
-}
-
-// ============================================================
-// GET DETAIL TOPSIS
-// ============================================================
-
-export async function getTopsisResult(
-  req: Request,
-  res: Response
-) {
-  try {
-    const result =
-      await prisma.topsisResult.findUnique(
-        {
-          where: {
-            id:
-              req.params.id,
-          },
-
-          include: {
-            pengajuan: {
-              include: {
-                mustahik: true,
-              },
-            },
-
-            details: {
-              include: {
-                kriteria: true,
-              },
-            },
-          },
-        }
-      )
-
-    if (!result) {
-      return fail(
-        res,
-        'Hasil TOPSIS tidak ditemukan.',
-        404
-      )
-    }
-
-    return success(
-      res,
-      'Detail hasil TOPSIS berhasil diambil.',
-      {
-        result,
-      }
-    )
-  } catch (error) {
-    console.error(
-      'GET TOPSIS RESULT ERROR:',
-      error
-    )
-
-    return fail(
-      res,
-      'Gagal mengambil detail TOPSIS.',
+      'Gagal mengambil hasil TOPSIS',
       500
     )
   }
