@@ -10,7 +10,12 @@ import {
   authenticate,
 } from '../middleware/auth.middleware'
 
-const router = Router()
+// ============================================================
+// ROUTER
+// ============================================================
+
+export const kuesionerRouter =
+  Router()
 
 // ============================================================
 // GET KUESIONER
@@ -19,11 +24,12 @@ const router = Router()
 // GET /api/kuesioner
 //
 // Mengambil:
-// - 5 kriteria
+// - 5 kriteria aktif
 // - 15 indikator aktif ID1 sampai ID15
+//
 // ============================================================
 
-router.get(
+kuesionerRouter.get(
   '/',
   authenticate,
   getKuesioner
@@ -47,29 +53,40 @@ router.get(
 //   ],
 //   statusRumah: string
 // }
+//
 // ============================================================
 
-router.post(
+kuesionerRouter.post(
   '/jawaban',
   authenticate,
   createJawaban
 )
 
 // ============================================================
-// UPDATE JAWABAN
+// UPDATE JAWABAN KUESIONER
 // ============================================================
 //
 // PUT /api/kuesioner/jawaban
 //
-// Endpoint tetap dipertahankan untuk kompatibilitas.
-// Namun controller hanya mengizinkan pengajuan
-// yang masih berstatus DRAFT.
+// Endpoint ini digunakan untuk memperbarui
+// jawaban kuesioner selama pengajuan masih
+// berstatus DRAFT.
+//
 // ============================================================
 
-router.put(
+kuesionerRouter.put(
   '/jawaban',
   authenticate,
   updateJawaban
 )
 
-export default router
+// ============================================================
+// DEFAULT EXPORT
+// ============================================================
+//
+// Tetap disediakan agar kompatibel apabila
+// ada file lain yang menggunakan default import.
+//
+// ============================================================
+
+export default kuesionerRouter
