@@ -1,19 +1,23 @@
 import {
   useEffect,
+  useMemo,
   useState,
 } from 'react'
 
 import {
-  Trophy,
-  Download,
-  CheckCircle,
-  XCircle,
+  RefreshCw,
   Loader2,
+  Trophy,
+  Medal,
+  Award,
+  FileText,
 } from 'lucide-react'
 
 import {
   Card,
   CardContent,
+  CardHeader,
+  CardTitle,
 } from '@/components/ui/card'
 
 import {
@@ -25,17 +29,110 @@ import {
 } from '@/components/shared/PageHeader'
 
 import {
-  DataTable,
-} from '@/components/shared/DataTable'
-
-import {
   getAdminTopsisResults,
   type AdminTopsisResult,
 } from '@/lib/adminApi'
 
-import {
-  formatDateShort,
-} from '@/lib/utils'
+// ============================================================
+// HELPER
+// ============================================================
+
+function toNumber(
+  value: number | string | null | undefined
+): number {
+  const result =
+    Number(value ?? 0)
+
+  return Number.isFinite(result)
+    ? result
+    : 0
+}
+
+function formatDate(
+  value: string | Date | null | undefined
+): string {
+  if (!value) {
+    return '-'
+  }
+
+  const date =
+    new Date(value)
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return '-'
+  }
+
+  return new Intl.DateTimeFormat(
+    'id-ID',
+    {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    }
+  ).format(date)
+}
+
+function getMustahikName(
+  result: AdminTopsisResult
+): string {
+  return (
+    result.pengajuan
+      ?.mustahik
+      ?.namaLengkap ||
+    result.mustahik
+      ?.namaLengkap ||
+    result.pengajuan
+      ?.user
+      ?.name ||
+    '-'
+  )
+}
+
+function getNIK(
+  result: AdminTopsisResult
+): string {
+  return (
+    result.pengajuan
+      ?.mustahik
+      ?.nik ||
+    result.mustahik
+      ?.nik ||
+    '-'
+  )
+}
+
+function getStatusLabel(
+  status: string
+): string {
+  switch (status) {
+    case 'LAYAK_DIDANAI':
+      return 'Layak Didanai'
+
+    case 'TIDAK_DIDANAI':
+      return 'Tidak Didanai'
+
+    case 'DIPROSES_TOPSIS':
+      return 'Diproses TOPSIS'
+
+    default:
+      return status
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(
+          /\b\w/g,
+          (letter: string) =>
+            letter.toUpperCase()
+        )
+  }
+}
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export function HasilRankingPage() {
   const [
@@ -59,132 +156,226 @@ export function HasilRankingPage() {
   // LOAD DATA
   // ==========================================================
 
-  useEffect(() => {
-    let mounted = true
+  const loadResults =
+    async () => {
+      try {
+        setLoading(true)
 
-    const load =
-      async () => {
-        try {
-          setLoading(true)
-          setError('')
+        setError('')
 
-          const data =
-            await getAdminTopsisResults()
+        const data =
+          await getAdminTopsisResults()
 
-          if (!mounted) {
-            return
-          }
+        // ------------------------------------------------------
+        // Ambil hasil terbaru untuk setiap pengajuan
+        // ------------------------------------------------------
 
-          /*
-           * Backend sekarang menyimpan satu hasil terbaru
-           * untuk setiap pengajuan yang ikut perhitungan.
-           *
-           * Jadi JANGAN lagi filter berdasarkan
-           * tanggalProses paling baru.
-           *
-           * Filter timestamp seperti itu menyebabkan:
-           *
-           * Difi = 10:20
-           * Rafi = 10:21
-           *
-           * hanya Rafi yang tampil.
-           */
+        const latestResults =
+          new Map<
+            string,
+            AdminTopsisResult
+          >()
 
-          // --------------------------------------------------
-          // Ambil satu hasil terbaru untuk setiap pengajuan.
-          // Ini membuat halaman aman apabila database masih
-          // mempunyai hasil TOPSIS lama.
-          // --------------------------------------------------
-
-          const latestByPengajuan =
-            new Map<
-              string,
-              AdminTopsisResult
-            >()
-
-          for (
-            const item of data
-          ) {
-            const existing =
-              latestByPengajuan.get(
-                item.pengajuanId
-              )
-
-            if (
-              !existing ||
-              new Date(
-                item.tanggalProses
-              ).getTime() >
-                new Date(
-                  existing.tanggalProses
-                ).getTime()
-            ) {
-              latestByPengajuan.set(
-                item.pengajuanId,
-                item
-              )
-            }
-          }
-
-          const latestResults =
-            Array.from(
-              latestByPengajuan.values()
-            ).sort(
-              (
-                a,
-                b
-              ) =>
-                a.ranking -
-                b.ranking
+        for (
+          const result of data
+        ) {
+          const existing =
+            latestResults.get(
+              result.pengajuanId
             )
 
-          setResults(
-            latestResults
-          )
-        } catch (
-          err: any
-        ) {
-          console.error(
-            'GET RANKING ERROR:',
-            err
-          )
+          if (!existing) {
+            latestResults.set(
+              result.pengajuanId,
+              result
+            )
 
-          if (
-            !mounted
-          ) {
-            return
+            continue
           }
 
-          setError(
-            err.response
-              ?.data?.message ||
-              'Gagal mengambil hasil TOPSIS.'
-          )
-        } finally {
-          if (mounted) {
-            setLoading(
-              false
+          const currentDate =
+            new Date(
+              result.tanggalProses
+            ).getTime()
+
+          const existingDate =
+            new Date(
+              existing.tanggalProses
+            ).getTime()
+
+          if (
+            currentDate >
+            existingDate
+          ) {
+            latestResults.set(
+              result.pengajuanId,
+              result
             )
           }
         }
+
+        const sortedResults =
+          Array.from(
+            latestResults.values()
+          ).sort(
+            (
+              a,
+              b
+            ) =>
+              a.ranking -
+              b.ranking
+          )
+
+        setResults(
+          sortedResults
+        )
+      } catch (
+        err: unknown
+      ) {
+        console.error(
+          'GET RANKING ERROR:',
+          err
+        )
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Gagal mengambil hasil ranking.'
+        )
+      } finally {
+        setLoading(false)
+      }
+    }
+
+  // ==========================================================
+  // INITIAL LOAD
+  // ==========================================================
+
+  useEffect(
+    () => {
+      void loadResults()
+    },
+    []
+  )
+
+  // ==========================================================
+  // STATISTICS
+  // ==========================================================
+
+  const statistics =
+    useMemo(() => {
+      const layak =
+        results.filter(
+          (
+            result
+          ) =>
+            result.status ===
+            'LAYAK_DIDANAI'
+        ).length
+
+      const tidakLayak =
+        results.filter(
+          (
+            result
+          ) =>
+            result.status ===
+            'TIDAK_DIDANAI'
+        ).length
+
+      const rataRata =
+        results.length === 0
+          ? 0
+          : results.reduce(
+              (
+                total,
+                result
+              ) =>
+                total +
+                toNumber(
+                  result.nilaiPreferensi
+                ),
+              0
+            ) /
+            results.length
+
+      return {
+        total:
+          results.length,
+
+        layak,
+
+        tidakLayak,
+
+        rataRata,
+      }
+    }, [
+      results,
+    ])
+
+  // ==========================================================
+  // GET RANK ICON
+  // ==========================================================
+
+  const getRankIcon =
+    (
+      ranking: number
+    ) => {
+      if (ranking === 1) {
+        return (
+          <Trophy className="w-5 h-5 text-yellow-500" />
+        )
       }
 
-    load()
+      if (ranking === 2) {
+        return (
+          <Medal className="w-5 h-5 text-slate-400" />
+        )
+      }
 
-    return () => {
-      mounted = false
+      if (ranking === 3) {
+        return (
+          <Award className="w-5 h-5 text-amber-600" />
+        )
+      }
+
+      return (
+        <span className="font-semibold">
+          #{ranking}
+        </span>
+      )
     }
-  }, [])
 
   // ==========================================================
-  // PODIUM
+  // STATUS STYLE
   // ==========================================================
 
-  const podium =
-    results.slice(
-      0,
-      3
+  const getStatusClass =
+    (
+      status: string
+    ) => {
+      switch (status) {
+        case 'LAYAK_DIDANAI':
+          return 'bg-green-100 text-green-700 border-green-200'
+
+        case 'TIDAK_DIDANAI':
+          return 'bg-red-100 text-red-700 border-red-200'
+
+        default:
+          return 'bg-slate-100 text-slate-700 border-slate-200'
+      }
+    }
+
+  // ==========================================================
+  // LOADING
+  // ==========================================================
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="w-7 h-7 animate-spin text-green-600" />
+      </div>
     )
+  }
 
   // ==========================================================
   // RENDER
@@ -194,203 +385,309 @@ export function HasilRankingPage() {
     <div className="space-y-6">
       <PageHeader
         title="Hasil Ranking TOPSIS"
-        description="Hasil perhitungan TOPSIS yang tersimpan di database"
+        description="Hasil perangkingan mustahik berdasarkan nilai preferensi metode TOPSIS."
       >
         <Button
           variant="outline"
-          size="sm"
+          onClick={() => {
+            void loadResults()
+          }}
+          disabled={loading}
         >
-          <Download className="w-4 h-4 mr-2" />
-          Export Hasil
+          <RefreshCw className="w-4 h-4 mr-2" />
+
+          Muat Ulang
         </Button>
       </PageHeader>
 
+      {/* ======================================================
+          ERROR
+      ====================================================== */}
+
       {error && (
-        <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-green-600" />
-        </div>
-      ) : results.length === 0 ? (
+      {/* ======================================================
+          STATISTICS
+      ====================================================== */}
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
-          <CardContent className="py-16 text-center text-slate-500">
-            Belum ada hasil TOPSIS.
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate-500">
+              Total Mustahik
+            </p>
+
+            <p className="text-3xl font-bold mt-2">
+              {
+                statistics.total
+              }
+            </p>
           </CardContent>
         </Card>
-      ) : (
-        <>
-          {/* ==================================================
-              PODIUM
-          ================================================== */}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {podium.map(
-              (item) => (
-                <Card
-                  key={
-                    item.id
-                  }
-                >
-                  <CardContent className="pt-5 text-center">
-                    <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-green-600 text-white font-bold mb-2">
-                      #
-                      {
-                        item.ranking
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate-500">
+              Layak Didanai
+            </p>
+
+            <p className="text-3xl font-bold text-green-600 mt-2">
+              {
+                statistics.layak
+              }
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate-500">
+              Tidak Didanai
+            </p>
+
+            <p className="text-3xl font-bold text-red-600 mt-2">
+              {
+                statistics.tidakLayak
+              }
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-slate-500">
+              Rata-rata Preferensi
+            </p>
+
+            <p className="text-3xl font-bold mt-2">
+              {statistics.rataRata.toFixed(
+                4
+              )}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ======================================================
+          TOP 3
+      ====================================================== */}
+
+      {results.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Peringkat Teratas
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              {results
+                .slice(0, 3)
+                .map(
+                  (
+                    result
+                  ) => (
+                    <div
+                      key={
+                        result.id
                       }
-                    </div>
+                      className="rounded-xl border p-4 bg-slate-50"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-slate-500">
+                            Peringkat
+                          </p>
 
-                    <h3 className="font-bold">
-                      {
-                        item
-                          .pengajuan
-                          ?.mustahik
-                          ?.namaLengkap
-                      }
-                    </h3>
+                          <div className="mt-1">
+                            {getRankIcon(
+                              result.ranking
+                            )}
+                          </div>
+                        </div>
 
-                    <p className="text-xs text-slate-500 mt-1">
-                      Nilai Ci:{' '}
-                      <span className="font-mono font-bold text-green-700">
-                        {Number(
-                          item.nilaiPreferensi
-                        ).toFixed(
-                          4
+                        <div
+                          className={`rounded-full border px-3 py-1 text-xs font-medium ${getStatusClass(
+                            result.status
+                          )}`}
+                        >
+                          {getStatusLabel(
+                            result.status
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="mt-4 font-semibold">
+                        {getMustahikName(
+                          result
                         )}
-                      </span>
-                    </p>
+                      </p>
 
-                    {item.status ===
-                    'LAYAK_DIDANAI' ? (
-                      <span className="inline-flex items-center gap-1 mt-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        LAYAK DIDANAI
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 mt-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                        <XCircle className="w-3.5 h-3.5" />
-                        TIDAK DIDANAI
-                      </span>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            )}
-          </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        NIK:{' '}
+                        {getNIK(
+                          result
+                        )}
+                      </p>
 
-          {/* ==================================================
-              TABLE
-          ================================================== */}
+                      <div className="mt-4">
+                        <p className="text-xs text-slate-500">
+                          Nilai Preferensi
+                        </p>
 
-          <DataTable
-            columns={[
-              {
-                key: 'ranking',
-
-                header: 'Ranking',
-
-                render: (
-                  row
-                ) => (
-                  <div className="flex items-center gap-2 font-bold">
-                    {row.ranking <=
-                      3 && (
-                      <Trophy className="w-4 h-4 text-amber-500" />
-                    )}
-
-                    #
-                    {
-                      row.ranking
-                    }
-                  </div>
-                ),
-              },
-
-              {
-                key: 'nama',
-
-                header:
-                  'Nama Mustahik',
-
-                render: (
-                  row
-                ) => (
-                  <span className="font-semibold">
-                    {
-                      row
-                        .pengajuan
-                        ?.mustahik
-                        ?.namaLengkap
-                    }
-                  </span>
-                ),
-              },
-
-              {
-                key: 'nilai',
-
-                header:
-                  'Nilai Ci',
-
-                render: (
-                  row
-                ) => (
-                  <span className="font-mono font-bold text-green-700">
-                    {Number(
-                      row.nilaiPreferensi
-                    ).toFixed(
-                      4
-                    )}
-                  </span>
-                ),
-              },
-
-              {
-                key: 'status',
-
-                header:
-                  'Keputusan',
-
-                render: (
-                  row
-                ) =>
-                  row.status ===
-                  'LAYAK_DIDANAI' ? (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      Layak Didanai
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
-                      <XCircle className="w-3.5 h-3.5" />
-                      Tidak Didanai
-                    </span>
-                  ),
-              },
-
-              {
-                key: 'tanggal',
-
-                header:
-                  'Tanggal Proses',
-
-                render: (
-                  row
-                ) =>
-                  formatDateShort(
-                    row.tanggalProses
-                  ),
-              },
-            ]}
-            data={
-              results
-            }
-          />
-        </>
+                        <p className="text-2xl font-bold text-green-700">
+                          {toNumber(
+                            result.nilaiPreferensi
+                          ).toFixed(
+                            6
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                )}
+            </div>
+          </CardContent>
+        </Card>
       )}
+
+      {/* ======================================================
+          TABLE
+      ====================================================== */}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Daftar Hasil Ranking
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="overflow-x-auto">
+          {results.length ===
+          0 ? (
+            <div className="flex flex-col items-center justify-center py-14 text-center">
+              <FileText className="w-10 h-10 text-slate-400" />
+
+              <h3 className="mt-4 font-semibold">
+                Belum Ada Hasil Ranking
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Jalankan proses TOPSIS terlebih
+                dahulu untuk menghasilkan ranking.
+              </p>
+            </div>
+          ) : (
+            <table className="data-table w-full">
+              <thead>
+                <tr>
+                  <th className="w-24 text-center">
+                    Ranking
+                  </th>
+
+                  <th>
+                    Nama Mustahik
+                  </th>
+
+                  <th>
+                    NIK
+                  </th>
+
+                  <th className="text-center">
+                    Nilai Preferensi
+                  </th>
+
+                  <th className="text-center">
+                    Status
+                  </th>
+
+                  <th>
+                    Tanggal Proses
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {results.map(
+                  (
+                    result
+                  ) => (
+                    <tr
+                      key={
+                        result.id
+                      }
+                    >
+                      <td className="text-center">
+                        <div className="flex justify-center">
+                          {getRankIcon(
+                            result.ranking
+                          )}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div>
+                          <p className="font-semibold">
+                            {getMustahikName(
+                              result
+                            )}
+                          </p>
+
+                          <p className="text-xs text-slate-500">
+                            Pengajuan:{' '}
+                            {
+                              result.pengajuanId
+                            }
+                          </p>
+                        </div>
+                      </td>
+
+                      <td className="font-mono text-sm">
+                        {getNIK(
+                          result
+                        )}
+                      </td>
+
+                      <td className="text-center">
+                        <span className="font-mono font-bold text-green-700">
+                          {toNumber(
+                            result.nilaiPreferensi
+                          ).toFixed(
+                            6
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="text-center">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getStatusClass(
+                            result.status
+                          )}`}
+                        >
+                          {getStatusLabel(
+                            result.status
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="text-sm text-slate-600">
+                        {formatDate(
+                          result.tanggalProses
+                        )}
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
