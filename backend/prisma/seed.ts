@@ -397,7 +397,7 @@ async function main() {
   console.log('SEED TOPSIS DAN ADMIN BERHASIL')
   console.log('========================================')
 
-  console.log('Email admin: ayu@spkmustakhi.id')
+  console.log('Email admin: ayu@spkmustahik.id')
   console.log('Role admin: ADMIN')
 }
 
