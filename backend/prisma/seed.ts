@@ -15,13 +15,6 @@ async function main() {
 
   /*
    * Hapus data lama berdasarkan urutan relasi.
-   *
-   * JawabanKuesioner bergantung pada:
-   * - Indikator
-   * - SubKriteria
-   * - Kriteria
-   *
-   * Maka JawabanKuesioner harus dihapus terlebih dahulu.
    */
 
   console.log('Menghapus jawaban kuesioner lama...')
@@ -32,12 +25,6 @@ async function main() {
 
   console.log('Menghapus subkriteria lama...')
   await prisma.subKriteria.deleteMany()
-
-  /*
-   * TopsisDetail bergantung pada Kriteria.
-   *
-   * Hapus terlebih dahulu sebelum Kriteria.
-   */
 
   console.log('Menghapus detail TOPSIS lama...')
   await prisma.topsisDetail.deleteMany()
@@ -293,7 +280,7 @@ async function main() {
 
   const admin = await prisma.user.upsert({
     where: {
-      email: 'ayu@spkmustakhi.id',
+      email: 'ayu@spkmustahik.id',
     },
     update: {
       name: 'Ayu',
@@ -302,7 +289,7 @@ async function main() {
     },
     create: {
       name: 'Ayu',
-      email: 'ayu@spkmustakhi.id',
+      email: 'ayu@spkmustahik.id',
       passwordHash: adminPasswordHash,
       role: Role.ADMIN,
     },
@@ -397,8 +384,15 @@ async function main() {
   console.log('SEED TOPSIS DAN ADMIN BERHASIL')
   console.log('========================================')
 
-  console.log('Email admin: ayu@spkmustahik.id')
-  console.log('Role admin: ADMIN')
+  console.log(
+    'Email admin: ayu@spkmustahik.id'
+  )
+  console.log(
+    'Password admin: ayuadmin123'
+  )
+  console.log(
+    'Role admin: ADMIN'
+  )
 }
 
 main()
