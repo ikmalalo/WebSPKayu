@@ -1,6 +1,7 @@
 import {
   PrismaClient,
   KriteriaTipe,
+  IndikatorTipe,
   Role,
 } from '@prisma/client'
 
@@ -8,247 +9,212 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+type IndikatorSeed = {
+  kode: string
+  nama: string
+  deskripsi: string
+  tipe: IndikatorTipe
+  urutan: number
+}
+
 type KriteriaSeed = {
   kode: string
   nama: string
   bobot: number
   tipe: KriteriaTipe
-  skala: string[]
+  deskripsi: string
+  dimensi: string
+  urutan: number
+  indikator: IndikatorSeed[]
 }
 
-type DimensiSeed = {
-  nama: string
-  bobot: number
-  kriteria: KriteriaSeed[]
-}
-
-const DATA_ASESMEN: DimensiSeed[] = [
+const DATA_ASESMEN: KriteriaSeed[] = [
   {
+    kode: 'C1',
     nama: 'Hifzh ad-Din',
     bobot: 0.12,
-    kriteria: [
+    tipe: KriteriaTipe.BENEFIT,
+    deskripsi:
+      'Penilaian terhadap aspek agama, integritas, dan kepatuhan mustahik dalam menjalankan aktivitas muamalah.',
+    dimensi: 'Maqashid Syariah',
+    urutan: 1,
+
+    indikator: [
       {
-        kode: 'C1',
+        kode: 'ID1',
         nama: 'Integritas dan kepatuhan muamalah',
-        bobot: 0.05,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Terdapat indikasi ketidakjujuran atau aktivitas usaha bertentangan dengan syariah.',
-          'Integritas rendah; beberapa informasi atau transaksi tidak dapat dijelaskan.',
-          'Cukup jujur; transaksi umumnya sesuai syariah tetapi dokumentasi masih terbatas.',
-          'Jujur, transparan dan konsisten menjalankan transaksi halal.',
-          'Sangat jujur, transparan, amanah dan menjadi contoh kepatuhan muamalah.',
-        ],
+        deskripsi:
+          'Penilaian integritas, kejujuran, transparansi, dan kepatuhan aktivitas usaha terhadap prinsip syariah.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 1,
       },
       {
-        kode: 'C2',
+        kode: 'ID2',
         nama: 'Komitmen pembinaan spiritual',
-        bobot: 0.03,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Menolak pembinaan spiritual.',
-          'Bersedia hanya jika diwajibkan dan menunjukkan komitmen rendah.',
-          'Bersedia mengikuti pembinaan secara cukup rutin.',
-          'Aktif mengikuti pembinaan dan menerima arahan.',
-          'Sangat aktif, konsisten dan berkomitmen mengimplementasikan pembinaan.',
-        ],
+        deskripsi:
+          'Penilaian kesediaan dan komitmen mustahik dalam mengikuti kegiatan pembinaan spiritual.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 2,
       },
       {
-        kode: 'C3',
+        kode: 'ID3',
         nama: 'Komitmen amanah terhadap program',
-        bobot: 0.04,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Tidak bersedia menaati ketentuan program.',
-          'Komitmen rendah dan terdapat keraguan penggunaan dana sesuai tujuan.',
-          'Cukup berkomitmen menggunakan dana sesuai tujuan program.',
-          'Berkomitmen kuat, siap melapor dan memenuhi ketentuan.',
-          'Sangat amanah, transparan, disiplin dan siap dipantau secara berkala.',
-        ],
+        deskripsi:
+          'Penilaian komitmen mustahik dalam menggunakan bantuan sesuai tujuan dan menaati ketentuan program.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 3,
       },
     ],
   },
 
   {
+    kode: 'C2',
     nama: 'Hifzh an-Nafs',
     bobot: 0.25,
-    kriteria: [
+    tipe: KriteriaTipe.BENEFIT,
+    deskripsi:
+      'Penilaian terhadap kondisi kebutuhan dasar, kerentanan hidup, dan lingkungan mustahik.',
+    dimensi: 'Maqashid Syariah',
+    urutan: 2,
+
+    indikator: [
       {
-        kode: 'C4',
+        kode: 'ID4',
         nama: 'Tingkat kerentanan kebutuhan dasar',
-        bobot: 0.12,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Kebutuhan dasar relatif terpenuhi dan tidak menunjukkan kerentanan berarti.',
-          'Ada keterbatasan ringan pada sebagian kebutuhan dasar.',
-          'Beberapa kebutuhan dasar terbatas dan membutuhkan dukungan.',
-          'Kerentanan tinggi; pendapatan sulit mencukupi sebagian besar kebutuhan dasar.',
-          'Sangat rentan; kebutuhan dasar utama tidak terpenuhi secara memadai.',
-        ],
+        deskripsi:
+          'Penilaian tingkat kerentanan mustahik dalam memenuhi kebutuhan dasar sehari-hari.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 4,
       },
       {
-        kode: 'C5',
+        kode: 'ID5',
         nama: 'Kelayakan dan keamanan lingkungan usaha',
-        bobot: 0.07,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Lokasi tidak aman atau tidak layak dan sangat sulit diakses.',
-          'Keamanan atau akses rendah; terdapat hambatan serius bagi usaha.',
-          'Cukup aman dan cukup dapat diakses.',
-          'Aman, layak, mudah diakses dan mendukung aktivitas usaha.',
-          'Sangat aman, strategis, akses sangat baik dan lingkungan sangat mendukung usaha.',
-        ],
+        deskripsi:
+          'Penilaian kondisi keamanan, kelayakan, aksesibilitas, dan dukungan lingkungan terhadap usaha.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 5,
       },
       {
-        kode: 'C6',
-        nama: 'Risiko tekanan kebutuhan/utang',
-        bobot: 0.06,
-        tipe: KriteriaTipe.COST,
-        skala: [
-          'Risiko sangat rendah; utang tidak ada atau terkendali dan kebutuhan rutin relatif stabil.',
-          'Risiko rendah; kewajiban utang ringan.',
-          'Risiko sedang; terdapat kewajiban yang cukup menekan arus kas.',
-          'Risiko tinggi; utang atau kebutuhan mendesak sering mengganggu modal usaha.',
-          'Risiko sangat tinggi; tekanan utang atau kebutuhan berpotensi besar mengalihkan dana produktif.',
-        ],
+        kode: 'ID6',
+        nama: 'Risiko tekanan kebutuhan atau utang',
+        deskripsi:
+          'Penilaian tingkat risiko tekanan kebutuhan mendesak dan kewajiban utang terhadap keberlangsungan usaha.',
+        tipe: IndikatorTipe.NEGATIF,
+        urutan: 6,
       },
     ],
   },
 
   {
+    kode: 'C3',
     nama: "Hifzh al-'Aql",
     bobot: 0.15,
-    kriteria: [
+    tipe: KriteriaTipe.BENEFIT,
+    deskripsi:
+      'Penilaian terhadap kemampuan, pengetahuan, keterampilan, dan kesiapan mustahik dalam mengembangkan usaha.',
+    dimensi: 'Maqashid Syariah',
+    urutan: 3,
+
+    indikator: [
       {
-        kode: 'C7',
+        kode: 'ID7',
         nama: 'Literasi dan pengetahuan usaha',
-        bobot: 0.05,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Tidak memahami dasar pengelolaan usaha dan keuangan.',
-          'Pengetahuan usaha sangat terbatas; belum mampu menghitung laba atau biaya dengan baik.',
-          'Memahami dasar usaha dan pencatatan sederhana.',
-          'Memahami pengelolaan stok, biaya, laba dan pelanggan dengan baik.',
-          'Memiliki literasi usaha atau keuangan kuat dan mampu menggunakan informasi untuk keputusan usaha.',
-        ],
+        deskripsi:
+          'Penilaian pemahaman mustahik mengenai pengelolaan usaha dan keuangan.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 7,
       },
       {
-        kode: 'C8',
+        kode: 'ID8',
         nama: 'Keterampilan dan kesiapan belajar',
-        bobot: 0.05,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Tidak menunjukkan keterampilan dasar dan tidak siap belajar.',
-          'Keterampilan rendah serta kurang responsif terhadap arahan.',
-          'Memiliki keterampilan dasar dan cukup siap belajar.',
-          'Terampil, terbuka terhadap perubahan dan aktif belajar.',
-          'Sangat terampil, adaptif, cepat belajar dan mampu menerapkan pengetahuan baru.',
-        ],
+        deskripsi:
+          'Penilaian keterampilan dasar, kemampuan beradaptasi, dan kesiapan mustahik untuk belajar.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 8,
       },
       {
-        kode: 'C9',
+        kode: 'ID9',
         nama: 'Komitmen mengikuti pendampingan',
-        bobot: 0.05,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Tidak bersedia mengikuti pendampingan.',
-          'Bersedia tetapi kemungkinan kehadiran atau partisipasi rendah.',
-          'Bersedia mengikuti sebagian besar kegiatan.',
-          'Berkomitmen mengikuti kegiatan secara rutin dan aktif.',
-          'Sangat berkomitmen, disiplin, aktif dan siap memenuhi seluruh agenda pendampingan.',
-        ],
+        deskripsi:
+          'Penilaian kesediaan dan komitmen mustahik dalam mengikuti kegiatan pendampingan.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 9,
       },
     ],
   },
 
   {
+    kode: 'C4',
     nama: 'Hifzh an-Nasl',
     bobot: 0.18,
-    kriteria: [
+    tipe: KriteriaTipe.BENEFIT,
+    deskripsi:
+      'Penilaian terhadap kondisi keluarga, tanggungan, dukungan keluarga, dan dampak usaha terhadap kesejahteraan keluarga.',
+    dimensi: 'Maqashid Syariah',
+    urutan: 4,
+
+    indikator: [
       {
-        kode: 'C10',
+        kode: 'ID10',
         nama: 'Beban tanggungan keluarga',
-        bobot: 0.07,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Tidak memiliki tanggungan atau beban keluarga sangat rendah.',
-          'Tanggungan rendah dan sebagian besar anggota keluarga produktif.',
-          'Tanggungan sedang.',
-          'Tanggungan tinggi dan mustahik menjadi sumber nafkah utama.',
-          'Tanggungan sangat tinggi, termasuk anak, lansia, atau anggota keluarga tidak produktif yang bergantung pada mustahik.',
-        ],
+        deskripsi:
+          'Penilaian tingkat beban tanggungan dan ketergantungan anggota keluarga terhadap mustahik.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 10,
       },
       {
-        kode: 'C11',
+        kode: 'ID11',
         nama: 'Dukungan keluarga terhadap usaha',
-        bobot: 0.05,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Keluarga menolak atau menghambat usaha.',
-          'Dukungan keluarga rendah.',
-          'Keluarga cukup mendukung secara moral.',
-          'Keluarga mendukung dan membantu operasional usaha bila diperlukan.',
-          'Keluarga sangat mendukung dan terlibat positif dalam keberlanjutan usaha.',
-        ],
+        deskripsi:
+          'Penilaian tingkat dukungan keluarga terhadap aktivitas dan pengembangan usaha mustahik.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 11,
       },
       {
-        kode: 'C12',
+        kode: 'ID12',
         nama: 'Potensi usaha mendukung kesejahteraan keluarga',
-        bobot: 0.06,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Usaha hampir tidak memberi kontribusi terhadap kebutuhan keluarga.',
-          'Kontribusi usaha rendah dan belum stabil.',
-          'Usaha memberi kontribusi sedang terhadap kebutuhan keluarga.',
-          'Usaha berpotensi kuat meningkatkan pendapatan dan kesejahteraan keluarga.',
-          'Usaha sangat potensial menjadi sumber nafkah utama yang stabil dan meningkatkan kualitas hidup keluarga.',
-        ],
+        deskripsi:
+          'Penilaian potensi usaha dalam meningkatkan pendapatan dan kesejahteraan keluarga.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 12,
       },
     ],
   },
 
   {
+    kode: 'C5',
     nama: 'Hifzh al-Mal',
     bobot: 0.3,
-    kriteria: [
+    tipe: KriteriaTipe.BENEFIT,
+    deskripsi:
+      'Penilaian terhadap kondisi ekonomi, akses pasar, dan keberlanjutan usaha mustahik.',
+    dimensi: 'Maqashid Syariah',
+    urutan: 5,
+
+    indikator: [
       {
-        kode: 'C13',
+        kode: 'ID13',
         nama: 'Kondisi dan potensi ekonomi usaha',
-        bobot: 0.12,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Usaha tidak berjalan atau tidak memiliki prospek yang layak.',
-          'Usaha sangat lemah; omzet dan aktivitas tidak stabil.',
-          'Usaha berjalan dengan potensi pengembangan sedang.',
-          'Usaha berjalan baik dan memiliki peluang pertumbuhan nyata.',
-          'Usaha sehat, prospektif dan sangat layak dikembangkan dengan tambahan modal.',
-        ],
+        deskripsi:
+          'Penilaian kondisi usaha saat ini dan potensi pengembangan ekonomi usaha.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 13,
       },
       {
-        kode: 'C14',
+        kode: 'ID14',
         nama: 'Akses pasar dan jaringan usaha',
-        bobot: 0.08,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Tidak memiliki pasar atau pelanggan yang jelas dan akses sangat terbatas.',
-          'Pasar terbatas, pelanggan tidak stabil dan belum memiliki jaringan pemasok.',
-          'Memiliki pelanggan dan pemasok dasar tetapi jangkauan masih terbatas.',
-          'Pasar cukup kuat, pelanggan relatif stabil dan memiliki jaringan pemasok.',
-          'Akses pasar sangat baik, pelanggan kuat, jaringan pemasok atau mitra luas dan terdapat peluang ekspansi.',
-        ],
+        deskripsi:
+          'Penilaian akses mustahik terhadap pasar, pelanggan, pemasok, dan jaringan usaha.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 14,
       },
       {
-        kode: 'C15',
+        kode: 'ID15',
         nama: 'Potensi keberlanjutan dan kemandirian usaha',
-        bobot: 0.1,
-        tipe: KriteriaTipe.BENEFIT,
-        skala: [
-          'Sangat kecil kemungkinan usaha bertahan setelah bantuan.',
-          'Keberlanjutan rendah dan sangat bergantung pada bantuan.',
-          'Cukup berpotensi bertahan dengan pendampingan intensif.',
-          'Berpotensi kuat mandiri dan berkembang setelah intervensi.',
-          'Sangat berpotensi berkelanjutan, mandiri, tumbuh, dan secara bertahap keluar dari ketergantungan bantuan.',
-        ],
+        deskripsi:
+          'Penilaian kemampuan usaha untuk bertahan, berkembang, dan mencapai kemandirian.',
+        tipe: IndikatorTipe.POSITIF,
+        urutan: 15,
       },
     ],
   },
@@ -256,11 +222,17 @@ const DATA_ASESMEN: DimensiSeed[] = [
 
 async function main() {
   console.log('========================================')
-  console.log('MEMULAI SEED FORM ASESMEN TOPSIS')
+  console.log('MEMULAI SEED DATA ASESMEN TOPSIS')
   console.log('========================================')
 
-  console.log('Menghapus jawaban lama...')
+  console.log('Menghapus jawaban kuesioner lama...')
   await prisma.jawabanKuesioner.deleteMany()
+
+  console.log('Menghapus indikator lama...')
+  await prisma.indikator.deleteMany()
+
+  console.log('Menghapus subkriteria lama...')
+  await prisma.subKriteria.deleteMany()
 
   console.log('Menghapus detail TOPSIS lama...')
   await prisma.topsisDetail.deleteMany()
@@ -268,92 +240,71 @@ async function main() {
   console.log('Menghapus hasil TOPSIS lama...')
   await prisma.topsisResult.deleteMany()
 
-  console.log('Menghapus subkriteria lama...')
-  await prisma.subKriteria.deleteMany()
-
   console.log('Menghapus kriteria lama...')
   await prisma.kriteria.deleteMany()
 
   console.log('========================================')
-  console.log('MEMBUAT 15 KRITERIA ASESMEN')
+  console.log('MEMBUAT 5 KRITERIA DAN 15 INDIKATOR')
   console.log('========================================')
 
-  for (
-    const dimensi of DATA_ASESMEN
-  ) {
-    for (
-      const [
-        index,
-        kriteria,
-      ] of dimensi.kriteria.entries()
-    ) {
-      await prisma.kriteria.create({
-        data: {
-          kode: kriteria.kode,
-          nama: kriteria.nama,
-          bobot: kriteria.bobot,
-          tipe: kriteria.tipe,
-          deskripsi: `Kriteria ${kriteria.nama}`,
-          aktif: true,
-          dimensi: dimensi.nama,
-          urutan: index + 1,
+  for (const kriteria of DATA_ASESMEN) {
+    await prisma.kriteria.create({
+      data: {
+        kode: kriteria.kode,
+        nama: kriteria.nama,
+        bobot: kriteria.bobot,
+        tipe: kriteria.tipe,
+        deskripsi: kriteria.deskripsi,
+        aktif: true,
+        dimensi: kriteria.dimensi,
+        urutan: kriteria.urutan,
 
-          subKriteria: {
-            create:
-              kriteria.skala.map(
-                (
-                  keterangan,
-                  skor
-                ) => ({
-                  nama:
-                    `Skor ${skor + 1}`,
-
-                  nilai:
-                    skor + 1,
-
-                  keterangan,
-                })
-              ),
-          },
+        indikator: {
+          create: kriteria.indikator.map(
+            (indikator) => ({
+              kode: indikator.kode,
+              nama: indikator.nama,
+              deskripsi: indikator.deskripsi,
+              tipe: indikator.tipe,
+              urutan: indikator.urutan,
+              aktif: true,
+            })
+          ),
         },
-      })
-    }
+      },
+    })
   }
 
   console.log('========================================')
   console.log('MEMBUAT AKUN ADMIN')
   console.log('========================================')
 
-  const passwordHash =
-    await bcrypt.hash(
-      'ayuadmin123',
-      12
-    )
+  const passwordHash = await bcrypt.hash(
+    'ayuadmin123',
+    12
+  )
 
-  const admin =
-    await prisma.user.upsert({
-      where: {
-        email:
-          'ayu@spkmustahik.id',
-      },
+  const admin = await prisma.user.upsert({
+    where: {
+      email: 'ayu@spkmustahik.id',
+    },
 
-      update: {
-        name: 'Ayu',
-        passwordHash,
-        role: Role.ADMIN,
-      },
+    update: {
+      name: 'Ayu',
+      passwordHash,
+      role: Role.ADMIN,
+    },
 
-      create: {
-        name: 'Ayu',
-        email:
-          'ayu@spkmustahik.id',
-        passwordHash,
-        role: Role.ADMIN,
-      },
-    })
+    create: {
+      name: 'Ayu',
+      email: 'ayu@spkmustahik.id',
+      passwordHash,
+      role: Role.ADMIN,
+    },
+  })
 
   console.log(
-    `Admin berhasil dibuat: ${admin.email}`
+    `Admin berhasil dibuat/diperbarui: ${admin.email}`
   )
 
   console.log('========================================')
@@ -363,10 +314,10 @@ async function main() {
   const totalKriteria =
     await prisma.kriteria.count()
 
-  const totalSubKriteria =
-    await prisma.subKriteria.count()
+  const totalIndikator =
+    await prisma.indikator.count()
 
-  const bobot =
+  const totalBobot =
     await prisma.kriteria.aggregate({
       _sum: {
         bobot: true,
@@ -382,64 +333,61 @@ async function main() {
   )
 
   console.log(
-    `Total pilihan skor: ${totalSubKriteria}`
+    `Total indikator: ${totalIndikator}`
   )
 
   console.log(
     `Total bobot: ${
-      Number(
-        bobot._sum.bobot ?? 0
-      ) * 100
+      Number(totalBobot._sum.bobot ?? 0) *
+      100
     }%`
   )
 
   console.log('')
 
-  const list =
+  const daftarKriteria =
     await prisma.kriteria.findMany({
       include: {
-        subKriteria: {
+        indikator: {
           orderBy: {
-            nilai: 'asc',
+            urutan: 'asc',
           },
         },
       },
 
-      orderBy: [
-        {
-          kode: 'asc',
-        },
-      ],
+      orderBy: {
+        urutan: 'asc',
+      },
     })
 
-  for (
-    const item of list
-  ) {
+  for (const kriteria of daftarKriteria) {
     console.log(
-      `${item.kode} - ${item.nama}`
+      `${kriteria.kode} - ${kriteria.nama}`
     )
 
     console.log(
       `Bobot: ${
-        Number(item.bobot) * 100
+        Number(kriteria.bobot) * 100
       }%`
     )
 
     console.log(
-      `Tipe: ${item.tipe}`
-    )
-
-    console.log(
-      `Jumlah skor: ${
-        item.subKriteria.length
+      `Jumlah indikator: ${
+        kriteria.indikator.length
       }`
     )
+
+    for (const indikator of kriteria.indikator) {
+      console.log(
+        `  ${indikator.kode} - ${indikator.nama} (${indikator.tipe})`
+      )
+    }
 
     console.log('')
   }
 
   console.log('========================================')
-  console.log('SEED BERHASIL')
+  console.log('SEED DATA ASESMEN BERHASIL')
   console.log('========================================')
 
   console.log(
@@ -452,18 +400,14 @@ async function main() {
 }
 
 main()
-  .catch(
-    (error) => {
-      console.error(
-        'SEED ERROR:',
-        error
-      )
+  .catch((error) => {
+    console.error(
+      'SEED ERROR:',
+      error
+    )
 
-      process.exit(1)
-    }
-  )
-  .finally(
-    async () => {
-      await prisma.$disconnect()
-    }
-  )
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
