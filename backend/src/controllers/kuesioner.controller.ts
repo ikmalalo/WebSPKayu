@@ -17,6 +17,7 @@ import {
   fail,
 } from '../utils/response'
 
+
 // ============================================================
 // HELPER
 // ============================================================
@@ -24,16 +25,8 @@ import {
 function getUserId(
   req: Request
 ): string | null {
-  const user = (
-    req as Request & {
-      user?: {
-        id?: string
-      }
-    }
-  ).user
-
   return (
-    user?.id ||
+    req.auth?.userId ||
     null
   )
 }
@@ -41,23 +34,6 @@ function getUserId(
 
 // ============================================================
 // GET KUESIONER
-// ============================================================
-//
-// Mengambil 5 kriteria dan 15 indikator aktif.
-//
-// Struktur:
-//
-// C1
-//   ├── ID1
-//   ├── ID2
-//   └── ID3
-//
-// C2
-//   ├── ID4
-//   ├── ID5
-//   └── ID6
-//
-// dan seterusnya.
 // ============================================================
 
 export async function getKuesioner(
@@ -109,7 +85,7 @@ export async function getKuesioner(
 
 
     // ========================================================
-    // VALIDASI
+    // VALIDASI DATA
     // ========================================================
 
     if (
@@ -177,22 +153,6 @@ export async function getKuesioner(
 
 // ============================================================
 // SUBMIT JAWABAN KUESIONER
-// ============================================================
-//
-// Request:
-//
-// {
-//   pengajuanId: "...",
-//   statusRumah: "...",
-//   jawaban: [
-//     {
-//       indikatorId: "...",
-//       nilai: 4
-//     }
-//   ]
-// }
-//
-// Semua 15 indikator wajib dijawab.
 // ============================================================
 
 export async function submitJawabanKuesioner(
@@ -340,7 +300,7 @@ export async function submitJawabanKuesioner(
 
 
     // ========================================================
-    // CEK KEPEMILIKAN
+    // CEK KEPEMILIKAN PENGAJUAN
     // ========================================================
 
     if (
@@ -472,13 +432,13 @@ export async function submitJawabanKuesioner(
 
 
       // ------------------------------------------------------
-      // VALIDASI ID
+      // VALIDASI ID INDIKATOR
       // ------------------------------------------------------
 
       if (
         !indikatorId ||
         typeof indikatorId !==
-          'string'
+        'string'
       ) {
         return fail(
           res,
@@ -554,7 +514,7 @@ export async function submitJawabanKuesioner(
 
 
     // ========================================================
-    // PASTIKAN SEMUA INDIKATOR ADA
+    // PASTIKAN SEMUA INDIKATOR TERJAWAB
     // ========================================================
 
     if (
@@ -580,7 +540,7 @@ export async function submitJawabanKuesioner(
         ) => {
 
           // --------------------------------------------------
-          // UPDATE STATUS RUMAH
+          // UPDATE STATUS RUMAH MUSTAHIK
           // --------------------------------------------------
 
           await tx.mustahik.update({
@@ -596,7 +556,7 @@ export async function submitJawabanKuesioner(
 
 
           // --------------------------------------------------
-          // SIMPAN JAWABAN
+          // SIMPAN JAWABAN KUESIONER
           // --------------------------------------------------
 
           await tx.jawabanKuesioner.createMany({
