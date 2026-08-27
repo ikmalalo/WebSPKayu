@@ -110,6 +110,7 @@ type Alternative = {
 
 type IndicatorMeta = {
   id: string
+  kriteriaId: string
   kode: string
   nama: string
   tipe: IndikatorTipe
@@ -212,6 +213,9 @@ export async function processTopsis(
           id:
             indikator.id,
 
+          kriteriaId:
+            item.id,
+
           kode:
             indikator.kode,
 
@@ -240,8 +244,14 @@ export async function processTopsis(
     const pengajuan =
       await prisma.pengajuan.findMany({
         where: {
-          status:
-            PengajuanStatus.LOLOS_VERIFIKASI,
+          status: {
+            in: [
+              PengajuanStatus.LOLOS_VERIFIKASI,
+              PengajuanStatus.DIPROSES_TOPSIS,
+              PengajuanStatus.LAYAK_DIDANAI,
+              PengajuanStatus.TIDAK_DIDANAI,
+            ],
+          },
         },
 
         include: {
@@ -741,6 +751,9 @@ export async function processTopsis(
                       ) => ({
                         indikatorId:
                           indikator.id,
+
+                        kriteriaId:
+                          indikator.kriteriaId,
 
                         nilaiAwal:
                           decimal(
