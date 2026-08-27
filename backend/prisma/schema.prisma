@@ -158,8 +158,8 @@ model Indikator {
   urutan     Int
   aktif      Boolean       @default(true)
 
-  kriteria Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
-  jawaban  JawabanKuesioner[]
+  kriteria     Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
+  jawaban      JawabanKuesioner[]
   topsisDetails TopsisDetail[]
 
   createdAt DateTime @default(now())
@@ -241,7 +241,7 @@ model TopsisResult {
 
   tanggalProses DateTime @default(now())
 
-  pengajuan Pengajuan      @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
+  pengajuan Pengajuan    @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
   details   TopsisDetail[]
 
   createdAt DateTime @default(now())
