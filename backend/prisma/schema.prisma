@@ -29,15 +29,15 @@ enum KriteriaTipe {
   COST
 }
 
-enum IndikatorTipe {
-  POSITIF
-  NEGATIF
-}
-
 enum VerifikasiStatus {
   LOLOS
   PERLU_PERBAIKAN
   DITOLAK
+}
+
+enum IndikatorTipe {
+  POSITIF
+  NEGATIF
 }
 
 model User {
@@ -132,42 +132,46 @@ model Kriteria {
   deskripsi String?
   aktif     Boolean      @default(true)
 
-  indikator     Indikator[]
+  dimensi String
+  urutan  Int
+
   subKriteria   SubKriteria[]
+  indikator     Indikator[]
   jawaban       JawabanKuesioner[]
   topsisDetails TopsisDetail[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([dimensi, urutan])
+  @@index([dimensi])
   @@map("kriteria")
 }
 
 model Indikator {
-  id         String @id @default(cuid())
-  kode       String @unique
+  id String @id @default(cuid())
+
   kriteriaId String
+  kode       String        @unique
+  nama       String
+  deskripsi  String?
+  tipe       IndikatorTipe @default(POSITIF)
+  urutan     Int
+  aktif      Boolean       @default(true)
 
-  nama      String
-  deskripsi String?
-  tipe      IndikatorTipe @default(POSITIF)
-  urutan    Int
-  aktif     Boolean       @default(true)
-
-  kriteria Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
-  jawaban  JawabanKuesioner[]
+  kriteria Kriteria @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([kriteriaId, urutan])
   @@index([kriteriaId])
-  @@index([urutan])
+  @@index([aktif])
   @@map("indikator")
 }
 
 model SubKriteria {
-  id         String @id @default(cuid())
+  id String @id @default(cuid())
+
   kriteriaId String
 
   nama       String
@@ -189,25 +193,21 @@ model JawabanKuesioner {
   id String @id @default(cuid())
 
   pengajuanId   String
-  kriteriaId    String?
-  subKriteriaId String?
-  indikatorId   String?
+  kriteriaId    String
+  subKriteriaId String
 
   nilai Decimal @db.Decimal(10, 4)
 
-  pengajuan   Pengajuan    @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
-  kriteria    Kriteria?    @relation(fields: [kriteriaId], references: [id], onDelete: Restrict)
-  subKriteria SubKriteria? @relation(fields: [subKriteriaId], references: [id], onDelete: Restrict)
-  indikator   Indikator?   @relation(fields: [indikatorId], references: [id], onDelete: Restrict)
+  pengajuan   Pengajuan   @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
+  kriteria    Kriteria    @relation(fields: [kriteriaId], references: [id], onDelete: Restrict)
+  subKriteria SubKriteria @relation(fields: [subKriteriaId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([pengajuanId, kriteriaId])
-  @@unique([pengajuanId, indikatorId])
   @@index([pengajuanId])
   @@index([kriteriaId])
-  @@index([indikatorId])
   @@map("jawabankuesioner")
 }
 
