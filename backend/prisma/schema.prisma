@@ -41,12 +41,12 @@ enum IndikatorTipe {
 }
 
 model User {
-  id           String @id @default(cuid())
+  id           String  @id @default(cuid())
   name         String
-  email        String @unique
+  email        String  @unique
   passwordHash String
   phone        String?
-  role         Role   @default(USER)
+  role         Role    @default(USER)
 
   mustahik      Mustahik?
   pengajuan     Pengajuan[]
@@ -133,10 +133,10 @@ model Kriteria {
   aktif     Boolean      @default(true)
 
   dimensi String
-  urutan   Int
+  urutan  Int
 
-  subKriteria   SubKriteria[]
   indikator     Indikator[]
+  subKriteria   SubKriteria[]
   topsisDetails TopsisDetail[]
 
   createdAt DateTime @default(now())
@@ -158,13 +158,8 @@ model Indikator {
   urutan     Int
   aktif      Boolean       @default(true)
 
-  kriteria Kriteria           @relation(
-    fields: [kriteriaId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  jawaban JawabanKuesioner[]
+  kriteria Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
+  jawaban  JawabanKuesioner[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -183,11 +178,7 @@ model SubKriteria {
   nilai      Decimal @db.Decimal(8, 4)
   keterangan String?
 
-  kriteria Kriteria @relation(
-    fields: [kriteriaId],
-    references: [id],
-    onDelete: Cascade
-  )
+  kriteria Kriteria @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -205,17 +196,8 @@ model JawabanKuesioner {
 
   nilai Decimal @db.Decimal(10, 4)
 
-  pengajuan Pengajuan @relation(
-    fields: [pengajuanId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  indikator Indikator @relation(
-    fields: [indikatorId],
-    references: [id],
-    onDelete: Restrict
-  )
+  pengajuan Pengajuan @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
+  indikator Indikator @relation(fields: [indikatorId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -235,18 +217,8 @@ model Verifikasi {
   status  VerifikasiStatus
   catatan String?
 
-  pengajuan Pengajuan @relation(
-    fields: [pengajuanId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  admin User @relation(
-    "Verifier",
-    fields: [adminId],
-    references: [id],
-    onDelete: Restrict
-  )
+  pengajuan Pengajuan @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
+  admin     User      @relation("Verifier", fields: [adminId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -266,13 +238,8 @@ model TopsisResult {
 
   tanggalProses DateTime @default(now())
 
-  pengajuan Pengajuan @relation(
-    fields: [pengajuanId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  details TopsisDetail[]
+  pengajuan Pengajuan      @relation(fields: [pengajuanId], references: [id], onDelete: Cascade)
+  details   TopsisDetail[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -292,17 +259,8 @@ model TopsisDetail {
   nilaiNormalisasi Decimal @db.Decimal(12, 8)
   nilaiTerbobot    Decimal @db.Decimal(12, 8)
 
-  topsisResult TopsisResult @relation(
-    fields: [topsisResultId],
-    references: [id],
-    onDelete: Cascade
-  )
-
-  kriteria Kriteria @relation(
-    fields: [kriteriaId],
-    references: [id],
-    onDelete: Restrict
-  )
+  topsisResult TopsisResult @relation(fields: [topsisResultId], references: [id], onDelete: Cascade)
+  kriteria     Kriteria     @relation(fields: [kriteriaId], references: [id], onDelete: Restrict)
 
   @@unique([topsisResultId, kriteriaId])
   @@index([kriteriaId])
@@ -320,11 +278,7 @@ model AuditLog {
 
   metadata Json?
 
-  user User? @relation(
-    fields: [userId],
-    references: [id],
-    onDelete: SetNull
-  )
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
