@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Outlet } from 'react-router-dom'
 import AdminSidebar from '../components/shared/AdminSidebar'
 
@@ -6,7 +6,7 @@ interface AdminLayoutProps {
   children?: ReactNode
 }
 
-export default function AdminLayout({
+export function AdminLayout({
   children,
 }: AdminLayoutProps) {
   return (
@@ -21,3 +21,5 @@ export default function AdminLayout({
     </div>
   )
 }
+
+export default AdminLayout
