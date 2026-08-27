@@ -792,9 +792,19 @@ export async function getAdminVerifikasi(
     ) {
       const objectData =
         data as {
+          verifikasi?: AdminPengajuan[]
           pengajuan?: AdminPengajuan[]
           items?: AdminPengajuan[]
+          data?: AdminPengajuan[]
         }
+
+      if (
+        Array.isArray(
+          objectData.verifikasi
+        )
+      ) {
+        return objectData.verifikasi
+      }
 
       if (
         Array.isArray(
@@ -810,6 +820,14 @@ export async function getAdminVerifikasi(
         )
       ) {
         return objectData.items
+      }
+
+      if (
+        Array.isArray(
+          objectData.data
+        )
+      ) {
+        return objectData.data
       }
     }
 

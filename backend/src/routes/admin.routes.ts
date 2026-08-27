@@ -51,6 +51,7 @@ import {
 
 import {
   processTopsis,
+  getTopsisCandidates,
   getTopsisResults,
   getTopsisResultById,
 } from '../controllers/topsis.controller'
@@ -222,6 +223,17 @@ adminRouter.delete(
   '/subkriteria/:id',
   asyncHandler(
     deleteSubKriteria
+  )
+)
+
+// ============================================================
+// TOPSIS - CANDIDATES
+// ============================================================
+
+adminRouter.get(
+  '/topsis/candidates',
+  asyncHandler(
+    getTopsisCandidates
   )
 )
 

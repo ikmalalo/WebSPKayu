@@ -1,15 +1,24 @@
-# SPK Mustahik - Sistem Pendukung Keputusan Kelayakan Mustahik
+# SPK Mustahik Zakat Produktif
 
 ## 1. DESKRIPSI PROJECT
 
-Project ini adalah website Sistem Pendukung Keputusan (SPK) untuk membantu proses penentuan kelayakan calon mustahik menggunakan metode TOPSIS.
+Project ini adalah aplikasi Sistem Pendukung Keputusan (SPK) untuk membantu proses seleksi dan penentuan kelayakan calon mustahik penerima zakat produktif menggunakan metode TOPSIS.
 
-Sistem memiliki dua role utama:
+Sistem digunakan untuk:
+
+- Pendaftaran akun calon mustahik
+- Pengajuan data calon mustahik
+- Pengisian kuesioner/asesmen
+- Verifikasi data oleh admin
+- Pengelolaan data mustahik
+- Proses perhitungan TOPSIS
+- Penentuan ranking dan kelayakan
+- Pemantauan status pengajuan oleh user
+
+Project memiliki dua role utama:
 
 1. USER / CALON MUSTAHIK
-2. ADMIN / PENGELOLA SISTEM
-
-Sistem digunakan untuk mengelola data calon mustahik, proses pengajuan, kuesioner/verifikasi, perhitungan TOPSIS, dan hasil keputusan kelayakan.
+2. ADMIN
 
 ---
 
@@ -17,13 +26,14 @@ Sistem digunakan untuk mengelola data calon mustahik, proses pengajuan, kuesione
 
 Sistem bertujuan untuk:
 
-- Mempermudah calon mustahik melakukan pengajuan.
-- Mempermudah admin mengelola data mustahik.
-- Mempermudah proses verifikasi calon mustahik.
-- Membantu proses penilaian menggunakan metode TOPSIS.
-- Menghasilkan ranking berdasarkan nilai TOPSIS.
-- Menentukan hasil kelayakan calon mustahik.
-- Memberikan informasi hasil pengajuan kepada user.
+- Mempermudah calon mustahik melakukan pengajuan
+- Mempermudah proses pengumpulan data calon mustahik
+- Mempermudah proses asesmen dan kuesioner
+- Mempermudah admin melakukan verifikasi data
+- Membantu proses pengambilan keputusan menggunakan metode TOPSIS
+- Menghasilkan ranking calon mustahik
+- Menentukan status layak atau tidak layak didanai
+- Memungkinkan user memantau status pengajuannya
 
 ---
 
@@ -35,13 +45,14 @@ User dapat:
 
 - Register
 - Login
-- Mengisi data diri
-- Mengajukan diri sebagai calon mustahik
-- Mengisi kuesioner
-- Melihat status verifikasi
-- Melihat hasil pengajuan
-- Melihat hasil penilaian TOPSIS
-- Melihat status kelayakan
+- Melihat dashboard
+- Mengisi data pengajuan
+- Mengisi data pribadi
+- Mengisi kuesioner/asesmen
+- Melihat status pengajuan
+- Melihat hasil verifikasi
+- Melihat hasil penilaian
+- Melihat hasil kelayakan
 - Mengelola profil
 - Logout
 
@@ -52,190 +63,220 @@ User dapat:
 Admin dapat:
 
 - Login
-- Melihat dashboard
-- Melihat data mustahik
-- Mencari mustahik
+- Melihat dashboard admin
+- Melihat daftar calon mustahik
+- Mencari data mustahik
 - Melihat detail pengajuan
-- Melakukan verifikasi
+- Melihat jawaban kuesioner user
+- Melakukan verifikasi data
+- Mengubah status pengajuan
 - Mengelola data mustahik
-- Mengelola kriteria TOPSIS
-- Mengelola bobot kriteria
+- Mengelola kriteria
 - Mengelola subkriteria
 - Menjalankan proses TOPSIS
 - Melihat hasil ranking
 - Melihat laporan
-- Mengelola akun
+- Mengelola pengaturan akun
 - Logout
 
 ---
 
-# 4. ALUR USER
-
-Flow utama user:
+# 4. ALUR UTAMA USER
 
 START
 ↓
 REGISTER / LOGIN
 ↓
 LOGIN BERHASIL?
-├── TIDAK → Kembali ke LOGIN
-└── YA
-    ↓
+
+Jika TIDAK:
+↓
+Kembali ke LOGIN
+
+Jika YA:
+↓
 DASHBOARD USER
-    ↓
-    ├── DAFTAR / PENGAJUAN MUSTAHIK
-    │
-    ├── VERIFIKASI / KUESIONER
-    │
-    ├── PANTAU HASIL PENGAJUAN
-    │
-    └── PROFIL
+↓
+PENGAJUAN
+↓
+ISI DATA CALON MUSTAHIK
+↓
+ISI KUESIONER / ASESMEN
+↓
+KIRIM PENGAJUAN
+↓
+STATUS = MENUNGGU VERIFIKASI
+↓
+ADMIN MELAKUKAN VERIFIKASI
+↓
+STATUS DIPERBARUI
+↓
+USER MEMANTAU HASIL PENGAJUAN
 
 ---
 
-# 5. ALUR PENGAJUAN USER
-
-User login
-↓
-Dashboard
-↓
-Pengajuan Mustahik
-↓
-Mengisi data diri
-↓
-Mengisi kuesioner
-↓
-Submit
-↓
-Status = MENUNGGU VERIFIKASI
-↓
-Admin melakukan verifikasi
-↓
-Status diperbarui
-
----
-
-# 6. ALUR ADMIN
+# 5. ALUR ADMIN
 
 START
 ↓
 ADMIN LOGIN
 ↓
 LOGIN BERHASIL?
-├── TIDAK → Kembali ke LOGIN
-└── YA
-    ↓
+
+Jika TIDAK:
+↓
+Kembali ke LOGIN
+
+Jika YA:
+↓
 ADMIN DASHBOARD
-    ↓
-    ├── HOME
-    ├── PENCARIAN
-    ├── VERIFIKASI
-    ├── PENGELOLAAN DATA
-    ├── KRITERIA TOPSIS
-    ├── PROSES TOPSIS
-    ├── HASIL RANKING
-    ├── LAPORAN
-    └── PENGATURAN
+↓
+ADMIN DAPAT MEMILIH:
+
+- Dashboard
+- Data Mustahik
+- Verifikasi
+- Kriteria
+- Subkriteria
+- Proses TOPSIS
+- Hasil Ranking
+- Laporan
+- Pengaturan
+- Logout
 
 ---
 
-# 7. ALUR VERIFIKASI
+# 6. ALUR PENGAJUAN USER
 
-Admin membuka data pengajuan
+User login
 ↓
-Melihat data calon mustahik
+Membuka menu Pengajuan
 ↓
-Melihat jawaban kuesioner
+Mengisi data calon mustahik
 ↓
-Melakukan validasi
+Data pengajuan tersimpan
 ↓
-Data valid?
-├── TIDAK
-│   ↓
-│   Status = PERLU PERBAIKAN / DITOLAK
-│
-└── YA
-    ↓
-    Status = LOLOS VERIFIKASI
-    ↓
-    Masuk proses TOPSIS
+User membuka menu Kuesioner
+↓
+Mengisi seluruh asesmen/kuesioner
+↓
+Mengirim kuesioner
+↓
+Pengajuan masuk ke proses verifikasi
+↓
+Status = MENUNGGU VERIFIKASI
 
 ---
 
-# 8. METODE TOPSIS
+# 7. ALUR VERIFIKASI ADMIN
 
-TOPSIS digunakan untuk melakukan penilaian dan ranking calon mustahik.
+Admin login
+↓
+Membuka menu Verifikasi
+↓
+Melihat daftar calon mustahik
+↓
+Memilih salah satu calon mustahik
+↓
+Melihat data pengajuan
+↓
+Melihat jawaban kuesioner/asesmen
+↓
+Melakukan validasi data
+↓
+DATA VALID?
 
-Tahapan TOPSIS:
+Jika TIDAK:
+↓
+Status = PERLU PERBAIKAN atau DITOLAK
 
-1. Menentukan alternatif.
-2. Menentukan kriteria.
-3. Menentukan bobot kriteria.
-4. Membentuk matriks keputusan.
-5. Melakukan normalisasi.
-6. Melakukan normalisasi terbobot.
-7. Menentukan solusi ideal positif.
-8. Menentukan solusi ideal negatif.
-9. Menghitung jarak setiap alternatif terhadap solusi ideal.
-10. Menghitung nilai preferensi.
-11. Melakukan ranking.
-12. Menentukan hasil kelayakan.
-
-Catatan:
-
-Kriteria, bobot, tipe benefit/cost, dan nilai subkriteria harus dibuat dinamis.
-
-Jangan hardcode nilai TOPSIS ke dalam frontend.
-
----
-
-# 9. KRITERIA TOPSIS
-
-Kriteria dan bobot belum dianggap final sampai diberikan oleh pemilik project.
-
-Contoh sementara:
-
-| Kriteria | Tipe | Bobot |
-|---|---|---:|
-| Penghasilan | Cost | 30% |
-| Jumlah Tanggungan | Benefit | 25% |
-| Kondisi Rumah | Benefit | 20% |
-| Status Pekerjaan | Benefit | 15% |
-| Kepemilikan Aset | Cost | 10% |
-
-CATATAN:
-
-Data di atas hanya contoh untuk development.
-
-Jangan menganggap data ini sebagai data final.
-
-Jika pemilik project memberikan kriteria/bobot baru, gunakan data terbaru.
+Jika YA:
+↓
+Status = LOLOS VERIFIKASI
+↓
+Data dapat masuk ke proses TOPSIS
 
 ---
 
-# 10. HASIL TOPSIS
+# 8. KUESIONER / FORM ASESMEN
 
-Sistem menghasilkan:
+Kuesioner mengikuti konsep Form Asesmen Seleksi Mustahik Zakat Produktif yang diberikan oleh client.
 
-- Nilai preferensi
-- Ranking
-- Status kelayakan
+Form asesmen digunakan sebagai input penilaian untuk Sistem Pendukung Keputusan menggunakan metode TOPSIS.
+
+Struktur asesmen menggunakan lima dimensi Maqashid Syariah.
+
+Contoh struktur:
+
+- C1 Hifzh ad-Din
+- C2 Hifzh an-Nafs
+- C3 Hifzh al-Aql
+- C4 Hifzh an-Nasl
+- C5 Hifzh al-Mal
+
+Setiap dimensi dapat memiliki beberapa indikator penilaian.
 
 Contoh:
 
-| Ranking | Nama | Nilai | Status |
-|---:|---|---:|---|
-| 1 | Ahmad | 0.821 | Layak |
-| 2 | Budi | 0.743 | Layak |
-| 3 | Citra | 0.521 | Tidak Layak |
+C1 Hifzh ad-Din
 
-Nilai di atas hanya contoh.
+- ID1 Integritas dan kepatuhan muamalah
+- ID2 Komitmen pembinaan spiritual
+- ID3 Komitmen amanah terhadap program
+
+User memberikan jawaban berdasarkan kondisi yang dialami saat ini.
+
+---
+
+# 9. SKALA PENILAIAN KUESIONER
+
+Saat ini kuesioner menggunakan skala nilai 1 sampai 5.
+
+Interpretasi sementara:
+
+1 = Kondisi sangat buruk / sangat tidak sesuai
+2 = Kurang
+3 = Cukup
+4 = Baik
+5 = Sangat baik
+
+CATATAN PENTING:
+
+Interpretasi detail setiap angka masih dapat berubah apabila client memberikan aturan penilaian yang lebih spesifik.
+
+Jangan mengubah pertanyaan, indikator, bobot, atau interpretasi nilai tanpa instruksi terbaru dari client.
+
+Jika ada revisi dari client mengenai Form Asesmen TOPSIS, gunakan requirement terbaru dari client.
+
+---
+
+# 10. DATA IDENTITAS CALON MUSTAHIK
+
+Data identitas dapat mencakup:
+
+- Nama lengkap
+- NIK
+- Tempat lahir
+- Tanggal lahir
+- Nomor HP
+- Alamat
+- Status pernikahan
+- Jumlah tanggungan
+- Pendidikan terakhir
+- Pekerjaan utama
+- Pekerjaan sampingan
+- Jenis usaha
+- Lama usaha
+
+Field harus mengikuti struktur backend dan database yang sudah tersedia.
+
+Jangan mengubah nama field database tanpa mempertimbangkan backend yang sudah ada.
 
 ---
 
 # 11. STATUS PENGAJUAN
 
-Gunakan status:
+Status pengajuan yang digunakan:
 
 - DRAFT
 - MENUNGGU_VERIFIKASI
@@ -247,9 +288,51 @@ Gunakan status:
 - LAYAK_DIDANAI
 - TIDAK_DIDANAI
 
+Gunakan status yang konsisten antara:
+
+- Frontend
+- Backend
+- Database
+- Dashboard user
+- Dashboard admin
+- Halaman verifikasi
+- Hasil pengajuan
+
 ---
 
-# 12. TECH STACK
+# 12. METODE TOPSIS
+
+TOPSIS digunakan untuk membantu proses penilaian dan pemeringkatan calon mustahik.
+
+Tahapan utama:
+
+1. Menentukan alternatif
+2. Menentukan kriteria
+3. Menentukan bobot kriteria
+4. Membentuk matriks keputusan
+5. Melakukan normalisasi
+6. Melakukan normalisasi terbobot
+7. Menentukan solusi ideal positif
+8. Menentukan solusi ideal negatif
+9. Menghitung jarak alternatif
+10. Menghitung nilai preferensi
+11. Membuat ranking
+12. Menentukan hasil kelayakan
+
+Hasil sistem dapat berupa:
+
+- Nilai TOPSIS
+- Ranking
+- Status Layak Didanai
+- Status Tidak Didanai
+
+CATATAN:
+
+Jangan membuat atau mengubah rumus, bobot, tipe benefit/cost, atau aturan kelayakan tanpa requirement yang jelas dari client.
+
+---
+
+# 13. TECH STACK
 
 ## Frontend
 
@@ -260,8 +343,6 @@ Gunakan status:
 - shadcn/ui
 - Lucide React
 - React Router
-- Axios
-- Recharts
 
 ## Backend
 
@@ -276,21 +357,103 @@ Gunakan status:
 
 - MySQL
 - Prisma ORM
-- Laragon (local development)
 
-Development Database:
+## Local Development
 
-- Database development menggunakan MySQL lokal melalui Laragon.
-- Prisma ORM digunakan untuk koneksi, schema, migration, dan pengelolaan database.
-- Postman bukan bagian dari sistem dan hanya digunakan sebagai tool testing API jika diperlukan.
-- Gunakan database MySQL lokal untuk development.
-- Jangan menggunakan PostgreSQL untuk project ini.
+- Laragon
+- MySQL lokal
 
 ---
 
-# 13. DESIGN DIRECTION
+# 14. STRUKTUR SISTEM
 
-Desain harus:
+Project memiliki frontend dan backend yang terpisah.
+
+Contoh struktur:
+
+webspkayu/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── context/
+│   │   ├── layouts/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   ├── types/
+│   │   └── App.tsx
+│   │
+│   └── package.json
+│
+└── backend/
+    ├── src/
+    │   ├── controllers/
+    │   ├── middleware/
+    │   ├── routes/
+    │   ├── services/
+    │   ├── utils/
+    │   └── server.ts
+    │
+    ├── prisma/
+    └── package.json
+
+Jangan mengubah struktur project secara besar-besaran tanpa alasan.
+
+Gunakan struktur yang sudah ada sebagai acuan utama.
+
+---
+
+# 15. AUTHENTICATION
+
+Sistem menggunakan authentication untuk user dan admin.
+
+Setiap role memiliki akses yang berbeda.
+
+USER:
+
+- Hanya dapat mengakses halaman user
+- Tidak dapat mengakses halaman admin
+
+ADMIN:
+
+- Dapat mengakses halaman admin sesuai hak akses
+
+Pastikan:
+
+- Login user tidak tercampur dengan admin
+- Redirect setelah login sesuai role
+- Protected route bekerja
+- Session/token tersimpan dengan benar
+- Halaman admin tidak meminta login ulang jika session masih valid
+- User tidak dapat masuk ke halaman admin tanpa role yang sesuai
+
+Jangan menghapus sistem authentication yang sudah ada kecuali memang diperlukan untuk memperbaiki bug.
+
+---
+
+# 16. LAYOUT DAN SIDEBAR
+
+Sistem memiliki layout User dan Admin.
+
+Namun desain sidebar harus tetap konsisten.
+
+Sidebar Admin menggunakan desain visual yang sama atau mengikuti gaya sidebar User yang sudah lebih baik.
+
+Perbedaan utama sidebar hanya pada:
+
+- Menu
+- Icon
+- Role
+- Hak akses
+
+Jangan membuat dua desain sidebar yang sangat berbeda tanpa alasan.
+
+Prioritaskan consistency UI.
+
+---
+
+# 17. USER INTERFACE
+
+Desain aplikasi harus:
 
 - Modern
 - Clean
@@ -298,88 +461,68 @@ Desain harus:
 - Responsive
 - Mudah digunakan
 - Tidak terlalu ramai
-- Cocok untuk sistem pelayanan sosial/zakat
-
-Gunakan nuansa warna hijau sebagai warna utama.
+- Cocok untuk sistem zakat dan pelayanan sosial
 
 Gunakan:
 
-- White / off-white background
-- Green primary color
-- Soft gray secondary color
+- Nuansa hijau sebagai warna utama
+- Background putih atau off-white
+- Soft gray sebagai warna pendukung
 - Rounded card
 - Soft shadow
-- Modern typography
+- Typography yang jelas
 - Lucide icons
-- Clear badges
-- Clean table
-- Clean form
+- Badge status
+- Table yang clean
+- Form yang mudah digunakan
 
 Hindari:
 
 - Gradient berlebihan
 - Glassmorphism berlebihan
 - Animasi berlebihan
-- Warna terlalu banyak
-- UI yang terlalu ramai
+- Terlalu banyak warna
+- UI yang tidak konsisten
 
 ---
 
-# 14. USER INTERFACE
+# 18. FRONTEND RULE
 
-## User Layout
+Saat melakukan perubahan frontend:
 
-Sidebar:
-
-- Dashboard
-- Pengajuan
-- Kuesioner
-- Pantau Hasil
-- Profil
-- Logout
-
-Dashboard:
-
-- Greeting
-- Status Pengajuan
-- Progress Pengajuan
-- Status Verifikasi
-- Nilai TOPSIS
-- Hasil Keputusan
+- Jangan mengubah desain halaman lain tanpa diminta
+- Jangan menghapus fitur yang sudah berfungsi
+- Jangan membuat halaman baru jika tidak diperlukan
+- Gunakan reusable component jika memungkinkan
+- Perbaiki bug tanpa merusak flow yang sudah ada
+- Pastikan responsive
+- Gunakan TypeScript dengan benar
+- Jangan menggunakan `any` jika tipe yang jelas dapat dibuat
+- Periksa error build setelah melakukan perubahan
 
 ---
 
-# 15. ADMIN INTERFACE
+# 19. BACKEND RULE
 
-Sidebar:
+Saat melakukan perubahan backend:
 
-- Dashboard
-- Data Mustahik
-- Verifikasi
-- Kriteria
-- Subkriteria
-- Proses TOPSIS
-- Hasil Ranking
-- Laporan
-- Pengaturan
-- Logout
+- Jangan mengubah endpoint tanpa alasan
+- Jangan mengubah response API tanpa mengecek frontend
+- Jangan mengubah database schema tanpa mengecek relasi
+- Jangan membuat data dummy jika database seharusnya digunakan
+- Pastikan authentication tetap berjalan
+- Pastikan authorization berdasarkan role
+- Gunakan error handling yang jelas
 
-Dashboard admin menampilkan:
-
-- Total Mustahik
-- Pengajuan Baru
-- Menunggu Verifikasi
-- Sudah Diverifikasi
-- Layak Didanai
-- Tidak Didanai
-
-Gunakan chart sederhana jika memang diperlukan.
+Setiap perubahan backend harus mempertimbangkan dampaknya terhadap frontend.
 
 ---
 
-# 16. DATABASE ENTITY
+# 20. DATABASE RULE
 
-Minimal entity:
+Database menggunakan MySQL dengan Prisma ORM.
+
+Entity utama dapat mencakup:
 
 - User
 - Mustahik
@@ -392,243 +535,159 @@ Minimal entity:
 - TopsisDetail
 - AuditLog
 
-Relasi harus dirancang sebelum implementasi backend.
+Jangan mengubah schema Prisma sembarangan.
+
+Sebelum mengubah schema:
+
+1. Periksa schema yang sudah ada
+2. Periksa relasi
+3. Periksa backend yang menggunakan model tersebut
+4. Periksa frontend yang menggunakan response API
 
 ---
 
-# 17. BACKEND ARCHITECTURE
+# 21. CURRENT PROJECT STATE
 
-Backend menggunakan struktur sederhana:
+Project saat ini sudah memiliki:
 
-controllers
-services
-routes
-middleware
-validators
-utils
-types
+- Frontend
+- Backend
+- Database
+- Authentication
+- User role
+- Admin role
+- Pengajuan
+- Kuesioner
+- Halaman admin
+- Verifikasi
+- Deploy frontend/backend
 
-TOPSIS dipisahkan sebagai service tersendiri.
+Project bukan lagi tahap membuat UI dari nol.
 
-Contoh:
+Fokus utama saat ini adalah:
 
-backend/src/services/topsis/
-
-- topsis.service.ts
-- normalization.service.ts
-- weighting.service.ts
-- ideal-solution.service.ts
-- distance.service.ts
-- ranking.service.ts
-
----
-
-# 18. API
-
-Authentication:
-
-POST /api/auth/register
-POST /api/auth/login
-GET /api/auth/me
-
-User:
-
-GET /api/user/profile
-PUT /api/user/profile
-
-Pengajuan:
-
-POST /api/pengajuan
-GET /api/pengajuan/me
-GET /api/pengajuan/:id
-
-Kuesioner:
-
-GET /api/kuesioner
-POST /api/kuesioner/jawaban
-PUT /api/kuesioner/jawaban
-
-Admin:
-
-GET /api/admin/mustahik
-GET /api/admin/mustahik/:id
-PUT /api/admin/mustahik/:id
-DELETE /api/admin/mustahik/:id
-
-Verifikasi:
-
-GET /api/admin/verifikasi
-GET /api/admin/verifikasi/:id
-POST /api/admin/verifikasi/:id
-
-Kriteria:
-
-GET /api/admin/kriteria
-POST /api/admin/kriteria
-PUT /api/admin/kriteria/:id
-DELETE /api/admin/kriteria/:id
-
-TOPSIS:
-
-POST /api/admin/topsis/process
-GET /api/admin/topsis/results
-GET /api/admin/topsis/results/:id
+- Memperbaiki bug
+- Menyambungkan flow yang belum sempurna
+- Memastikan authentication berjalan benar
+- Memastikan route sesuai role
+- Memastikan frontend dan backend terhubung
+- Menyesuaikan requirement terbaru dari client
+- Melanjutkan fitur yang belum selesai
 
 ---
 
-# 19. DEVELOPMENT RULE
-
-Project harus dikerjakan secara bertahap.
-
-JANGAN langsung membuat seluruh frontend, backend, database, dan TOPSIS sekaligus.
-
-Development phases:
-
-PHASE 1:
-Frontend UI/UX
-
-PHASE 2:
-Frontend functionality
-
-PHASE 3:
-Backend API
-
-PHASE 4:
-Database
-
-PHASE 5:
-TOPSIS engine
-
-PHASE 6:
-Frontend + Backend integration
-
-PHASE 7:
-Testing
-
-PHASE 8:
-Deployment
-
-Setiap phase harus selesai dan diuji sebelum melanjutkan ke phase berikutnya.
-
----
-
-# 20. CURRENT DEVELOPMENT PHASE
-
-Saat pertama kali membaca README ini, fokus hanya pada:
-
-PHASE 1 - FRONTEND UI/UX
-
-Jangan membuat backend terlebih dahulu.
-
-Jangan membuat database terlebih dahulu.
-
-Jangan membuat API terlebih dahulu.
-
-Jangan membuat perhitungan TOPSIS terlebih dahulu.
-
-Buat seluruh halaman frontend berdasarkan requirement dan flow yang tersedia.
-
-Gunakan mock/static data hanya untuk kebutuhan visual frontend.
-
-Setelah frontend selesai, tunggu instruksi berikutnya sebelum mengerjakan backend.
-
----
-
-# 21. FRONTEND PAGES
-
-Buat halaman:
-
-AUTH:
-
-- Login
-- Register
+# 22. CURRENT FLOW YANG HARUS DIPERTAHANKAN
 
 USER:
 
-- Dashboard
-- Pengajuan
-- Form Data Mustahik
-- Kuesioner
-- Pantau Hasil
-- Detail Hasil
-- Profil
+Register / Login
+↓
+Dashboard
+↓
+Pengajuan
+↓
+Isi Data
+↓
+Kuesioner / Asesmen
+↓
+Kirim
+↓
+Menunggu Verifikasi
+↓
+Admin Verifikasi
+↓
+Proses TOPSIS
+↓
+Hasil Kelayakan
+↓
+User Pantau Hasil
 
 ADMIN:
 
-- Login
-- Dashboard
-- Data Mustahik
-- Detail Mustahik
-- Verifikasi
-- Kriteria
-- Subkriteria
-- Proses TOPSIS
-- Hasil Ranking
-- Laporan
-- Pengaturan
+Login
+↓
+Dashboard
+↓
+Melihat Data Mustahik
+↓
+Melihat Detail Pengajuan
+↓
+Melihat Jawaban Kuesioner
+↓
+Verifikasi
+↓
+Data Lolos Verifikasi
+↓
+Proses TOPSIS
+↓
+Ranking
+↓
+Layak / Tidak Layak
 
 ---
 
-# 22. FRONTEND REQUIREMENT
+# 23. ATURAN PENTING UNTUK AI AGENT
 
-Untuk PHASE 1:
+Sebelum mengubah kode:
 
-- Gunakan React + TypeScript.
-- Gunakan Tailwind.
-- Gunakan shadcn/ui.
-- Gunakan Lucide icons.
-- Gunakan reusable components.
-- Buat responsive desktop/tablet/mobile.
-- Buat sidebar reusable.
-- Buat navbar/topbar reusable.
-- Buat card reusable.
-- Buat table reusable.
-- Buat modal/dialog reusable.
-- Buat badge/status reusable.
-- Buat form component reusable.
+1. Pahami struktur project yang sudah ada.
+2. Cari file yang berhubungan dengan fitur yang akan diperbaiki.
+3. Jangan langsung mengganti banyak file tanpa memahami dependensinya.
+4. Pertahankan fitur yang sudah berfungsi.
+5. Jika memperbaiki bug, fokus pada akar masalah.
+6. Jangan membuat ulang seluruh project.
+7. Jangan mengganti tech stack.
+8. Jangan membuat backend baru jika backend sudah tersedia.
+9. Jangan membuat authentication baru jika sistem auth sudah ada.
+10. Jangan menghapus route atau context tanpa mengecek penggunaannya.
 
-Gunakan mock data.
+Jika ada error TypeScript:
 
-Jangan membuat API call.
+- Cari sumber tipe/interface yang benar.
+- Jangan memperbaiki dengan `any` secara sembarangan.
+- Pastikan import/export sesuai.
+- Jalankan build setelah perbaikan.
 
-Jangan membuat database.
+Jika ada bug frontend dan backend:
 
-Jangan membuat backend.
-
----
-
-# 23. FRONTEND QUALITY
-
-Prioritaskan:
-
-1. Visual hierarchy
-2. Consistency
-3. Responsive design
-4. Accessibility
-5. Reusable components
-6. Clean code
-7. User experience
-
-Jangan hanya membuat halaman kosong.
-
-Setiap halaman harus terlihat seperti aplikasi yang benar-benar siap digunakan.
+- Periksa request API.
+- Periksa response API.
+- Periksa authentication/token.
+- Periksa role.
+- Periksa protected route.
+- Periksa state/context.
+- Jangan hanya memperbaiki tampilan jika masalah berasal dari backend.
 
 ---
 
-# 24. IMPORTANT RULE FOR AI AGENT
+# 24. PRIORITAS SAAT INI
 
-Jika ada requirement yang belum jelas:
+Prioritas pengerjaan:
 
-JANGAN mengarang requirement penting.
+1. Memastikan authentication user dan admin berjalan benar
+2. Memastikan routing berdasarkan role berjalan benar
+3. Memastikan halaman admin tidak salah redirect ke login
+4. Menyamakan desain sidebar admin dengan desain sidebar user
+5. Memastikan pengajuan tersimpan dan terbaca
+6. Memastikan kuesioner terhubung dengan data pengajuan
+7. Memastikan admin dapat melihat data pengajuan dan jawaban kuesioner
+8. Memastikan flow verifikasi berjalan
+9. Melanjutkan integrasi TOPSIS sesuai requirement client
 
-Tandai sebagai TODO atau tanyakan sebelum implementasi.
+---
 
-Jangan mengubah flow bisnis utama tanpa alasan.
+# 25. SOURCE OF TRUTH
 
-Jangan menambahkan fitur besar yang tidak diminta.
+Urutan prioritas requirement:
 
-Jangan mengganti tech stack tanpa alasan.
+1. Instruksi terbaru dari client
+2. Flowchart terbaru dari client
+3. Form Asesmen TOPSIS dari client
+4. README ini
+5. Struktur project dan implementasi yang sudah berjalan
 
-Jangan membuat keputusan metodologi TOPSIS yang belum diberikan oleh pemilik project.
+Jika requirement terbaru dari client berbeda dengan README ini, ikuti requirement terbaru dari client dan perbarui README jika diperlukan.
 
-Selalu prioritaskan isi README ini sebagai sumber utama requirement
+JANGAN mengarang requirement penting yang belum diberikan oleh client.
+
+Jika ada bagian yang belum jelas, tandai sebagai TODO atau tanyakan terlebih dahulu.

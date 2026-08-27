@@ -1,273 +1,152 @@
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  BarChart3,
-  ChevronRight,
-  ClipboardCheck,
-  FileBarChart,
-  FileText,
-  Home,
-  ListChecks,
-  LogOut,
-  Menu,
-  Settings,
-  SlidersHorizontal,
+  LayoutDashboard,
   Users,
+  ClipboardCheck,
+  SlidersHorizontal,
+  ListChecks,
+  BarChart3,
+  FileText,
+  FileBarChart,
+  Settings,
+  LogOut,
   X,
+  Menu,
+  ChevronRight,
 } from 'lucide-react'
-import {
-  NavLink,
-  useLocation,
-  useNavigate,
-} from 'react-router-dom'
-import {
-  useEffect,
-  useState,
-} from 'react'
+import { useAuth } from '@/context/AuthContext'
+import logoImg from '@/assets/logo.png'
+import { cn } from '@/lib/utils'
 
-interface MenuItem {
-  label: string
-  path: string
-  icon: React.ReactNode
+interface AdminSidebarProps {
+  open: boolean
+  onClose: () => void
 }
 
-const menuItems: MenuItem[] = [
-  {
-    label: 'Dashboard',
-    path: '/admin/dashboard',
-    icon: <Home size={20} />,
-  },
-  {
-    label: 'Data Mustahik',
-    path: '/admin/mustahik',
-    icon: <Users size={20} />,
-  },
-  {
-    label: 'Verifikasi',
-    path: '/admin/verifikasi',
-    icon: <ClipboardCheck size={20} />,
-  },
-  {
-    label: 'Kriteria',
-    path: '/admin/kriteria',
-    icon: <SlidersHorizontal size={20} />,
-  },
-  {
-    label: 'Subkriteria',
-    path: '/admin/subkriteria',
-    icon: <ListChecks size={20} />,
-  },
-  {
-    label: 'Proses TOPSIS',
-    path: '/admin/topsis',
-    icon: <BarChart3 size={20} />,
-  },
-  {
-    label: 'Hasil Ranking',
-    path: '/admin/ranking',
-    icon: <FileText size={20} />,
-  },
-  {
-    label: 'Laporan',
-    path: '/admin/laporan',
-    icon: <FileBarChart size={20} />,
-  },
-  {
-    label: 'Pengaturan',
-    path: '/admin/pengaturan',
-    icon: <Settings size={20} />,
-  },
+const navItems = [
+  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admin/mustahik', icon: Users, label: 'Data Mustahik' },
+  { to: '/admin/verifikasi', icon: ClipboardCheck, label: 'Verifikasi' },
+  { to: '/admin/kriteria', icon: SlidersHorizontal, label: 'Kriteria TOPSIS' },
+  { to: '/admin/subkriteria', icon: ListChecks, label: 'Subkriteria' },
+  { to: '/admin/topsis', icon: BarChart3, label: 'Proses TOPSIS' },
+  { to: '/admin/ranking', icon: FileText, label: 'Hasil Ranking' },
+  { to: '/admin/laporan', icon: FileBarChart, label: 'Laporan' },
+  { to: '/admin/pengaturan', icon: Settings, label: 'Pengaturan' },
 ]
 
-export default function AdminSidebar() {
-  const location = useLocation()
+export function AdminSidebar({ open, onClose }: AdminSidebarProps) {
   const navigate = useNavigate()
-
-  const [mobileOpen, setMobileOpen] =
-    useState(false)
-
-  useEffect(() => {
-    setMobileOpen(false)
-  }, [location.pathname])
+  const { currentUser, logoutSession } = useAuth()
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    localStorage.removeItem('auth')
-
-    sessionStorage.clear()
-
-    navigate('/login', {
-      replace: true,
-    })
+    logoutSession()
+    navigate('/login', { replace: true })
   }
 
-  const sidebarContent = (
-    <>
-      {/* LOGO */}
-
-      <div className="flex h-20 items-center border-b border-slate-200 px-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-600 text-sm font-bold text-white shadow-sm">
-            SPK
-          </div>
-
-          <div className="min-w-0 overflow-hidden whitespace-nowrap">
-            <p className="truncate text-sm font-bold text-slate-900">
-              SPK Mustahik
-            </p>
-
-            <p className="truncate text-xs text-slate-500">
-              Panel Admin
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* MENU */}
-
-      <div className="flex-1 overflow-y-auto px-3 py-4">
-        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          Menu Admin
-        </p>
-
-        <nav className="space-y-1">
-          {menuItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                [
-                  'group flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-200',
-                  isActive
-                    ? 'bg-green-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-green-50 hover:text-green-700',
-                ].join(' ')
-              }
-            >
-              <span className="shrink-0">
-                {item.icon}
-              </span>
-
-              <span className="min-w-0 flex-1 truncate whitespace-nowrap">
-                {item.label}
-              </span>
-
-              <ChevronRight
-                size={16}
-                className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-              />
-            </NavLink>
-          ))}
-        </nav>
-      </div>
-
-      {/* ADMIN INFO + LOGOUT */}
-
-      <div className="border-t border-slate-200 p-3">
-        <div className="mb-2 flex items-center gap-3 rounded-xl px-2 py-2">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100 font-semibold text-green-700">
-            A
-          </div>
-
-          <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-            <p className="truncate text-sm font-semibold text-slate-800">
-              Administrator
-            </p>
-
-            <p className="truncate text-xs text-slate-500">
-              Admin SPK Mustahik
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-        >
-          <LogOut
-            size={20}
-            className="shrink-0"
-          />
-
-          <span className="whitespace-nowrap">
-            Logout
-          </span>
-        </button>
-      </div>
-    </>
-  )
+  const displayName = currentUser?.name || 'Administrator'
+  const displayEmail = currentUser?.email || 'admin@maqzis.id'
 
   return (
     <>
-      {/* MOBILE HEADER */}
-
-      <div className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 lg:hidden">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-sm font-bold text-white">
-            SPK
-          </div>
-
-          <div>
-            <p className="text-sm font-bold text-slate-900">
-              SPK Mustahik
-            </p>
-
-            <p className="text-xs text-slate-500">
-              Panel Admin
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            setMobileOpen(true)
-          }
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
-        >
-          <Menu size={22} />
-        </button>
-      </div>
-
-      {/* DESKTOP SIDEBAR */}
-
-      <aside className="group/admin-sidebar fixed inset-y-0 left-0 z-50 hidden w-20 flex-col overflow-hidden border-r border-slate-200 bg-white shadow-sm transition-all duration-300 hover:w-64 lg:flex">
-        {sidebarContent}
-      </aside>
-
-      {/* MOBILE SIDEBAR */}
-
-      {mobileOpen && (
+      {/* Overlay for mobile */}
+      {open && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/40 lg:hidden"
-          onClick={() =>
-            setMobileOpen(false)
-          }
-        >
-          <aside
-            className="flex h-full w-72 flex-col bg-white shadow-xl"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-            <div className="flex justify-end p-3">
-              <button
-                type="button"
-                onClick={() =>
-                  setMobileOpen(false)
-                }
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
-              >
-                <X size={22} />
-              </button>
-            </div>
-
-            <div className="-mt-3 flex min-h-0 flex-1 flex-col">
-              {sidebarContent}
-            </div>
-          </aside>
-        </div>
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          onClick={onClose}
+        />
       )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'group peer fixed inset-y-0 left-0 z-40 flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shrink-0 transition-all duration-300 ease-in-out shadow-lg',
+          // Hover-expand behavior on desktop
+          'lg:translate-x-0 lg:-translate-x-[calc(100%-12px)] lg:hover:translate-x-0',
+          open ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        {/* Logo */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <img src={logoImg} alt="Logo MAQZIS" className="w-8 h-8 object-contain rounded-lg" />
+            <div>
+              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">MAQZIS</span>
+              <p className="text-xs text-slate-400 leading-none">Panel Admin</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="lg:hidden p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Admin info */}
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-950/80 flex items-center justify-center text-green-700 dark:text-green-300 text-sm font-bold">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{displayName}</p>
+              <p className="text-xs text-slate-400 truncate">{displayEmail}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {navItems.map(({ to, icon: Icon, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              onClick={onClose}
+              className={({ isActive }) =>
+                cn('sidebar-link', isActive ? 'sidebar-link-active' : 'sidebar-link-inactive')
+              }
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Logout */}
+        <div className="px-3 py-4 border-t border-slate-100 dark:border-slate-800">
+          <button
+            onClick={handleLogout}
+            className="sidebar-link sidebar-link-inactive w-full text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 hover:text-red-600"
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span>Keluar</span>
+          </button>
+        </div>
+
+        {/* Floating Hint Handle for Desktop */}
+        <div className="hidden lg:flex absolute top-1/2 -right-6 -translate-y-1/2 w-6 h-14 bg-green-600 text-white rounded-r-xl shadow-md items-center justify-center cursor-pointer group-hover:opacity-0 transition-opacity">
+          <ChevronRight className="w-4 h-4 animate-pulse" />
+        </div>
+      </aside>
     </>
   )
 }
+
+// Mobile toggle button
+interface MobileMenuButtonProps {
+  onClick: () => void
+}
+
+export function AdminMobileMenuButton({ onClick }: MobileMenuButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+    >
+      <Menu className="w-5 h-5" />
+    </button>
+  )
+}
+
+export default AdminSidebar

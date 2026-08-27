@@ -1143,6 +1143,119 @@ export async function getTopsisResultByPengajuanId(
 
 
 // ============================================================
+// GET TOPSIS CANDIDATES
+// ============================================================
+
+export async function getTopsisCandidates(
+  req: Request,
+  res: Response
+) {
+  try {
+    const kriteria = await prisma.kriteria.findMany({
+      where: {
+        aktif: true,
+      },
+      include: {
+        indikator: {
+          where: {
+            aktif: true,
+          },
+          orderBy: {
+            urutan: 'asc',
+          },
+        },
+      },
+      orderBy: {
+        urutan: 'asc',
+      },
+    })
+
+    const pengajuan = await prisma.pengajuan.findMany({
+      where: {
+        status: {
+          in: [
+            PengajuanStatus.LOLOS_VERIFIKASI,
+            PengajuanStatus.DIPROSES_TOPSIS,
+            PengajuanStatus.LAYAK_DIDANAI,
+            PengajuanStatus.TIDAK_DIDANAI,
+          ],
+        },
+      },
+      include: {
+        mustahik: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        jawaban: {
+          include: {
+            indikator: {
+              include: {
+                kriteria: true,
+              },
+            },
+          },
+        },
+        topsisResults: {
+          orderBy: {
+            tanggalProses: 'desc',
+          },
+          take: 1,
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
+
+    const candidates = pengajuan.map((p) => ({
+      id: p.id,
+      userId: p.userId,
+      mustahikId: p.mustahikId,
+      status: p.status,
+      tanggalPengajuan: p.tanggalPengajuan ? p.tanggalPengajuan.toISOString() : null,
+      user: p.user,
+      mustahik: p.mustahik,
+      jumlahJawaban: p.jawaban.length,
+      jawaban: p.jawaban.map((j) => ({
+        id: j.id,
+        indikatorId: j.indikatorId,
+        kode: j.indikator?.kode || null,
+        nama: j.indikator?.nama || null,
+        tipe: j.indikator?.tipe || null,
+        nilai: Number(j.nilai),
+      })),
+      hasilTopsis: p.topsisResults[0]
+        ? {
+            id: p.topsisResults[0].id,
+            nilaiPreferensi: Number(p.topsisResults[0].nilaiPreferensi),
+            ranking: p.topsisResults[0].ranking,
+            status: p.topsisResults[0].status,
+            tanggalProses: p.topsisResults[0].tanggalProses.toISOString(),
+          }
+        : null,
+    }))
+
+    return success(
+      res,
+      'Data kandidat TOPSIS berhasil diambil',
+      {
+        criteria: kriteria,
+        candidates,
+        total: candidates.length,
+      }
+    )
+  } catch (error) {
+    console.error('GET TOPSIS CANDIDATES ERROR:', error)
+    return fail(res, 'Gagal mengambil kandidat TOPSIS', 500)
+  }
+}
+
+
+// ============================================================
 // ALIAS
 // ============================================================
 
@@ -1153,4 +1266,4 @@ export const getResults =
   getTopsisResults
 
 export const getResultById =
-  getTopsisResultById
+  getTopsisResultById
