@@ -30,7 +30,6 @@ import {
   useAuth,
 } from '@/context/AuthContext'
 
-
 // ============================================================
 // API
 // ============================================================
@@ -38,7 +37,6 @@ import {
 const API_URL =
   import.meta.env.VITE_API_URL ||
   'http://localhost:5000/api'
-
 
 // ============================================================
 // TYPES
@@ -53,7 +51,6 @@ interface ApiKriteria {
   deskripsi?: string | null
 }
 
-
 interface ApiIndikator {
   id?: string
   kriteriaId?: string
@@ -63,7 +60,6 @@ interface ApiIndikator {
     nama?: string
   } | null
 }
-
 
 interface ApiTopsisDetail {
   id?: string
@@ -85,13 +81,11 @@ interface ApiTopsisDetail {
   } | null
 }
 
-
 interface ApiMustahik {
   id?: string
   namaLengkap?: string | null
   nik?: string | null
 }
-
 
 interface ApiTopsisResult {
   id: string
@@ -117,7 +111,6 @@ interface ApiTopsisResult {
   topsisDetails?: ApiTopsisDetail[]
 }
 
-
 interface MatrixRow {
   resultId: string
   mustahikId: string
@@ -130,7 +123,6 @@ interface MatrixRow {
   values: Record<string, number>
 }
 
-
 interface CriterionInfo {
   id: string
   kode: string
@@ -138,7 +130,6 @@ interface CriterionInfo {
   bobot: number
   tipe: 'BENEFIT' | 'COST'
 }
-
 
 interface ProcessData {
   criteria: CriterionInfo[]
@@ -160,7 +151,6 @@ interface ProcessData {
   preference: Record<string, number>
 }
 
-
 // ============================================================
 // HELPER
 // ============================================================
@@ -169,35 +159,24 @@ function toNumber(
   value: unknown,
   fallback = 0
 ): number {
-
   const numberValue =
     Number(value)
 
-  return Number.isFinite(
-    numberValue
-  )
+  return Number.isFinite(numberValue)
     ? numberValue
     : fallback
 }
-
 
 function formatNumber(
   value: unknown,
   digits = 6
 ): string {
-
-  return toNumber(
-    value
-  ).toFixed(
-    digits
-  )
+  return toNumber(value).toFixed(digits)
 }
-
 
 function getArrayFromResponse(
   responseData: any
 ): any[] {
-
   const candidates = [
     responseData?.data?.results,
     responseData?.data?.topsis,
@@ -210,11 +189,8 @@ function getArrayFromResponse(
   for (
     const candidate of candidates
   ) {
-
     if (
-      Array.isArray(
-        candidate
-      )
+      Array.isArray(candidate)
     ) {
       return candidate
     }
@@ -223,11 +199,9 @@ function getArrayFromResponse(
   return []
 }
 
-
 function getDetails(
   result: ApiTopsisResult
 ): ApiTopsisDetail[] {
-
   const candidates = [
     result.details,
     result.detail,
@@ -237,11 +211,8 @@ function getDetails(
   for (
     const candidate of candidates
   ) {
-
     if (
-      Array.isArray(
-        candidate
-      )
+      Array.isArray(candidate)
     ) {
       return candidate
     }
@@ -250,25 +221,19 @@ function getDetails(
   return []
 }
 
-
 function getDetailKriteriaId(
   detail: ApiTopsisDetail
 ): string | null {
-
   if (
     detail.kriteriaId
   ) {
-    return String(
-      detail.kriteriaId
-    )
+    return String(detail.kriteriaId)
   }
 
   if (
     detail.kriteria?.id
   ) {
-    return String(
-      detail.kriteria.id
-    )
+    return String(detail.kriteria.id)
   }
 
   if (
@@ -290,11 +255,9 @@ function getDetailKriteriaId(
   return null
 }
 
-
 function getDetailOriginalValue(
   detail: ApiTopsisDetail
 ): number {
-
   if (
     detail.nilaiAwal !== undefined &&
     detail.nilaiAwal !== null
@@ -316,45 +279,9 @@ function getDetailOriginalValue(
   return 0
 }
 
-
-function getDetailNormalizedValue(
-  detail: ApiTopsisDetail
-): number {
-
-  if (
-    detail.nilaiNormalisasi !== undefined &&
-    detail.nilaiNormalisasi !== null
-  ) {
-    return toNumber(
-      detail.nilaiNormalisasi
-    )
-  }
-
-  return 0
-}
-
-
-function getDetailWeightedValue(
-  detail: ApiTopsisDetail
-): number {
-
-  if (
-    detail.nilaiTerbobot !== undefined &&
-    detail.nilaiTerbobot !== null
-  ) {
-    return toNumber(
-      detail.nilaiTerbobot
-    )
-  }
-
-  return 0
-}
-
-
 function normalizeStatus(
   status?: string | null
 ): string {
-
   if (
     !status
   ) {
@@ -362,37 +289,28 @@ function normalizeStatus(
   }
 
   return status
-    .replaceAll(
-      '_',
+    .replace(
+      /_/g,
       ' '
     )
     .replace(
       /\b\w/g,
-      (
-        character
-      ) =>
+      (character: string) =>
         character.toUpperCase()
     )
 }
 
-
 function getStatusClass(
   status?: string | null
 ): string {
-
   const normalized =
     String(
-      status ||
-      ''
+      status || ''
     ).toUpperCase()
 
   if (
-    normalized.includes(
-      'LAYAK'
-    ) ||
-    normalized.includes(
-      'LOLOS'
-    )
+    normalized.includes('LAYAK') ||
+    normalized.includes('LOLOS')
   ) {
     return (
       'bg-green-50 text-green-700 border-green-200'
@@ -400,12 +318,8 @@ function getStatusClass(
   }
 
   if (
-    normalized.includes(
-      'TIDAK'
-    ) ||
-    normalized.includes(
-      'DITOLAK'
-    )
+    normalized.includes('TIDAK') ||
+    normalized.includes('DITOLAK')
   ) {
     return (
       'bg-red-50 text-red-700 border-red-200'
@@ -417,39 +331,30 @@ function getStatusClass(
   )
 }
 
-
 // ============================================================
-// AGGREGATE MATRIX X
+// BUILD MATRIX X
 // ============================================================
 
 function buildMatrixX(
   results: ApiTopsisResult[],
   criteria: CriterionInfo[]
 ): MatrixRow[] {
-
   return results.map(
     (
       result,
       index
     ) => {
-
       const details =
-        getDetails(
-          result
-        )
+        getDetails(result)
 
       const values:
-        Record<
-          string,
-          number
-        > =
+        Record<string, number> =
         {}
 
       criteria.forEach(
         (
           criterion
         ) => {
-
           const relatedDetails =
             details.filter(
               (
@@ -457,15 +362,12 @@ function buildMatrixX(
               ) =>
                 getDetailKriteriaId(
                   detail
-                ) ===
-                criterion.id
+                ) === criterion.id
             )
 
           if (
-            relatedDetails.length >
-            0
+            relatedDetails.length > 0
           ) {
-
             const total =
               relatedDetails.reduce(
                 (
@@ -488,24 +390,14 @@ function buildMatrixX(
             return
           }
 
-
-          // ================================================
-          // FALLBACK
-          //
-          // Jika backend mengirim nilai per kriteria
-          // langsung pada detail, nilai tetap digunakan.
-          // ================================================
-
           const directDetail =
             details.find(
               (
                 detail
               ) =>
                 String(
-                  detail.kriteriaId ||
-                  ''
-                ) ===
-                criterion.id
+                  detail.kriteriaId || ''
+                ) === criterion.id
             )
 
           values[
@@ -519,12 +411,9 @@ function buildMatrixX(
         }
       )
 
-
       return {
         resultId:
-          String(
-            result.id
-          ),
+          String(result.id),
 
         mustahikId:
           String(
@@ -551,8 +440,7 @@ function buildMatrixX(
 
         status:
           String(
-            result.status ||
-            '-'
+            result.status || '-'
           ),
 
         ranking:
@@ -572,39 +460,28 @@ function buildMatrixX(
   )
 }
 
-
 // ============================================================
-// NORMALISASI MATRIX R
-// ============================================================
-//
-// r_ij = x_ij / sqrt(sum(x_ij²))
+// BUILD MATRIX R
 // ============================================================
 
 function buildMatrixR(
   matrixX: MatrixRow[],
   criteria: CriterionInfo[]
 ): MatrixRow[] {
-
   const denominators:
-    Record<
-      string,
-      number
-    > =
+    Record<string, number> =
     {}
-
 
   criteria.forEach(
     (
       criterion
     ) => {
-
       const totalSquare =
         matrixX.reduce(
           (
             sum,
             row
           ) => {
-
             const value =
               toNumber(
                 row.values[
@@ -614,8 +491,7 @@ function buildMatrixR(
 
             return (
               sum +
-              value *
-                value
+              value * value
             )
           },
           0
@@ -624,30 +500,22 @@ function buildMatrixR(
       denominators[
         criterion.id
       ] =
-        Math.sqrt(
-          totalSquare
-        )
+        Math.sqrt(totalSquare)
     }
   )
-
 
   return matrixX.map(
     (
       row
     ) => {
-
       const values:
-        Record<
-          string,
-          number
-        > =
+        Record<string, number> =
         {}
 
       criteria.forEach(
         (
           criterion
         ) => {
-
           const denominator =
             denominators[
               criterion.id
@@ -664,8 +532,7 @@ function buildMatrixR(
             criterion.id
           ] =
             denominator > 0
-              ? value /
-                denominator
+              ? value / denominator
               : 0
         }
       )
@@ -678,36 +545,26 @@ function buildMatrixR(
   )
 }
 
-
 // ============================================================
-// MATRIX TERBOBOT Y
-// ============================================================
-//
-// y_ij = w_j × r_ij
+// BUILD MATRIX Y
 // ============================================================
 
 function buildMatrixY(
   matrixR: MatrixRow[],
   criteria: CriterionInfo[]
 ): MatrixRow[] {
-
   return matrixR.map(
     (
       row
     ) => {
-
       const values:
-        Record<
-          string,
-          number
-        > =
+        Record<string, number> =
         {}
 
       criteria.forEach(
         (
           criterion
         ) => {
-
           values[
             criterion.id
           ] =
@@ -728,36 +585,26 @@ function buildMatrixY(
   )
 }
 
-
 // ============================================================
-// SOLUSI IDEAL
+// IDEAL SOLUTIONS
 // ============================================================
 
 function buildIdealSolutions(
   matrixY: MatrixRow[],
   criteria: CriterionInfo[]
 ) {
-
   const idealPositive:
-    Record<
-      string,
-      number
-    > =
+    Record<string, number> =
     {}
 
   const idealNegative:
-    Record<
-      string,
-      number
-    > =
+    Record<string, number> =
     {}
-
 
   criteria.forEach(
     (
       criterion
     ) => {
-
       const values =
         matrixY.map(
           (
@@ -773,59 +620,42 @@ function buildIdealSolutions(
       if (
         values.length === 0
       ) {
-
         idealPositive[
           criterion.id
-        ] =
-          0
+        ] = 0
 
         idealNegative[
           criterion.id
-        ] =
-          0
+        ] = 0
 
         return
       }
 
-
       if (
-        criterion.tipe ===
-        'COST'
+        criterion.tipe === 'COST'
       ) {
-
         idealPositive[
           criterion.id
         ] =
-          Math.min(
-            ...values
-          )
+          Math.min(...values)
 
         idealNegative[
           criterion.id
         ] =
-          Math.max(
-            ...values
-          )
-
+          Math.max(...values)
       } else {
-
         idealPositive[
           criterion.id
         ] =
-          Math.max(
-            ...values
-          )
+          Math.max(...values)
 
         idealNegative[
           criterion.id
         ] =
-          Math.min(
-            ...values
-          )
+          Math.min(...values)
       }
     }
   )
-
 
   return {
     idealPositive,
@@ -833,15 +663,8 @@ function buildIdealSolutions(
   }
 }
 
-
 // ============================================================
-// JARAK DAN PREFERENSI
-// ============================================================
-//
-// D+ = sqrt(sum((Y - A+)²))
-// D- = sqrt(sum((Y - A-)²))
-//
-// V = D- / (D+ + D-)
+// DISTANCE AND PREFERENCE
 // ============================================================
 
 function buildDistancesAndPreference(
@@ -850,46 +673,29 @@ function buildDistancesAndPreference(
   idealPositive: Record<string, number>,
   idealNegative: Record<string, number>
 ) {
-
   const distancePositive:
-    Record<
-      string,
-      number
-    > =
+    Record<string, number> =
     {}
 
   const distanceNegative:
-    Record<
-      string,
-      number
-    > =
+    Record<string, number> =
     {}
 
   const preference:
-    Record<
-      string,
-      number
-    > =
+    Record<string, number> =
     {}
-
 
   matrixY.forEach(
     (
       row
     ) => {
-
-      let totalPositive =
-        0
-
-      let totalNegative =
-        0
-
+      let totalPositive = 0
+      let totalNegative = 0
 
       criteria.forEach(
         (
           criterion
         ) => {
-
           const value =
             toNumber(
               row.values[
@@ -913,20 +719,17 @@ function buildDistancesAndPreference(
 
           totalPositive +=
             Math.pow(
-              value -
-                positive,
+              value - positive,
               2
             )
 
           totalNegative +=
             Math.pow(
-              value -
-                negative,
+              value - negative,
               2
             )
         }
       )
-
 
       const dPositive =
         Math.sqrt(
@@ -938,32 +741,25 @@ function buildDistancesAndPreference(
           totalNegative
         )
 
-
       distancePositive[
         row.resultId
-      ] =
-        dPositive
+      ] = dPositive
 
       distanceNegative[
         row.resultId
-      ] =
-        dNegative
-
+      ] = dNegative
 
       const denominator =
-        dPositive +
-        dNegative
+        dPositive + dNegative
 
       preference[
         row.resultId
       ] =
         denominator > 0
-          ? dNegative /
-            denominator
+          ? dNegative / denominator
           : 0
     }
   )
-
 
   return {
     distancePositive,
@@ -972,84 +768,54 @@ function buildDistancesAndPreference(
   }
 }
 
-
 // ============================================================
 // PAGE
 // ============================================================
 
 export function ProcessTopsisPage() {
-
-  // ==========================================================
-  // AUTH
-  // ==========================================================
-
   const {
     token,
-  } =
-    useAuth()
-
-
-  // ==========================================================
-  // STATE
-  // ==========================================================
+  } = useAuth()
 
   const [
     results,
     setResults,
   ] =
-    useState<
-      ApiTopsisResult[]
-    >([])
-
+    useState<ApiTopsisResult[]>(
+      []
+    )
 
   const [
     criteria,
     setCriteria,
   ] =
-    useState<
-      CriterionInfo[]
-    >([])
-
+    useState<CriterionInfo[]>(
+      []
+    )
 
   const [
     loading,
     setLoading,
   ] =
-    useState(
-      true
-    )
-
+    useState(true)
 
   const [
     processing,
     setProcessing,
   ] =
-    useState(
-      false
-    )
-
+    useState(false)
 
   const [
     error,
     setError,
   ] =
-    useState(
-      ''
-    )
-
+    useState('')
 
   const [
     activeStep,
     setActiveStep,
   ] =
-    useState(
-      1
-    )
-
-
-  // ==========================================================
-  // AUTH HEADERS
-  // ==========================================================
+    useState(1)
 
   const authHeaders =
     useMemo(
@@ -1062,7 +828,6 @@ export function ProcessTopsisPage() {
       ]
     )
 
-
   // ==========================================================
   // LOAD DATA
   // ==========================================================
@@ -1070,14 +835,10 @@ export function ProcessTopsisPage() {
   const loadData =
     useCallback(
       async () => {
-
         if (
           !token
         ) {
-
-          setLoading(
-            false
-          )
+          setLoading(false)
 
           setError(
             'Sesi login tidak ditemukan.'
@@ -1086,17 +847,9 @@ export function ProcessTopsisPage() {
           return
         }
 
-
         try {
-
-          setLoading(
-            true
-          )
-
-          setError(
-            ''
-          )
-
+          setLoading(true)
+          setError('')
 
           const [
             resultResponse,
@@ -1120,36 +873,41 @@ export function ProcessTopsisPage() {
               ),
             ])
 
-
           const rawResults =
             getArrayFromResponse(
               resultResponse.data
             )
-
 
           const rawCriteria =
             getArrayFromResponse(
               criteriaResponse.data
             )
 
-
-          const normalizedCriteria =
+          const normalizedCriteria: CriterionInfo[] =
             rawCriteria.map(
               (
                 item: ApiKriteria,
                 index: number
-              ) => {
-
+              ): CriterionInfo => {
                 const rawBobot =
                   toNumber(
                     item.bobot
                   )
 
+                const tipe:
+                  | 'BENEFIT'
+                  | 'COST' =
+                  String(
+                    item.tipe ||
+                    'BENEFIT'
+                  ).toUpperCase() ===
+                  'COST'
+                    ? 'COST'
+                    : 'BENEFIT'
+
                 return {
                   id:
-                    String(
-                      item.id
-                    ),
+                    String(item.id),
 
                   kode:
                     String(
@@ -1166,25 +924,10 @@ export function ProcessTopsisPage() {
                   bobot:
                     rawBobot,
 
-                  tipe:
-                    String(
-                      item.tipe ||
-                      'BENEFIT'
-                    ).toUpperCase() ===
-                    'COST'
-                      ? 'COST'
-                      : 'BENEFIT',
+                  tipe,
                 }
               }
             )
-
-
-          // ==================================================
-          // NORMALISASI BOBOT
-          //
-          // Agar tetap aman jika bobot database disimpan
-          // dalam bentuk 20,20,20,20,20 atau 0.2,0.2...
-          // ==================================================
 
           const totalBobot =
             normalizedCriteria.reduce(
@@ -1192,17 +935,16 @@ export function ProcessTopsisPage() {
                 total,
                 item
               ) =>
-                total +
-                item.bobot,
+                total + item.bobot,
               0
             )
 
-
-          const criteriaWithWeight =
+          const criteriaWithWeight:
+            CriterionInfo[] =
             normalizedCriteria.map(
               (
                 item
-              ) => ({
+              ): CriterionInfo => ({
                 ...item,
 
                 bobot:
@@ -1217,7 +959,6 @@ export function ProcessTopsisPage() {
               })
             )
 
-
           setResults(
             rawResults as
               ApiTopsisResult[]
@@ -1226,31 +967,33 @@ export function ProcessTopsisPage() {
           setCriteria(
             criteriaWithWeight
           )
-
         } catch (
-          error: any
+          caughtError: unknown
         ) {
-
           console.error(
             'LOAD TOPSIS ERROR:',
-            error
+            caughtError
           )
 
-          setError(
-            error
-              ?.response
-              ?.data
-              ?.message ||
-            error
-              ?.message ||
-            'Gagal memuat data TOPSIS.'
-          )
-
+          if (
+            axios.isAxiosError(
+              caughtError
+            )
+          ) {
+            setError(
+              caughtError.response
+                ?.data
+                ?.message ||
+              caughtError.message ||
+              'Gagal memuat data TOPSIS.'
+            )
+          } else {
+            setError(
+              'Gagal memuat data TOPSIS.'
+            )
+          }
         } finally {
-
-          setLoading(
-            false
-          )
+          setLoading(false)
         }
       },
       [
@@ -1259,22 +1002,14 @@ export function ProcessTopsisPage() {
       ]
     )
 
-
-  // ==========================================================
-  // INITIAL LOAD
-  // ==========================================================
-
   useEffect(
     () => {
-
       void loadData()
-
     },
     [
       loadData,
     ]
   )
-
 
   // ==========================================================
   // PROCESS TOPSIS
@@ -1282,7 +1017,6 @@ export function ProcessTopsisPage() {
 
   const handleProcess =
     async () => {
-
       if (
         !token
       ) {
@@ -1290,15 +1024,8 @@ export function ProcessTopsisPage() {
       }
 
       try {
-
-        setProcessing(
-          true
-        )
-
-        setError(
-          ''
-        )
-
+        setProcessing(true)
+        setError('')
 
         await axios.post(
           `${API_URL}/admin/topsis/process`,
@@ -1309,57 +1036,51 @@ export function ProcessTopsisPage() {
           }
         )
 
-
         await loadData()
 
-        setActiveStep(
-          1
-        )
-
+        setActiveStep(1)
       } catch (
-        error: any
+        caughtError: unknown
       ) {
-
         console.error(
           'PROCESS TOPSIS ERROR:',
-          error
+          caughtError
         )
 
-        setError(
-          error
-            ?.response
-            ?.data
-            ?.message ||
-          error
-            ?.message ||
-          'Gagal melakukan perhitungan TOPSIS.'
-        )
-
+        if (
+          axios.isAxiosError(
+            caughtError
+          )
+        ) {
+          setError(
+            caughtError.response
+              ?.data
+              ?.message ||
+            caughtError.message ||
+            'Gagal melakukan perhitungan TOPSIS.'
+          )
+        } else {
+          setError(
+            'Gagal melakukan perhitungan TOPSIS.'
+          )
+        }
       } finally {
-
-        setProcessing(
-          false
-        )
+        setProcessing(false)
       }
     }
 
-
   // ==========================================================
-  // BUILD PROCESS DATA
+  // PROCESS DATA
   // ==========================================================
 
   const processData =
-    useMemo<
-      ProcessData
-    >(
+    useMemo<ProcessData>(
       () => {
-
         const matrixX =
           buildMatrixX(
             results,
             criteria
           )
-
 
         const matrixR =
           buildMatrixR(
@@ -1367,13 +1088,11 @@ export function ProcessTopsisPage() {
             criteria
           )
 
-
         const matrixY =
           buildMatrixY(
             matrixR,
             criteria
           )
-
 
         const {
           idealPositive,
@@ -1383,7 +1102,6 @@ export function ProcessTopsisPage() {
             matrixY,
             criteria
           )
-
 
         const {
           distancePositive,
@@ -1396,7 +1114,6 @@ export function ProcessTopsisPage() {
             idealPositive,
             idealNegative
           )
-
 
         return {
           criteria,
@@ -1417,7 +1134,6 @@ export function ProcessTopsisPage() {
 
           preference,
         }
-
       },
       [
         results,
@@ -1425,36 +1141,25 @@ export function ProcessTopsisPage() {
       ]
     )
 
-
-  // ==========================================================
-  // SUMMARY
-  // ==========================================================
-
   const totalIndicators =
     useMemo(
       () => {
-
         const indicatorIds =
-          new Set<
-            string
-          >()
+          new Set<string>()
 
         results.forEach(
           (
             result
           ) => {
-
             getDetails(
               result
             ).forEach(
               (
                 detail
               ) => {
-
                 if (
                   detail.indikatorId
                 ) {
-
                   indicatorIds.add(
                     String(
                       detail.indikatorId
@@ -1467,13 +1172,11 @@ export function ProcessTopsisPage() {
         )
 
         return indicatorIds.size
-
       },
       [
         results,
       ]
     )
-
 
   // ==========================================================
   // LOADING
@@ -1482,36 +1185,24 @@ export function ProcessTopsisPage() {
   if (
     loading
   ) {
-
     return (
       <div className="flex min-h-[500px] items-center justify-center">
-
         <div className="flex items-center gap-3 text-slate-500">
-
           <Loader2 className="h-5 w-5 animate-spin text-green-600" />
 
           <span>
             Memuat data TOPSIS...
           </span>
-
         </div>
-
       </div>
     )
   }
 
-
-  // ==========================================================
-  // EMPTY
-  // ==========================================================
-
   const hasData =
-    processData.matrixX.length >
-    0
-
+    processData.matrixX.length > 0
 
   // ==========================================================
-  // RENDER MATRIX TABLE
+  // MATRIX TABLE
   // ==========================================================
 
   const renderMatrixTable =
@@ -1519,156 +1210,104 @@ export function ProcessTopsisPage() {
       title: string,
       rows: MatrixRow[]
     ) => (
-
       <Card>
-
         <CardHeader>
-
           <CardTitle className="text-base">
-
             {title}
-
           </CardTitle>
-
         </CardHeader>
 
-
         <CardContent>
-
           <div className="overflow-x-auto">
-
             <table className="w-full min-w-[900px] text-sm">
-
               <thead>
-
                 <tr className="border-b bg-slate-50/80">
-
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-
                     Mustahik
-
                   </th>
-
 
                   {processData.criteria.map(
                     (
                       criterion
                     ) => (
-
                       <th
                         key={
                           criterion.id
                         }
                         className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500"
                       >
-
                         {criterion.kode}
-
                       </th>
-
                     )
                   )}
-
                 </tr>
-
               </thead>
 
-
               <tbody>
-
                 {rows.map(
                   (
                     row
                   ) => (
-
                     <tr
                       key={
                         row.resultId
                       }
                       className="border-b last:border-b-0"
                     >
-
                       <td className="px-4 py-4 font-medium text-slate-800">
-
                         {row.nama}
-
                       </td>
-
 
                       {processData.criteria.map(
                         (
                           criterion
                         ) => (
-
                           <td
                             key={
                               criterion.id
                             }
                             className="px-4 py-4 text-center font-mono text-sm text-slate-700"
                           >
-
                             {formatNumber(
                               row.values[
                                 criterion.id
                               ]
                             )}
-
                           </td>
-
                         )
                       )}
-
                     </tr>
-
                   )
                 )}
-
               </tbody>
-
             </table>
-
           </div>
-
         </CardContent>
-
       </Card>
     )
-
 
   // ==========================================================
   // PAGE
   // ==========================================================
 
   return (
-
     <div className="space-y-6">
 
-      {/* ======================================================
-          HEADER
-      ====================================================== */}
+      {/* HEADER */}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-
         <div>
-
           <h1 className="text-2xl font-bold text-slate-800">
-
             Proses Perhitungan TOPSIS
-
           </h1>
 
-
           <p className="mt-1 text-sm text-slate-500">
-
-            Perhitungan dilakukan menggunakan indikator yang dibentuk menjadi kriteria TOPSIS.
-
+            Perhitungan dilakukan menggunakan indikator
+            yang dibentuk menjadi kriteria TOPSIS.
           </p>
-
         </div>
 
-
         <div className="flex flex-wrap gap-3">
-
           <Button
             type="button"
             variant="outline"
@@ -1680,13 +1319,10 @@ export function ProcessTopsisPage() {
               processing
             }
           >
-
             <RefreshCw className="mr-2 h-4 w-4" />
 
             Muat Ulang
-
           </Button>
-
 
           <Button
             type="button"
@@ -1698,152 +1334,92 @@ export function ProcessTopsisPage() {
             }
             className="bg-green-600 hover:bg-green-700"
           >
-
             {processing ? (
-
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-
             ) : (
-
               <Play className="mr-2 h-4 w-4" />
-
             )}
 
             Hitung TOPSIS
-
           </Button>
-
         </div>
-
       </div>
 
-
-      {/* ======================================================
-          ERROR
-      ====================================================== */}
+      {/* ERROR */}
 
       {error && (
-
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-
           <div className="flex gap-3">
-
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
 
             <p className="text-sm text-red-700">
-
               {error}
-
             </p>
-
           </div>
-
         </div>
-
       )}
 
-
-      {/* ======================================================
-          INFO
-      ====================================================== */}
+      {/* INFO */}
 
       <Card className="border-green-200 bg-green-50/40">
-
         <CardContent className="p-5">
-
           <div className="flex gap-3">
-
             <Info className="mt-0.5 h-5 w-5 shrink-0 text-green-700" />
 
-
             <div>
-
               <p className="font-semibold text-slate-800">
-
                 Perhitungan TOPSIS
-
               </p>
-
 
               <p className="mt-1 text-sm text-slate-600">
-
-                Sistem menampilkan Matriks Keputusan (X), Normalisasi (R),
-                Matriks Normalisasi Terbobot (Y), solusi ideal positif dan
-                negatif, jarak alternatif, serta nilai preferensi.
-
+                Sistem menampilkan Matriks Keputusan (X),
+                Normalisasi (R), Matriks Normalisasi
+                Terbobot (Y), solusi ideal positif dan
+                negatif, jarak alternatif, serta nilai
+                preferensi.
               </p>
 
-
               <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
-
                 <span>
-
-                  Kriteria:
-                  {' '}
+                  Kriteria:{' '}
                   <strong className="text-slate-800">
-
-                    {processData.criteria.length}
-
+                    {
+                      processData.criteria.length
+                    }
                   </strong>
-
                 </span>
 
-
                 <span>
-
-                  Indikator:
-                  {' '}
+                  Indikator:{' '}
                   <strong className="text-slate-800">
-
                     {totalIndicators}
-
                   </strong>
-
                 </span>
 
-
                 <span>
-
-                  Alternatif siap diproses:
-                  {' '}
+                  Alternatif siap diproses:{' '}
                   <strong className="text-slate-800">
-
-                    {processData.matrixX.length}
-
+                    {
+                      processData.matrixX.length
+                    }
                   </strong>
-
                 </span>
 
-
                 <span>
-
-                  Hasil tersimpan:
-                  {' '}
+                  Hasil tersimpan:{' '}
                   <strong className="text-slate-800">
-
                     {results.length}
-
                   </strong>
-
                 </span>
-
               </div>
-
             </div>
-
           </div>
-
         </CardContent>
-
       </Card>
 
-
-      {/* ======================================================
-          TABS
-      ====================================================== */}
+      {/* STEP BUTTON */}
 
       <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 md:grid-cols-4">
-
         {[
           {
             id: 1,
@@ -1865,7 +1441,6 @@ export function ProcessTopsisPage() {
           (
             item
           ) => (
-
             <button
               key={
                 item.id
@@ -1883,363 +1458,232 @@ export function ProcessTopsisPage() {
                   : 'rounded-lg px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:text-slate-800'
               }
             >
-
               {item.label}
-
             </button>
-
           )
         )}
-
       </div>
 
-
-      {/* ======================================================
-          EMPTY DATA
-      ====================================================== */}
+      {/* EMPTY */}
 
       {!hasData && (
-
         <Card>
-
           <CardContent className="py-16 text-center">
-
             <Info className="mx-auto h-8 w-8 text-slate-400" />
 
             <h3 className="mt-4 font-semibold text-slate-800">
-
               Belum ada data TOPSIS
-
             </h3>
 
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-
               Belum ada alternatif yang dapat ditampilkan.
-              Pastikan pengajuan sudah lolos verifikasi dan memiliki
-              jawaban kuesioner sebelum menjalankan perhitungan TOPSIS.
-
+              Pastikan pengajuan sudah lolos verifikasi
+              dan memiliki jawaban kuesioner sebelum
+              menjalankan perhitungan TOPSIS.
             </p>
-
           </CardContent>
-
         </Card>
-
       )}
 
-
-      {/* ======================================================
-          STEP 1 - MATRIX X
-      ====================================================== */}
+      {/* STEP 1 */}
 
       {hasData &&
-        activeStep ===
-          1 &&
-
+        activeStep === 1 &&
         renderMatrixTable(
           'Matriks Keputusan (X)',
           processData.matrixX
         )}
 
-
-      {/* ======================================================
-          STEP 2 - NORMALISASI R
-      ====================================================== */}
+      {/* STEP 2 */}
 
       {hasData &&
-        activeStep ===
-          2 &&
-
+        activeStep === 2 &&
         renderMatrixTable(
           'Matriks Normalisasi (R)',
           processData.matrixR
         )}
 
-
-      {/* ======================================================
-          STEP 3 - MATRIX Y
-      ====================================================== */}
+      {/* STEP 3 */}
 
       {hasData &&
-        activeStep ===
-          3 &&
-
+        activeStep === 3 &&
         renderMatrixTable(
           'Matriks Normalisasi Terbobot (Y)',
           processData.matrixY
         )}
 
-
-      {/* ======================================================
-          STEP 4 - IDEAL & DISTANCE
-      ====================================================== */}
+      {/* STEP 4 */}
 
       {hasData &&
-        activeStep ===
-          4 && (
-
+        activeStep === 4 && (
           <div className="space-y-6">
 
-            {/* JARAK */}
-
             <Card>
-
               <CardHeader>
-
                 <CardTitle className="text-base">
-
                   Solusi Ideal dan Jarak
-
                 </CardTitle>
-
               </CardHeader>
 
-
               <CardContent>
-
                 <div className="overflow-x-auto">
-
                   <table className="w-full min-w-[750px] text-sm">
-
                     <thead>
-
                       <tr className="border-b bg-slate-50/80">
-
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-
                           Mustahik
-
                         </th>
 
-
                         <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-
                           D+
-
                         </th>
 
-
                         <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-
                           D-
-
                         </th>
 
-
                         <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-
                           Vi
-
                         </th>
-
 
                         <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-
                           Ranking
-
                         </th>
-
                       </tr>
-
                     </thead>
 
-
                     <tbody>
-
                       {processData.matrixY.map(
                         (
                           row
                         ) => (
-
                           <tr
                             key={
                               row.resultId
                             }
                             className="border-b last:border-b-0"
                           >
-
                             <td className="px-4 py-4 font-medium text-slate-800">
-
                               {row.nama}
-
                             </td>
 
-
                             <td className="px-4 py-4 text-center font-mono">
-
                               {formatNumber(
                                 processData.distancePositive[
                                   row.resultId
                                 ]
                               )}
-
                             </td>
 
-
                             <td className="px-4 py-4 text-center font-mono">
-
                               {formatNumber(
                                 processData.distanceNegative[
                                   row.resultId
                                 ]
                               )}
-
                             </td>
 
-
                             <td className="px-4 py-4 text-center font-mono font-semibold text-slate-800">
-
                               {formatNumber(
                                 processData.preference[
                                   row.resultId
                                 ]
                               )}
-
                             </td>
-
 
                             <td className="px-4 py-4 text-center font-semibold text-slate-800">
-
-                              #
-                              {
-                                row.ranking
-                              }
-
+                              #{row.ranking}
                             </td>
-
                           </tr>
-
                         )
                       )}
-
                     </tbody>
-
                   </table>
-
                 </div>
-
               </CardContent>
-
             </Card>
 
-
-            {/* SOLUSI IDEAL */}
-
             <Card>
-
               <CardContent className="p-5">
-
                 <div className="space-y-8">
 
                   <div>
-
                     <h3 className="font-semibold text-slate-800">
-
                       Solusi Ideal Positif (A+)
-
                     </h3>
 
-
                     <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-5">
-
                       {processData.criteria.map(
                         (
                           criterion
                         ) => (
-
                           <div
                             key={
                               criterion.id
                             }
                             className="text-center"
                           >
-
                             <p className="text-xs text-slate-500">
-
-                              {criterion.kode}
-
+                              {
+                                criterion.kode
+                              }
                             </p>
 
-
                             <p className="mt-1 font-mono font-semibold text-slate-800">
-
                               {formatNumber(
                                 processData.idealPositive[
                                   criterion.id
                                 ]
                               )}
-
                             </p>
-
                           </div>
-
                         )
                       )}
-
                     </div>
-
                   </div>
 
-
                   <div>
-
                     <h3 className="font-semibold text-slate-800">
-
                       Solusi Ideal Negatif (A-)
-
                     </h3>
 
-
                     <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-5">
-
                       {processData.criteria.map(
                         (
                           criterion
                         ) => (
-
                           <div
                             key={
                               criterion.id
                             }
                             className="text-center"
                           >
-
                             <p className="text-xs text-slate-500">
-
-                              {criterion.kode}
-
+                              {
+                                criterion.kode
+                              }
                             </p>
 
-
                             <p className="mt-1 font-mono font-semibold text-slate-800">
-
                               {formatNumber(
                                 processData.idealNegative[
                                   criterion.id
                                 ]
                               )}
-
                             </p>
-
                           </div>
-
                         )
                       )}
-
                     </div>
-
                   </div>
 
                 </div>
-
               </CardContent>
-
             </Card>
 
           </div>
-
         )}
 
     </div>
-
   )
 }
