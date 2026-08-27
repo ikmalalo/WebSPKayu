@@ -4,44 +4,156 @@ import type {
 } from 'express'
 
 import {
+  PengajuanStatus,
+  VerifikasiStatus,
+} from '@prisma/client'
+
+import {
   prisma,
 } from '../config/prisma'
 
-import {
-  fail,
-  success,
-} from '../utils/api-response'
-
-const VERIFIKASI_STATUS = [
-  'LOLOS',
-  'PERLU_PERBAIKAN',
-  'DITOLAK',
-] as const
-
-const PENGAJUAN_STATUS = [
-  'DRAFT',
-  'MENUNGGU_VERIFIKASI',
-  'SEDANG_DIVERIFIKASI',
-  'PERLU_PERBAIKAN',
-  'LOLOS_VERIFIKASI',
-  'DITOLAK',
-  'DIPROSES_TOPSIS',
-  'LAYAK_DIDANAI',
-  'TIDAK_DIDANAI',
-] as const
-
-type PengajuanStatus =
-  typeof PENGAJUAN_STATUS[number]
-
-type VerifikasiStatus =
-  typeof VERIFIKASI_STATUS[number]
 
 // ============================================================
-// DASHBOARD ADMIN
+// RESPONSE HELPER
 // ============================================================
 
-export async function getDashboard(
-  _req: Request,
+function success(
+  res: Response,
+  message: string,
+  data: unknown = null,
+  statusCode = 200
+) {
+  return res.status(
+    statusCode
+  ).json({
+    success: true,
+    message,
+    data,
+  })
+}
+
+
+function fail(
+  res: Response,
+  message: string,
+  statusCode = 500,
+  data: unknown = null
+) {
+  return res.status(
+    statusCode
+  ).json({
+    success: false,
+    message,
+    data,
+  })
+}
+
+
+// ============================================================
+// AUTH HELPER
+// ============================================================
+
+function getAdminId(
+  req: Request
+): string | null {
+  const request =
+    req as Request & {
+      auth?: {
+        userId?: string
+      }
+    }
+
+  return (
+    request.auth?.userId ||
+    null
+  )
+}
+
+
+// ============================================================
+// INCLUDE MUSTAHIK
+// ============================================================
+
+const mustahikInclude = {
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      createdAt: true,
+    },
+  },
+
+  pengajuan: {
+    include: {
+      jawaban: {
+        include: {
+          indikator: {
+            include: {
+              kriteria: true,
+            },
+          },
+        },
+
+        orderBy: {
+          createdAt:
+            'asc' as const,
+        },
+      },
+
+      verifications: {
+        include: {
+          admin: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+
+        orderBy: {
+          createdAt:
+            'desc' as const,
+        },
+      },
+
+      topsisResults: {
+        include: {
+          details: {
+            include: {
+              indikator: {
+                include: {
+                  kriteria: true,
+                },
+              },
+            },
+          },
+        },
+
+        orderBy: {
+          tanggalProses:
+            'desc' as const,
+        },
+      },
+    },
+
+    orderBy: {
+      createdAt:
+        'desc' as const,
+    },
+  },
+}
+
+
+// ============================================================
+// ADMIN DASHBOARD
+// ============================================================
+
+export async function getAdminDashboard(
+  req: Request,
   res: Response
 ) {
   try {
@@ -49,232 +161,48 @@ export async function getDashboard(
       totalMustahik,
       pengajuanBaru,
       menungguVerifikasi,
-      sudahDiverifikasi,
+      lolosVerifikasi,
       layakDidanai,
       tidakDidanai,
-      pengajuanPerBulan,
-      pengajuanTerbaru,
-    ] = await Promise.all([
-      // Total mustahik
-      prisma.mustahik.count(),
+    ] =
+      await Promise.all([
+        prisma.mustahik.count(),
 
-      // Pengajuan baru
-      prisma.pengajuan.count({
-        where: {
-          status: {
-            in: [
-              'DRAFT',
-              'MENUNGGU_VERIFIKASI',
-            ],
+        prisma.pengajuan.count({
+          where: {
+            status:
+              PengajuanStatus.DRAFT,
           },
-        },
-      }),
+        }),
 
-      // Menunggu verifikasi
-      prisma.pengajuan.count({
-        where: {
-          status: {
-            in: [
-              'MENUNGGU_VERIFIKASI',
-              'SEDANG_DIVERIFIKASI',
-            ],
+        prisma.pengajuan.count({
+          where: {
+            status:
+              PengajuanStatus.MENUNGGU_VERIFIKASI,
           },
-        },
-      }),
+        }),
 
-      // Sudah diverifikasi
-      prisma.pengajuan.count({
-        where: {
-          status: {
-            in: [
-              'LOLOS_VERIFIKASI',
-              'PERLU_PERBAIKAN',
-              'DITOLAK',
-              'DIPROSES_TOPSIS',
-              'LAYAK_DIDANAI',
-              'TIDAK_DIDANAI',
-            ],
+        prisma.pengajuan.count({
+          where: {
+            status:
+              PengajuanStatus.LOLOS_VERIFIKASI,
           },
-        },
-      }),
+        }),
 
-      // Layak didanai
-      prisma.pengajuan.count({
-        where: {
-          status:
-            'LAYAK_DIDANAI',
-        },
-      }),
-
-      // Tidak didanai
-      prisma.pengajuan.count({
-        where: {
-          status:
-            'TIDAK_DIDANAI',
-        },
-      }),
-
-      // Data untuk grafik
-      prisma.pengajuan.findMany({
-        select: {
-          tanggalPengajuan: true,
-          status: true,
-        },
-        orderBy: {
-          tanggalPengajuan:
-            'asc',
-        },
-      }),
-
-      // 6 pengajuan terbaru
-      prisma.pengajuan.findMany({
-        take: 6,
-        orderBy: {
-          createdAt: 'desc',
-        },
-        include: {
-          mustahik: {
-            select: {
-              id: true,
-              namaLengkap: true,
-              nik: true,
-            },
+        prisma.pengajuan.count({
+          where: {
+            status:
+              PengajuanStatus.LAYAK_DIDANAI,
           },
-        },
-      }),
-    ])
+        }),
 
-    const namaBulan = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'Mei',
-      'Jun',
-      'Jul',
-      'Agu',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des',
-    ]
-
-    const chartMap = new Map<
-      string,
-      {
-        pengajuan: number
-        lolos: number
-        ditolak: number
-      }
-    >()
-
-    namaBulan.forEach(
-      (bulan) => {
-        chartMap.set(
-          bulan,
-          {
-            pengajuan: 0,
-            lolos: 0,
-            ditolak: 0,
-          }
-        )
-      }
-    )
-
-    for (
-      const item of
-        pengajuanPerBulan
-    ) {
-      const tanggal =
-        new Date(
-          item.tanggalPengajuan
-        )
-
-      if (
-        Number.isNaN(
-          tanggal.getTime()
-        )
-      ) {
-        continue
-      }
-
-      const bulan =
-        namaBulan[
-          tanggal.getMonth()
-        ]
-
-      const current =
-        chartMap.get(
-          bulan
-        )
-
-      if (!current) {
-        continue
-      }
-
-      current.pengajuan++
-
-      if (
-        item.status ===
-        'LOLOS_VERIFIKASI'
-      ) {
-        current.lolos++
-      }
-
-      if (
-        item.status ===
-        'DITOLAK'
-      ) {
-        current.ditolak++
-      }
-    }
-
-    const chart =
-      namaBulan.map(
-        (bulan) => {
-          const item =
-            chartMap.get(
-              bulan
-            )
-
-          return {
-            bulan,
-
-            pengajuan:
-              item?.pengajuan ??
-              0,
-
-            lolos:
-              item?.lolos ??
-              0,
-
-            ditolak:
-              item?.ditolak ??
-              0,
-          }
-        }
-      )
-
-    const statusDistribution = [
-      {
-        name:
-          'Layak Didanai',
-        value:
-          layakDidanai,
-      },
-      {
-        name:
-          'Tidak Didanai',
-        value:
-          tidakDidanai,
-      },
-      {
-        name:
-          'Menunggu Proses',
-        value:
-          menungguVerifikasi,
-      },
-    ]
+        prisma.pengajuan.count({
+          where: {
+            status:
+              PengajuanStatus.TIDAK_DIDANAI,
+          },
+        }),
+      ])
 
     return success(
       res,
@@ -283,83 +211,78 @@ export async function getDashboard(
         totalMustahik,
         pengajuanBaru,
         menungguVerifikasi,
-        sudahDiverifikasi,
+        lolosVerifikasi,
         layakDidanai,
         tidakDidanai,
-        chart,
-        statusDistribution,
-        pengajuanTerbaru,
       }
     )
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
-      'GET ADMIN DASHBOARD ERROR:',
+      'ADMIN DASHBOARD ERROR:',
       error
     )
 
     return fail(
       res,
-      'Gagal mengambil data dashboard admin',
+      'Gagal mengambil dashboard admin',
       500
     )
   }
 }
 
+
 // ============================================================
-// DATA MUSTAHIK
+// GET MUSTAHIK
 // ============================================================
 
-export async function listMustahik(
+export async function getMustahik(
   req: Request,
   res: Response
 ) {
   try {
-    const q =
+    const search =
       String(
-        req.query.q ?? ''
+        req.query.search ||
+        ''
       ).trim()
 
     const mustahik =
       await prisma.mustahik.findMany({
         where:
-          q.length > 0
+          search
             ? {
                 OR: [
                   {
                     namaLengkap: {
-                      contains: q,
+                      contains: search,
                     },
                   },
+
                   {
                     nik: {
-                      contains: q,
+                      contains: search,
+                    },
+                  },
+
+                  {
+                    user: {
+                      email: {
+                        contains: search,
+                      },
                     },
                   },
                 ],
               }
-            : {},
+            : undefined,
 
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              phone: true,
-            },
-          },
-
-          pengajuan: {
-            orderBy: {
-              createdAt: 'desc',
-            },
-
-            take: 1,
-          },
-        },
+        include:
+          mustahikInclude,
 
         orderBy: {
-          createdAt: 'desc',
+          createdAt:
+            'desc',
         },
       })
 
@@ -368,11 +291,15 @@ export async function listMustahik(
       'Data mustahik berhasil diambil',
       {
         mustahik,
+        total:
+          mustahik.length,
       }
     )
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
-      'LIST MUSTAHIK ERROR:',
+      'GET MUSTAHIK ERROR:',
       error
     )
 
@@ -384,61 +311,36 @@ export async function listMustahik(
   }
 }
 
+
 // ============================================================
-// DETAIL MUSTAHIK
+// GET DETAIL MUSTAHIK
 // ============================================================
 
-export async function getMustahik(
+export async function getMustahikById(
   req: Request,
   res: Response
 ) {
   try {
+    const {
+      id,
+    } = req.params
+
     const mustahik =
       await prisma.mustahik.findUnique({
         where: {
-          id: req.params.id,
+          id,
         },
 
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              phone: true,
-            },
-          },
-
-          pengajuan: {
-            orderBy: {
-              createdAt: 'desc',
-            },
-
-            include: {
-              jawaban: {
-                include: {
-                  kriteria: true,
-                  subKriteria: true,
-                },
-              },
-
-              verifications: {
-                orderBy: {
-                  createdAt:
-                    'desc',
-                },
-              },
-
-              topsisResults: true,
-            },
-          },
-        },
+        include:
+          mustahikInclude,
       })
 
-    if (!mustahik) {
+    if (
+      !mustahik
+    ) {
       return fail(
         res,
-        'Mustahik tidak ditemukan',
+        'Data mustahik tidak ditemukan',
         404
       )
     }
@@ -450,9 +352,11 @@ export async function getMustahik(
         mustahik,
       }
     )
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
-      'GET MUSTAHIK ERROR:',
+      'GET DETAIL MUSTAHIK ERROR:',
       error
     )
 
@@ -464,6 +368,7 @@ export async function getMustahik(
   }
 }
 
+
 // ============================================================
 // UPDATE MUSTAHIK
 // ============================================================
@@ -473,109 +378,199 @@ export async function updateMustahik(
   res: Response
 ) {
   try {
-    const current =
+    const adminId =
+      getAdminId(req)
+
+    const {
+      id,
+    } = req.params
+
+    const existing =
       await prisma.mustahik.findUnique({
         where: {
-          id: req.params.id,
+          id,
         },
       })
 
-    if (!current) {
+    if (
+      !existing
+    ) {
       return fail(
         res,
-        'Mustahik tidak ditemukan',
+        'Data mustahik tidak ditemukan',
         404
       )
     }
 
-    const allowed = [
-      'namaLengkap',
-      'tempatLahir',
-      'tanggalLahir',
-      'jenisKelamin',
-      'alamat',
-      'kelurahan',
-      'kecamatan',
-      'kota',
-      'provinsi',
-      'noHp',
-      'statusPernikahan',
-      'pekerjaan',
-      'penghasilan',
-      'jumlahTanggungan',
-      'statusRumah',
-      'kondisiRumah',
-      'kepemilikanAset',
-    ]
+    const body =
+      (
+        req.body ||
+        {}
+      ) as Record<
+        string,
+        unknown
+      >
 
-    const data: Record<
-      string,
-      unknown
-    > = {}
-
-    for (
-      const key of allowed
-    ) {
-      if (
-        req.body?.[key] !==
-        undefined
-      ) {
-        data[key] =
-          req.body[key]
-      }
-    }
-
-    if (
-      data.tanggalLahir
-    ) {
-      data.tanggalLahir =
-        new Date(
-          String(
-            data.tanggalLahir
-          )
-        )
-    }
-
-    if (
-      data.penghasilan !==
-      undefined
-    ) {
-      data.penghasilan =
-        Number(
-          data.penghasilan
-        )
-    }
-
-    if (
-      data.jumlahTanggungan !==
-      undefined
-    ) {
-      data.jumlahTanggungan =
-        Number(
-          data.jumlahTanggungan
-        )
-    }
-
-    const mustahik =
+    const updated =
       await prisma.mustahik.update({
         where: {
-          id: current.id,
+          id,
         },
-        data,
+
+        data: {
+          nik:
+            body.nik !== undefined
+              ? String(body.nik).trim()
+              : undefined,
+
+          namaLengkap:
+            body.namaLengkap !== undefined
+              ? String(body.namaLengkap).trim()
+              : undefined,
+
+          tempatLahir:
+            body.tempatLahir !== undefined
+              ? String(body.tempatLahir)
+              : undefined,
+
+          tanggalLahir:
+            body.tanggalLahir
+              ? new Date(
+                  String(
+                    body.tanggalLahir
+                  )
+                )
+              : undefined,
+
+          jenisKelamin:
+            body.jenisKelamin !== undefined
+              ? String(body.jenisKelamin)
+              : undefined,
+
+          alamat:
+            body.alamat !== undefined
+              ? String(body.alamat)
+              : undefined,
+
+          kelurahan:
+            body.kelurahan !== undefined
+              ? String(body.kelurahan)
+              : undefined,
+
+          kecamatan:
+            body.kecamatan !== undefined
+              ? String(body.kecamatan)
+              : undefined,
+
+          kota:
+            body.kota !== undefined
+              ? String(body.kota)
+              : undefined,
+
+          provinsi:
+            body.provinsi !== undefined
+              ? String(body.provinsi)
+              : undefined,
+
+          noHp:
+            body.noHp !== undefined
+              ? String(body.noHp)
+              : undefined,
+
+          statusPernikahan:
+            body.statusPernikahan !== undefined
+              ? String(body.statusPernikahan)
+              : undefined,
+
+          pekerjaan:
+            body.pekerjaan !== undefined
+              ? String(body.pekerjaan)
+              : undefined,
+
+          penghasilan:
+            body.penghasilan !== undefined &&
+            body.penghasilan !== null &&
+            body.penghasilan !== ''
+              ? Number(
+                  body.penghasilan
+                )
+              : undefined,
+
+          jumlahTanggungan:
+            body.jumlahTanggungan !== undefined &&
+            body.jumlahTanggungan !== null &&
+            body.jumlahTanggungan !== ''
+              ? Number(
+                  body.jumlahTanggungan
+                )
+              : undefined,
+
+          statusRumah:
+            body.statusRumah !== undefined
+              ? String(body.statusRumah)
+              : undefined,
+
+          kondisiRumah:
+            body.kondisiRumah !== undefined
+              ? String(body.kondisiRumah)
+              : undefined,
+
+          kepemilikanAset:
+            body.kepemilikanAset !== undefined
+              ? String(body.kepemilikanAset)
+              : undefined,
+        },
+
+        include:
+          mustahikInclude,
       })
+
+    if (
+      adminId
+    ) {
+      await prisma.auditLog.create({
+        data: {
+          userId:
+            adminId,
+
+          action:
+            'UPDATE_MUSTAHIK',
+
+          entity:
+            'Mustahik',
+
+          entityId:
+            id,
+        },
+      })
+    }
 
     return success(
       res,
       'Data mustahik berhasil diperbarui',
       {
-        mustahik,
+        mustahik:
+          updated,
       }
     )
-  } catch (error) {
+  } catch (
+    error: any
+  ) {
     console.error(
       'UPDATE MUSTAHIK ERROR:',
       error
     )
+
+    if (
+      error?.code ===
+      'P2002'
+    ) {
+      return fail(
+        res,
+        'NIK sudah digunakan',
+        409
+      )
+    }
 
     return fail(
       res,
@@ -584,6 +579,7 @@ export async function updateMustahik(
     )
   }
 }
+
 
 // ============================================================
 // DELETE MUSTAHIK
@@ -594,32 +590,63 @@ export async function deleteMustahik(
   res: Response
 ) {
   try {
-    const current =
+    const adminId =
+      getAdminId(req)
+
+    const {
+      id,
+    } = req.params
+
+    const mustahik =
       await prisma.mustahik.findUnique({
         where: {
-          id: req.params.id,
+          id,
         },
       })
 
-    if (!current) {
+    if (
+      !mustahik
+    ) {
       return fail(
         res,
-        'Mustahik tidak ditemukan',
+        'Data mustahik tidak ditemukan',
         404
       )
     }
 
     await prisma.mustahik.delete({
       where: {
-        id: current.id,
+        id,
       },
     })
 
+    if (
+      adminId
+    ) {
+      await prisma.auditLog.create({
+        data: {
+          userId:
+            adminId,
+
+          action:
+            'DELETE_MUSTAHIK',
+
+          entity:
+            'Mustahik',
+
+          entityId:
+            id,
+        },
+      })
+    }
+
     return success(
       res,
-      'Mustahik berhasil dihapus'
+      'Data mustahik berhasil dihapus'
     )
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
       'DELETE MUSTAHIK ERROR:',
       error
@@ -627,105 +654,15 @@ export async function deleteMustahik(
 
     return fail(
       res,
-      'Gagal menghapus mustahik',
+      'Gagal menghapus data mustahik',
       500
     )
   }
 }
 
-// ============================================================
-// LIST VERIFIKASI
-// ============================================================
-
-export async function listVerifikasi(
-  req: Request,
-  res: Response
-) {
-  try {
-    const requestedStatus =
-      req.query.status
-        ? String(
-            req.query.status
-          )
-        : null
-
-    let where = {}
-
-    if (
-      requestedStatus &&
-      PENGAJUAN_STATUS.includes(
-        requestedStatus as PengajuanStatus
-      )
-    ) {
-      where = {
-        status:
-          requestedStatus,
-      }
-    } else {
-      where = {
-        status: {
-          in: [
-            'MENUNGGU_VERIFIKASI',
-            'SEDANG_DIVERIFIKASI',
-            'PERLU_PERBAIKAN',
-            'LOLOS_VERIFIKASI',
-            'DITOLAK',
-          ],
-        },
-      }
-    }
-
-    const pengajuan =
-      await prisma.pengajuan.findMany({
-        where,
-
-        include: {
-          mustahik: true,
-
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-
-          verifications: {
-            orderBy: {
-              createdAt:
-                'desc',
-            },
-          },
-        },
-
-        orderBy: {
-          createdAt: 'asc',
-        },
-      })
-
-    return success(
-      res,
-      'Daftar verifikasi berhasil diambil',
-      {
-        pengajuan,
-      }
-    )
-  } catch (error) {
-    console.error(
-      'LIST VERIFIKASI ERROR:',
-      error
-    )
-
-    return fail(
-      res,
-      'Gagal mengambil data verifikasi',
-      500
-    )
-  }
-}
 
 // ============================================================
-// DETAIL VERIFIKASI
+// GET VERIFIKASI
 // ============================================================
 
 export async function getVerifikasi(
@@ -733,27 +670,30 @@ export async function getVerifikasi(
   res: Response
 ) {
   try {
-    const pengajuan =
-      await prisma.pengajuan.findUnique({
+    const verifikasi =
+      await prisma.pengajuan.findMany({
         where: {
-          id: req.params.id,
+          status: {
+            in: [
+              PengajuanStatus.MENUNGGU_VERIFIKASI,
+              PengajuanStatus.SEDANG_DIVERIFIKASI,
+              PengajuanStatus.PERLU_PERBAIKAN,
+              PengajuanStatus.LOLOS_VERIFIKASI,
+              PengajuanStatus.DITOLAK,
+            ],
+          },
         },
 
         include: {
           mustahik: true,
 
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-
           jawaban: {
             include: {
-              kriteria: true,
-              subKriteria: true,
+              indikator: {
+                include: {
+                  kriteria: true,
+                },
+              },
             },
           },
 
@@ -774,30 +714,128 @@ export async function getVerifikasi(
             },
           },
         },
+
+        orderBy: {
+          createdAt:
+            'desc',
+        },
       })
 
-    if (!pengajuan) {
+    return success(
+      res,
+      'Data verifikasi berhasil diambil',
+      {
+        verifikasi,
+        total:
+          verifikasi.length,
+      }
+    )
+  } catch (
+    error
+  ) {
+    console.error(
+      'GET VERIFIKASI ERROR:',
+      error
+    )
+
+    return fail(
+      res,
+      'Gagal mengambil data verifikasi',
+      500
+    )
+  }
+}
+
+
+// ============================================================
+// GET DETAIL VERIFIKASI
+// ============================================================
+
+export async function getVerifikasiById(
+  req: Request,
+  res: Response
+) {
+  try {
+    const {
+      id,
+    } = req.params
+
+    const pengajuan =
+      await prisma.pengajuan.findUnique({
+        where: {
+          id,
+        },
+
+        include: {
+          mustahik: true,
+
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+
+          jawaban: {
+            include: {
+              indikator: {
+                include: {
+                  kriteria: true,
+                },
+              },
+            },
+
+            orderBy: {
+              indikator: {
+                urutan:
+                  'asc',
+              },
+            },
+          },
+
+          verifications: {
+            include: {
+              admin: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+
+            orderBy: {
+              createdAt:
+                'desc',
+            },
+          },
+
+          topsisResults: {
+            include: {
+              details: {
+                include: {
+                  indikator: {
+                    include: {
+                      kriteria: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+
+    if (
+      !pengajuan
+    ) {
       return fail(
         res,
         'Pengajuan tidak ditemukan',
         404
       )
-    }
-
-    if (
-      pengajuan.status ===
-      'MENUNGGU_VERIFIKASI'
-    ) {
-      await prisma.pengajuan.update({
-        where: {
-          id: pengajuan.id,
-        },
-
-        data: {
-          status:
-            'SEDANG_DIVERIFIKASI',
-        },
-      })
     }
 
     return success(
@@ -807,9 +845,11 @@ export async function getVerifikasi(
         pengajuan,
       }
     )
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
-      'GET VERIFIKASI ERROR:',
+      'GET DETAIL VERIFIKASI ERROR:',
       error
     )
 
@@ -821,22 +861,54 @@ export async function getVerifikasi(
   }
 }
 
+
 // ============================================================
-// SUBMIT VERIFIKASI
+// CREATE VERIFIKASI
 // ============================================================
 
-export async function submitVerifikasi(
+export async function createVerifikasi(
   req: Request,
   res: Response
 ) {
   try {
-    const status =
-      String(
-        req.body?.status ?? ''
-      ).toUpperCase()
+    const adminId =
+      getAdminId(req)
 
     if (
-      !VERIFIKASI_STATUS.includes(
+      !adminId
+    ) {
+      return fail(
+        res,
+        'Admin belum terautentikasi',
+        401
+      )
+    }
+
+    const {
+      id,
+    } = req.params
+
+    const body =
+      req.body ||
+      {}
+
+    const status =
+      String(
+        body.status ||
+        ''
+      ).toUpperCase()
+
+    const catatan =
+      body.catatan
+        ? String(body.catatan)
+        : null
+
+    if (
+      ![
+        VerifikasiStatus.LOLOS,
+        VerifikasiStatus.PERLU_PERBAIKAN,
+        VerifikasiStatus.DITOLAK,
+      ].includes(
         status as VerifikasiStatus
       )
     ) {
@@ -850,11 +922,13 @@ export async function submitVerifikasi(
     const pengajuan =
       await prisma.pengajuan.findUnique({
         where: {
-          id: req.params.id,
+          id,
         },
       })
 
-    if (!pengajuan) {
+    if (
+      !pengajuan
+    ) {
       return fail(
         res,
         'Pengajuan tidak ditemukan',
@@ -862,83 +936,94 @@ export async function submitVerifikasi(
       )
     }
 
-    let nextStatus:
-      | 'DIPROSES_TOPSIS'
-      | 'PERLU_PERBAIKAN'
-      | 'DITOLAK'
+    let pengajuanStatus:
+      PengajuanStatus
 
     if (
-      status === 'LOLOS'
+      status ===
+      VerifikasiStatus.LOLOS
     ) {
-      nextStatus =
-        'DIPROSES_TOPSIS'
+      pengajuanStatus =
+        PengajuanStatus.LOLOS_VERIFIKASI
     } else if (
       status ===
-      'PERLU_PERBAIKAN'
+      VerifikasiStatus.PERLU_PERBAIKAN
     ) {
-      nextStatus =
-        'PERLU_PERBAIKAN'
+      pengajuanStatus =
+        PengajuanStatus.PERLU_PERBAIKAN
     } else {
-      nextStatus =
-        'DITOLAK'
+      pengajuanStatus =
+        PengajuanStatus.DITOLAK
     }
 
     const result =
       await prisma.$transaction(
-        async (tx) => {
+        async (
+          tx
+        ) => {
           const verifikasi =
             await tx.verifikasi.create({
               data: {
                 pengajuanId:
-                  pengajuan.id,
+                  id,
 
-                adminId:
-                  req.auth!
-                    .userId,
+                adminId,
 
                 status:
-                  status as any,
+                  status as VerifikasiStatus,
 
-                catatan:
-                  req.body
-                    ?.catatan
-                    ? String(
-                        req.body
-                          .catatan
-                      )
-                    : null,
+                catatan,
+              },
+
+              include: {
+                admin: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
               },
             })
 
-          const updated =
-            await tx.pengajuan.update({
-              where: {
-                id: pengajuan.id,
+          await tx.pengajuan.update({
+            where: {
+              id,
+            },
+
+            data: {
+              status:
+                pengajuanStatus,
+
+              catatan,
+
+              tanggalVerifikasi:
+                new Date(),
+            },
+          })
+
+          await tx.auditLog.create({
+            data: {
+              userId:
+                adminId,
+
+              action:
+                'CREATE_VERIFIKASI',
+
+              entity:
+                'Pengajuan',
+
+              entityId:
+                id,
+
+              metadata: {
+                status,
+                pengajuanStatus,
               },
+            },
+          })
 
-              data: {
-                status:
-                  nextStatus,
-
-                tanggalVerifikasi:
-                  new Date(),
-
-                catatan:
-                  req.body
-                    ?.catatan
-                    ? String(
-                        req.body
-                          .catatan
-                      )
-                    : null,
-              },
-            })
-
-          return {
-            verifikasi,
-            pengajuan:
-              updated,
-          }
+          return verifikasi
         }
       )
 
@@ -947,16 +1032,15 @@ export async function submitVerifikasi(
       'Verifikasi berhasil disimpan',
       {
         verifikasi:
-          result.verifikasi,
-
-        pengajuanStatus:
-          result.pengajuan
-            .status,
-      }
+          result,
+      },
+      201
     )
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
-      'SUBMIT VERIFIKASI ERROR:',
+      'CREATE VERIFIKASI ERROR:',
       error
     )
 
@@ -967,3 +1051,26 @@ export async function submitVerifikasi(
     )
   }
 }
+
+
+// ============================================================
+// ALIAS
+// ============================================================
+
+export const getAdminStats =
+  getAdminDashboard
+
+export const getAdminMustahik =
+  getMustahik
+
+export const getAdminMustahikById =
+  getMustahikById
+
+export const updateAdminMustahik =
+  updateMustahik
+
+export const deleteAdminMustahik =
+  deleteMustahik
+
+export const getVerifikasiList =
+  getVerifikasi

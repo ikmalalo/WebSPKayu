@@ -1,14 +1,16 @@
-import { Router } from 'express'
+import {
+  Router,
+} from 'express'
 
 import {
   getKuesioner,
-  createJawaban,
-  updateJawaban,
+  submitJawabanKuesioner,
 } from '../controllers/kuesioner.controller'
 
 import {
   authenticate,
 } from '../middleware/auth.middleware'
+
 
 // ============================================================
 // ROUTER
@@ -16,6 +18,7 @@ import {
 
 export const kuesionerRouter =
   Router()
+
 
 // ============================================================
 // GET KUESIONER
@@ -25,7 +28,8 @@ export const kuesionerRouter =
 //
 // Mengambil:
 // - 5 kriteria aktif
-// - 15 indikator aktif ID1 sampai ID15
+// - 15 indikator aktif
+// - Indikator ID1 sampai ID15
 //
 // ============================================================
 
@@ -34,6 +38,7 @@ kuesionerRouter.get(
   authenticate,
   getKuesioner
 )
+
 
 // ============================================================
 // SUBMIT JAWABAN KUESIONER
@@ -45,48 +50,28 @@ kuesionerRouter.get(
 //
 // {
 //   pengajuanId: string,
+//   statusRumah: string,
 //   jawaban: [
 //     {
 //       indikatorId: string,
 //       nilai: number
 //     }
-//   ],
-//   statusRumah: string
+//   ]
 // }
+//
+// Semua indikator wajib dijawab.
 //
 // ============================================================
 
 kuesionerRouter.post(
   '/jawaban',
   authenticate,
-  createJawaban
+  submitJawabanKuesioner
 )
 
-// ============================================================
-// UPDATE JAWABAN KUESIONER
-// ============================================================
-//
-// PUT /api/kuesioner/jawaban
-//
-// Endpoint ini digunakan untuk memperbarui
-// jawaban kuesioner selama pengajuan masih
-// berstatus DRAFT.
-//
-// ============================================================
-
-kuesionerRouter.put(
-  '/jawaban',
-  authenticate,
-  updateJawaban
-)
 
 // ============================================================
 // DEFAULT EXPORT
-// ============================================================
-//
-// Tetap disediakan agar kompatibel apabila
-// ada file lain yang menggunakan default import.
-//
 // ============================================================
 
 export default kuesionerRouter

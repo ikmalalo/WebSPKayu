@@ -41,12 +41,12 @@ enum IndikatorTipe {
 }
 
 model User {
-  id           String  @id @default(cuid())
+  id           String @id @default(cuid())
   name         String
-  email        String  @unique
+  email        String @unique
   passwordHash String
   phone        String?
-  role         Role    @default(USER)
+  role         Role   @default(USER)
 
   mustahik      Mustahik?
   pengajuan     Pengajuan[]
@@ -133,7 +133,7 @@ model Kriteria {
   aktif     Boolean      @default(true)
 
   dimensi String
-  urutan  Int
+  urutan   Int
 
   indikator     Indikator[]
   subKriteria   SubKriteria[]
@@ -151,43 +151,24 @@ model Indikator {
   id String @id @default(cuid())
 
   kriteriaId String
+  kode       String        @unique
+  nama       String
+  deskripsi  String?
+  tipe       IndikatorTipe @default(POSITIF)
+  urutan     Int
+  aktif      Boolean       @default(true)
 
-  kode      String        @unique
-  nama      String
-  deskripsi String?
-  tipe      IndikatorTipe @default(POSITIF)
-  urutan    Int
-  aktif     Boolean       @default(true)
-
-  kriteria     Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
-  jawaban      JawabanKuesioner[]
-  topsisDetail TopsisDetail[]
+  kriteria Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
+  jawaban  JawabanKuesioner[]
+  topsisDetails TopsisDetail[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([kriteriaId])
   @@index([aktif])
+  @@index([urutan])
   @@map("indikator")
-}
-
-model SubKriteria {
-  id String @id @default(cuid())
-
-  kriteriaId String
-
-  nama       String
-  nilai      Decimal @db.Decimal(8, 4)
-  keterangan String?
-
-  kriteria Kriteria @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([kriteriaId, nama])
-  @@index([kriteriaId])
-  @@map("subkriteria")
 }
 
 model JawabanKuesioner {
@@ -210,6 +191,25 @@ model JawabanKuesioner {
   @@map("jawabankuesioner")
 }
 
+model SubKriteria {
+  id String @id @default(cuid())
+
+  kriteriaId String
+
+  nama       String
+  nilai      Decimal @db.Decimal(8, 4)
+  keterangan String?
+
+  kriteria Kriteria @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kriteriaId, nama])
+  @@index([kriteriaId])
+  @@map("subkriteria")
+}
+
 model Verifikasi {
   id String @id @default(cuid())
 
@@ -226,6 +226,7 @@ model Verifikasi {
   updatedAt DateTime @updatedAt
 
   @@index([pengajuanId])
+  @@index([adminId])
   @@map("verifikasi")
 }
 
@@ -261,16 +262,23 @@ model TopsisDetail {
   nilaiNormalisasi Decimal @db.Decimal(12, 8)
   nilaiTerbobot    Decimal @db.Decimal(12, 8)
 
-  topsisResult TopsisResult @relation(fields: [topsisResultId], references: [id], onDelete: Cascade)
-  indikator    Indikator    @relation(fields: [indikatorId], references: [id], onDelete: Restrict)
+  topsisResult TopsisResult @relation(
+    fields: [topsisResultId],
+    references: [id],
+    onDelete: Cascade
+  )
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  Kriteria   Kriteria? @relation(fields: [kriteriaId], references: [id])
-  kriteriaId String?
+  indikator Indikator @relation(
+    fields: [indikatorId],
+    references: [id],
+    onDelete: Restrict
+  )
+
+  createdAt DateTime @default(now())
 
   @@unique([topsisResultId, indikatorId])
   @@index([indikatorId])
+  @@index([topsisResultId])
   @@map("topsisdetail")
 }
 
@@ -285,7 +293,11 @@ model AuditLog {
 
   metadata Json?
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(
+    fields: [userId],
+    references: [id],
+    onDelete: SetNull
+  )
 
   createdAt DateTime @default(now())
 

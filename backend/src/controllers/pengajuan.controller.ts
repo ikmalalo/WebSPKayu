@@ -1,9 +1,16 @@
-import type { Request, Response } from 'express'
+import type {
+  Request,
+  Response,
+} from 'express'
+
 import {
   PengajuanStatus,
 } from '@prisma/client'
 
-import { prisma } from '../config/prisma'
+import {
+  prisma,
+} from '../config/prisma'
+
 
 // ============================================================
 // RESPONSE HELPER
@@ -15,12 +22,15 @@ function success(
   data: unknown = null,
   statusCode = 200
 ) {
-  return res.status(statusCode).json({
+  return res.status(
+    statusCode
+  ).json({
     success: true,
     message,
     data,
   })
 }
+
 
 function fail(
   res: Response,
@@ -28,12 +38,15 @@ function fail(
   statusCode = 500,
   data: unknown = null
 ) {
-  return res.status(statusCode).json({
+  return res.status(
+    statusCode
+  ).json({
     success: false,
     message,
     data,
   })
 }
+
 
 // ============================================================
 // AUTH HELPER
@@ -55,9 +68,69 @@ function getUserId(
   )
 }
 
+
 // ============================================================
-// DATE HELPER
+// HELPER
 // ============================================================
+
+function stringOrNull(
+  value: unknown
+): string | null {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return null
+  }
+
+  const result =
+    String(value).trim()
+
+  return result || null
+}
+
+
+function numberOrNull(
+  value: unknown
+): number | null {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ''
+  ) {
+    return null
+  }
+
+  const result =
+    Number(value)
+
+  if (
+    Number.isNaN(result)
+  ) {
+    return null
+  }
+
+  return result
+}
+
+
+function integerOrNull(
+  value: unknown
+): number | null {
+  const result =
+    numberOrNull(value)
+
+  if (
+    result === null
+  ) {
+    return null
+  }
+
+  return Math.trunc(
+    result
+  )
+}
+
 
 function toDateOrNull(
   value: unknown
@@ -86,61 +159,9 @@ function toDateOrNull(
   return date
 }
 
-// ============================================================
-// STRING HELPER
-// ============================================================
-
-function stringOrNull(
-  value: unknown
-): string | null {
-  if (
-    value === undefined ||
-    value === null
-  ) {
-    return null
-  }
-
-  const valueString =
-    String(value).trim()
-
-  if (
-    !valueString
-  ) {
-    return null
-  }
-
-  return valueString
-}
 
 // ============================================================
-// NUMBER HELPER
-// ============================================================
-
-function numberOrNull(
-  value: unknown
-): number | null {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ''
-  ) {
-    return null
-  }
-
-  const number =
-    Number(value)
-
-  if (
-    Number.isNaN(number)
-  ) {
-    return null
-  }
-
-  return number
-}
-
-// ============================================================
-// PENGAJUAN INCLUDE
+// INCLUDE PENGAJUAN
 // ============================================================
 
 const pengajuanInclude = {
@@ -148,12 +169,16 @@ const pengajuanInclude = {
 
   jawaban: {
     include: {
-      kriteria: true,
-      subKriteria: true,
+      indikator: {
+        include: {
+          kriteria: true,
+        },
+      },
     },
 
     orderBy: {
-      createdAt: 'asc' as const,
+      createdAt:
+        'asc' as const,
     },
   },
 
@@ -169,7 +194,8 @@ const pengajuanInclude = {
     },
 
     orderBy: {
-      createdAt: 'desc' as const,
+      createdAt:
+        'desc' as const,
     },
   },
 
@@ -177,51 +203,66 @@ const pengajuanInclude = {
     include: {
       details: {
         include: {
-          kriteria: true,
+          indikator: {
+            include: {
+              kriteria: true,
+            },
+          },
         },
       },
     },
 
     orderBy: {
-      tanggalProses: 'desc' as const,
+      tanggalProses:
+        'desc' as const,
     },
   },
 }
 
+
 // ============================================================
-// MUSTAHIK DATA
+// GET CURRENT USER
 // ============================================================
-//
-// Nama dan nomor HP diambil dari User.
-//
-// Nama:
-//     User.name
-//
-// Nomor HP:
-//     User.phone
-//
-// Data ekonomi dan kondisi rumah bukan nilai TOPSIS langsung.
-// Nilai TOPSIS berasal dari jawaban kuesioner.
+
+async function getCurrentUser(
+  userId: string
+) {
+  return prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+    },
+  })
+}
+
+
+// ============================================================
+// CREATE MUSTAHIK DATA
 // ============================================================
 
 function createMustahikData(
-  raw: Record<string, unknown>,
+  raw: Record<
+    string,
+    unknown
+  >,
   user: {
     name: string
     phone: string | null
   }
 ) {
   return {
-    // ========================================================
-    // IDENTITAS
-    // ========================================================
-
     nik:
       String(
         raw.nik || ''
       ).trim(),
 
-    // 🔒 OTOMATIS DARI USER
     namaLengkap:
       user.name,
 
@@ -239,23 +280,6 @@ function createMustahikData(
       stringOrNull(
         raw.jenisKelamin
       ),
-
-    // ========================================================
-    // KONTAK
-    // ========================================================
-
-    // 🔒 OTOMATIS DARI USER
-    noHp:
-      user.phone,
-
-    statusPernikahan:
-      stringOrNull(
-        raw.statusPernikahan
-      ),
-
-    // ========================================================
-    // ALAMAT
-    // ========================================================
 
     alamat:
       stringOrNull(
@@ -282,13 +306,21 @@ function createMustahikData(
         raw.provinsi
       ),
 
-    // ========================================================
-    // DATA TAMBAHAN
-    // ========================================================
-    //
-    // Data ini dipertahankan agar kompatibel dengan schema.
-    // Penilaian TOPSIS tetap menggunakan JawabanKuesioner.
-    // ========================================================
+    noHp:
+      user.phone ||
+      stringOrNull(
+        raw.noHp
+      ),
+
+    statusPernikahan:
+      stringOrNull(
+        raw.statusPernikahan
+      ),
+
+    pekerjaan:
+      stringOrNull(
+        raw.pekerjaan
+      ),
 
     penghasilan:
       numberOrNull(
@@ -296,15 +328,9 @@ function createMustahikData(
       ),
 
     jumlahTanggungan:
-      raw.jumlahTanggungan ===
-        undefined ||
-      raw.jumlahTanggungan ===
-        null ||
-      raw.jumlahTanggungan === ''
-        ? null
-        : Number(
-            raw.jumlahTanggungan
-          ),
+      integerOrNull(
+        raw.jumlahTanggungan
+      ),
 
     statusRumah:
       stringOrNull(
@@ -323,49 +349,10 @@ function createMustahikData(
   }
 }
 
-// ============================================================
-// GET CURRENT USER
-// ============================================================
-
-async function getCurrentUser(
-  userId: string
-) {
-  return prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
-
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      role: true,
-    },
-  })
-}
 
 // ============================================================
 // CREATE PENGAJUAN
-// ============================================================
-//
 // POST /api/pengajuan
-//
-// Flow:
-//
-// REGISTER
-//     ↓
-// USER
-//     ↓
-// DATA PRIBADI
-//     ↓
-// PENGAJUAN DRAFT
-//     ↓
-// KUESIONER
-//     ↓
-// MENUNGGU_VERIFIKASI
-//
-// Satu user hanya boleh memiliki satu pengajuan.
 // ============================================================
 
 export async function createPengajuan(
@@ -373,14 +360,12 @@ export async function createPengajuan(
   res: Response
 ) {
   try {
-    // ========================================================
-    // AUTH
-    // ========================================================
-
     const userId =
       getUserId(req)
 
-    if (!userId) {
+    if (
+      !userId
+    ) {
       return fail(
         res,
         'User belum terautentikasi',
@@ -388,26 +373,20 @@ export async function createPengajuan(
       )
     }
 
-    // ========================================================
-    // USER
-    // ========================================================
-
     const user =
       await getCurrentUser(
         userId
       )
 
-    if (!user) {
+    if (
+      !user
+    ) {
       return fail(
         res,
         'Data user tidak ditemukan',
         404
       )
     }
-
-    // ========================================================
-    // BODY
-    // ========================================================
 
     const raw =
       (
@@ -419,16 +398,14 @@ export async function createPengajuan(
         unknown
       >
 
-    // ========================================================
-    // VALIDASI NIK
-    // ========================================================
-
     const nik =
       String(
         raw.nik || ''
       ).trim()
 
-    if (!nik) {
+    if (
+      !nik
+    ) {
       return fail(
         res,
         'NIK wajib diisi',
@@ -448,40 +425,6 @@ export async function createPengajuan(
       )
     }
 
-    // ========================================================
-    // VALIDASI NAMA USER
-    // ========================================================
-
-    if (
-      !user.name ||
-      !user.name.trim()
-    ) {
-      return fail(
-        res,
-        'Nama user belum tersedia. Silakan periksa data akun.',
-        422
-      )
-    }
-
-    // ========================================================
-    // VALIDASI NOMOR HP
-    // ========================================================
-
-    if (
-      !user.phone ||
-      !user.phone.trim()
-    ) {
-      return fail(
-        res,
-        'Nomor HP belum tersedia pada akun. Silakan perbarui profil.',
-        422
-      )
-    }
-
-    // ========================================================
-    // SATU USER = SATU PENGAJUAN
-    // ========================================================
-
     const existingPengajuan =
       await prisma.pengajuan.findFirst({
         where: {
@@ -499,14 +442,10 @@ export async function createPengajuan(
     ) {
       return fail(
         res,
-        'Anda sudah memiliki pengajuan. Satu user hanya dapat melakukan satu pengajuan.',
+        'Anda sudah memiliki pengajuan',
         409
       )
     }
-
-    // ========================================================
-    // CEK NIK
-    // ========================================================
 
     const existingNik =
       await prisma.mustahik.findUnique({
@@ -527,35 +466,23 @@ export async function createPengajuan(
       )
     }
 
-    // ========================================================
-    // DATA MUSTAHIK
-    // ========================================================
-
     const mustahikData =
       createMustahikData(
         raw,
         {
           name:
             user.name,
+
           phone:
             user.phone,
         }
       )
-
-    // ========================================================
-    // TRANSACTION
-    // ========================================================
 
     const pengajuan =
       await prisma.$transaction(
         async (
           tx
         ) => {
-
-          // ==================================================
-          // CREATE MUSTAHIK
-          // ==================================================
-
           const mustahik =
             await tx.mustahik.create({
               data: {
@@ -563,16 +490,11 @@ export async function createPengajuan(
 
                 user: {
                   connect: {
-                    id:
-                      userId,
+                    id: userId,
                   },
                 },
               },
             })
-
-          // ==================================================
-          // CREATE PENGAJUAN
-          // ==================================================
 
           const created =
             await tx.pengajuan.create({
@@ -590,10 +512,6 @@ export async function createPengajuan(
                 pengajuanInclude,
             })
 
-          // ==================================================
-          // AUDIT LOG
-          // ==================================================
-
           await tx.auditLog.create({
             data: {
               userId,
@@ -608,11 +526,11 @@ export async function createPengajuan(
                 created.id,
 
               metadata: {
-                status:
-                  PengajuanStatus.DRAFT,
-
                 mustahikId:
                   mustahik.id,
+
+                status:
+                  PengajuanStatus.DRAFT,
               },
             },
           })
@@ -620,10 +538,6 @@ export async function createPengajuan(
           return created
         }
       )
-
-    // ========================================================
-    // RESPONSE
-    // ========================================================
 
     return success(
       res,
@@ -633,7 +547,9 @@ export async function createPengajuan(
       },
       201
     )
-  } catch (error: any) {
+  } catch (
+    error: any
+  ) {
     console.error(
       'CREATE PENGAJUAN ERROR:',
       error
@@ -645,7 +561,7 @@ export async function createPengajuan(
     ) {
       return fail(
         res,
-        'Data sudah digunakan. Periksa NIK atau pengajuan Anda.',
+        'Data sudah digunakan',
         409
       )
     }
@@ -658,13 +574,10 @@ export async function createPengajuan(
   }
 }
 
+
 // ============================================================
 // GET MY PENGAJUAN
-// ============================================================
-//
 // GET /api/pengajuan/me
-//
-// User hanya mendapatkan pengajuannya sendiri.
 // ============================================================
 
 export async function getMyPengajuan(
@@ -675,7 +588,9 @@ export async function getMyPengajuan(
     const userId =
       getUserId(req)
 
-    if (!userId) {
+    if (
+      !userId
+    ) {
       return fail(
         res,
         'User belum terautentikasi',
@@ -708,7 +623,9 @@ export async function getMyPengajuan(
           pengajuan.length,
       }
     )
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
       'GET MY PENGAJUAN ERROR:',
       error
@@ -722,10 +639,9 @@ export async function getMyPengajuan(
   }
 }
 
+
 // ============================================================
 // GET DETAIL PENGAJUAN
-// ============================================================
-//
 // GET /api/pengajuan/:id
 // ============================================================
 
@@ -737,7 +653,9 @@ export async function getPengajuanById(
     const userId =
       getUserId(req)
 
-    if (!userId) {
+    if (
+      !userId
+    ) {
       return fail(
         res,
         'User belum terautentikasi',
@@ -749,7 +667,9 @@ export async function getPengajuanById(
       id,
     } = req.params
 
-    if (!id) {
+    if (
+      !id
+    ) {
       return fail(
         res,
         'ID pengajuan wajib diisi',
@@ -777,10 +697,6 @@ export async function getPengajuanById(
       )
     }
 
-    // ========================================================
-    // CEK KEPEMILIKAN
-    // ========================================================
-
     if (
       pengajuan.userId !==
       userId
@@ -799,9 +715,11 @@ export async function getPengajuanById(
         pengajuan,
       }
     )
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
-      'GET PENGAJUAN DETAIL ERROR:',
+      'GET DETAIL PENGAJUAN ERROR:',
       error
     )
 
@@ -813,34 +731,9 @@ export async function getPengajuanById(
   }
 }
 
+
 // ============================================================
-// UPDATE DATA MUSTAHIK
-// ============================================================
-//
-// PATCH /api/pengajuan/mustahik
-//
-// Yang boleh diubah:
-//
-// - NIK
-// - tempat lahir
-// - tanggal lahir
-// - jenis kelamin
-// - status pernikahan
-// - alamat
-// - kelurahan
-// - kecamatan
-// - kota
-// - provinsi
-//
-// Yang tidak boleh diubah:
-//
-// - namaLengkap
-// - noHp
-// - userId
-// - status pengajuan
-// - hasil TOPSIS
-//
-// DRAFT dan PERLU_PERBAIKAN masih boleh diedit.
+// UPDATE MUSTAHIK DATA
 // ============================================================
 
 export async function updateMustahikData(
@@ -848,41 +741,18 @@ export async function updateMustahikData(
   res: Response
 ) {
   try {
-    // ========================================================
-    // AUTH
-    // ========================================================
-
     const userId =
       getUserId(req)
 
-    if (!userId) {
+    if (
+      !userId
+    ) {
       return fail(
         res,
         'User belum terautentikasi',
         401
       )
     }
-
-    // ========================================================
-    // USER
-    // ========================================================
-
-    const user =
-      await getCurrentUser(
-        userId
-      )
-
-    if (!user) {
-      return fail(
-        res,
-        'Data user tidak ditemukan',
-        404
-      )
-    }
-
-    // ========================================================
-    // CARI PENGAJUAN
-    // ========================================================
 
     const pengajuan =
       await prisma.pengajuan.findFirst({
@@ -906,33 +776,14 @@ export async function updateMustahikData(
       )
     }
 
-    // ========================================================
-    // STATUS TERKUNCI
-    // ========================================================
-    //
-    // PERBAIKAN ERROR TYPESCRIPT:
-    //
-    // Explicitly beri tipe PengajuanStatus[].
-    //
-    // DRAFT dan PERLU_PERBAIKAN tidak dimasukkan
-    // karena user masih boleh melakukan perbaikan.
-    // ========================================================
-
-    const lockedStatuses:
-      PengajuanStatus[] = [
+    const lockedStatuses = [
       PengajuanStatus.MENUNGGU_VERIFIKASI,
-
       PengajuanStatus.SEDANG_DIVERIFIKASI,
-
       PengajuanStatus.LOLOS_VERIFIKASI,
-
-      PengajuanStatus.DITOLAK,
-
       PengajuanStatus.DIPROSES_TOPSIS,
-
       PengajuanStatus.LAYAK_DIDANAI,
-
       PengajuanStatus.TIDAK_DIDANAI,
+      PengajuanStatus.DITOLAK,
     ]
 
     if (
@@ -942,14 +793,10 @@ export async function updateMustahikData(
     ) {
       return fail(
         res,
-        'Data tidak dapat diubah karena pengajuan sudah diproses.',
+        'Data tidak dapat diubah karena pengajuan sudah diproses',
         409
       )
     }
-
-    // ========================================================
-    // BODY
-    // ========================================================
 
     const raw =
       (
@@ -961,16 +808,14 @@ export async function updateMustahikData(
         unknown
       >
 
-    // ========================================================
-    // VALIDASI NIK
-    // ========================================================
-
     const nik =
       String(
         raw.nik || ''
       ).trim()
 
-    if (!nik) {
+    if (
+      !nik
+    ) {
       return fail(
         res,
         'NIK wajib diisi',
@@ -990,21 +835,20 @@ export async function updateMustahikData(
       )
     }
 
-    // ========================================================
-    // CEK NIK USER LAIN
-    // ========================================================
-
-    const existingNik =
-      await prisma.mustahik.findUnique({
+    const duplicateNik =
+      await prisma.mustahik.findFirst({
         where: {
           nik,
+
+          NOT: {
+            id:
+              pengajuan.mustahikId,
+          },
         },
       })
 
     if (
-      existingNik &&
-      existingNik.id !==
-        pengajuan.mustahikId
+      duplicateNik
     ) {
       return fail(
         res,
@@ -1013,16 +857,8 @@ export async function updateMustahikData(
       )
     }
 
-    // ========================================================
-    // DATA YANG BOLEH DIUPDATE
-    // ========================================================
-
     const updateData = {
       nik,
-
-      // 🔒 Nama dari User
-      namaLengkap:
-        user.name,
 
       tempatLahir:
         stringOrNull(
@@ -1037,15 +873,6 @@ export async function updateMustahikData(
       jenisKelamin:
         stringOrNull(
           raw.jenisKelamin
-        ),
-
-      // 🔒 Nomor HP dari User
-      noHp:
-        user.phone,
-
-      statusPernikahan:
-        stringOrNull(
-          raw.statusPernikahan
         ),
 
       alamat:
@@ -1072,22 +899,48 @@ export async function updateMustahikData(
         stringOrNull(
           raw.provinsi
         ),
-    }
 
-    // ========================================================
-    // UPDATE TRANSACTION
-    // ========================================================
+      statusPernikahan:
+        stringOrNull(
+          raw.statusPernikahan
+        ),
+
+      pekerjaan:
+        stringOrNull(
+          raw.pekerjaan
+        ),
+
+      penghasilan:
+        numberOrNull(
+          raw.penghasilan
+        ),
+
+      jumlahTanggungan:
+        integerOrNull(
+          raw.jumlahTanggungan
+        ),
+
+      statusRumah:
+        stringOrNull(
+          raw.statusRumah
+        ),
+
+      kondisiRumah:
+        stringOrNull(
+          raw.kondisiRumah
+        ),
+
+      kepemilikanAset:
+        stringOrNull(
+          raw.kepemilikanAset
+        ),
+    }
 
     const updated =
       await prisma.$transaction(
         async (
           tx
         ) => {
-
-          // ==================================================
-          // UPDATE MUSTAHIK
-          // ==================================================
-
           await tx.mustahik.update({
             where: {
               id:
@@ -1097,10 +950,6 @@ export async function updateMustahikData(
             data:
               updateData,
           })
-
-          // ==================================================
-          // AMBIL DATA TERBARU
-          // ==================================================
 
           const updatedPengajuan =
             await tx.pengajuan.findUnique({
@@ -1112,10 +961,6 @@ export async function updateMustahikData(
               include:
                 pengajuanInclude,
             })
-
-          // ==================================================
-          // AUDIT LOG
-          // ==================================================
 
           await tx.auditLog.create({
             data: {
@@ -1133,9 +978,6 @@ export async function updateMustahikData(
               metadata: {
                 pengajuanId:
                   pengajuan.id,
-
-                status:
-                  pengajuan.status,
               },
             },
           })
@@ -1152,7 +994,9 @@ export async function updateMustahikData(
           updated,
       }
     )
-  } catch (error: any) {
+  } catch (
+    error: any
+  ) {
     console.error(
       'UPDATE MUSTAHIK ERROR:',
       error
@@ -1164,7 +1008,7 @@ export async function updateMustahikData(
     ) {
       return fail(
         res,
-        'NIK sudah digunakan oleh user lain',
+        'NIK sudah digunakan',
         409
       )
     }
@@ -1177,13 +1021,9 @@ export async function updateMustahikData(
   }
 }
 
+
 // ============================================================
-// DELETE / CANCEL PENGAJUAN
-// ============================================================
-//
-// Hanya DRAFT yang boleh dibatalkan.
-// Setelah kuesioner dikirim,
-// pengajuan tidak boleh dihapus.
+// DELETE PENGAJUAN
 // ============================================================
 
 export async function deletePengajuan(
@@ -1194,7 +1034,9 @@ export async function deletePengajuan(
     const userId =
       getUserId(req)
 
-    if (!userId) {
+    if (
+      !userId
+    ) {
       return fail(
         res,
         'User belum terautentikasi',
@@ -1206,7 +1048,9 @@ export async function deletePengajuan(
       id,
     } = req.params
 
-    if (!id) {
+    if (
+      !id
+    ) {
       return fail(
         res,
         'ID pengajuan wajib diisi',
@@ -1237,14 +1081,10 @@ export async function deletePengajuan(
     ) {
       return fail(
         res,
-        'Anda tidak memiliki akses ke pengajuan ini',
+        'Anda tidak memiliki akses',
         403
       )
     }
-
-    // ========================================================
-    // HANYA DRAFT
-    // ========================================================
 
     if (
       pengajuan.status !==
@@ -1252,7 +1092,7 @@ export async function deletePengajuan(
     ) {
       return fail(
         res,
-        'Pengajuan yang sudah diproses tidak dapat dihapus.',
+        'Pengajuan yang sudah diproses tidak dapat dihapus',
         409
       )
     }
@@ -1261,20 +1101,11 @@ export async function deletePengajuan(
       async (
         tx
       ) => {
-
-        // ----------------------------------------------------
-        // DELETE PENGAJUAN
-        // ----------------------------------------------------
-
         await tx.pengajuan.delete({
           where: {
             id,
           },
         })
-
-        // ----------------------------------------------------
-        // AUDIT LOG
-        // ----------------------------------------------------
 
         await tx.auditLog.create({
           data: {
@@ -1288,11 +1119,6 @@ export async function deletePengajuan(
 
             entityId:
               id,
-
-            metadata: {
-              status:
-                PengajuanStatus.DRAFT,
-            },
           },
         })
       }
@@ -1302,7 +1128,9 @@ export async function deletePengajuan(
       res,
       'Pengajuan berhasil dibatalkan'
     )
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
       'DELETE PENGAJUAN ERROR:',
       error
