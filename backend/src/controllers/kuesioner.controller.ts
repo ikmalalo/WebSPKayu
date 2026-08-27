@@ -1,10 +1,11 @@
-import type {
+import {
   Request,
   Response,
 } from 'express'
 
 import {
   PengajuanStatus,
+  Prisma,
 } from '@prisma/client'
 
 import {
@@ -12,18 +13,31 @@ import {
 } from '../config/prisma'
 
 import {
-  fail,
   success,
-} from '../utils/api-response'
+  fail,
+} from '../utils/response'
 
 // ============================================================
-// TYPE JAWABAN KUESIONER
+// HELPER
 // ============================================================
 
-type JawabanInput = {
-  indikatorId: string
-  nilai: number
+function getUserId(
+  req: Request
+): string | null {
+  const user = (
+    req as Request & {
+      user?: {
+        id?: string
+      }
+    }
+  ).user
+
+  return (
+    user?.id ||
+    null
+  )
 }
+
 
 // ============================================================
 // GET KUESIONER
@@ -34,23 +48,42 @@ type JawabanInput = {
 // Struktur:
 //
 // C1
-// ├── ID1
-// ├── ID2
-// └── ID3
+//   ├── ID1
+//   ├── ID2
+//   └── ID3
 //
 // C2
-// ├── ID4
-// ├── ID5
-// └── ID6
+//   ├── ID4
+//   ├── ID5
+//   └── ID6
 //
 // dan seterusnya.
 // ============================================================
 
 export async function getKuesioner(
-  _req: Request,
+  req: Request,
   res: Response
 ) {
   try {
+
+    const userId =
+      getUserId(req)
+
+    if (
+      !userId
+    ) {
+      return fail(
+        res,
+        'User belum terautentikasi',
+        401
+      )
+    }
+
+
+    // ========================================================
+    // AMBIL KRITERIA + INDIKATOR
+    // ========================================================
+
     const kriteria =
       await prisma.kriteria.findMany({
         where: {
@@ -66,31 +99,68 @@ export async function getKuesioner(
             orderBy: {
               urutan: 'asc',
             },
-
-            select: {
-              id: true,
-              kode: true,
-              nama: true,
-              deskripsi: true,
-              tipe: true,
-              urutan: true,
-            },
           },
         },
 
         orderBy: {
-          kode: 'asc',
+          urutan: 'asc',
         },
       })
 
+
+    // ========================================================
+    // VALIDASI
+    // ========================================================
+
+    if (
+      kriteria.length === 0
+    ) {
+      return fail(
+        res,
+        'Data kriteria belum tersedia',
+        404
+      )
+    }
+
+
+    const totalIndikator =
+      kriteria.reduce(
+        (
+          total,
+          item
+        ) =>
+          total +
+          item.indikator.length,
+        0
+      )
+
+
+    if (
+      totalIndikator === 0
+    ) {
+      return fail(
+        res,
+        'Data indikator belum tersedia',
+        404
+      )
+    }
+
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
     return success(
       res,
-      'Kuesioner berhasil diambil',
+      'Data kuesioner berhasil diambil',
       {
         kriteria,
       }
     )
-  } catch (error) {
+
+  } catch (
+    error
+  ) {
     console.error(
       'GET KUESIONER ERROR:',
       error
@@ -104,258 +174,131 @@ export async function getKuesioner(
   }
 }
 
-// ============================================================
-// VALIDASI JAWABAN
-// ============================================================
-//
-// Validasi:
-//
-// 1. Semua indikator aktif wajib dijawab.
-// 2. Tidak boleh ada indikator duplikat.
-// 3. indikatorId harus valid.
-// 4. Nilai harus berupa angka.
-// 5. Nilai harus berada pada rentang 1 sampai 5.
-// ============================================================
-
-async function validateAnswers(
-  jawaban: JawabanInput[]
-) {
-  // ----------------------------------------------------------
-  // Ambil seluruh indikator aktif
-  // ----------------------------------------------------------
-
-  const indikator =
-    await prisma.indikator.findMany({
-      where: {
-        aktif: true,
-
-        kriteria: {
-          aktif: true,
-        },
-      },
-
-      select: {
-        id: true,
-        kode: true,
-        kriteriaId: true,
-        urutan: true,
-      },
-
-      orderBy: {
-        urutan: 'asc',
-      },
-    })
-
-  // ----------------------------------------------------------
-  // Pastikan indikator tersedia
-  // ----------------------------------------------------------
-
-  if (
-    indikator.length === 0
-  ) {
-    throw new Error(
-      'Data indikator kuesioner belum tersedia'
-    )
-  }
-
-  // ----------------------------------------------------------
-  // Ambil semua indikator yang seharusnya dijawab
-  // ----------------------------------------------------------
-
-  const indikatorIds =
-    indikator.map(
-      (item) =>
-        item.id
-    )
-
-  // ----------------------------------------------------------
-  // Ambil indikator yang dijawab user
-  // ----------------------------------------------------------
-
-  const answeredIndikatorIds =
-    jawaban.map(
-      (item) =>
-        item.indikatorId
-    )
-
-  // ----------------------------------------------------------
-  // Semua indikator wajib dijawab
-  // ----------------------------------------------------------
-
-  const missingIndikator =
-    indikatorIds.filter(
-      (id) =>
-        !answeredIndikatorIds.includes(
-          id
-        )
-    )
-
-  if (
-    missingIndikator.length > 0
-  ) {
-    const missingCodes =
-      indikator
-        .filter(
-          (item) =>
-            missingIndikator.includes(
-              item.id
-            )
-        )
-        .map(
-          (item) =>
-            item.kode
-        )
-
-    throw new Error(
-      `Semua pertanyaan wajib dijawab. Jawaban belum ditemukan untuk: ${missingCodes.join(
-        ', '
-      )}`
-    )
-  }
-
-  // ----------------------------------------------------------
-  // Tidak boleh ada indikator duplikat
-  // ----------------------------------------------------------
-
-  const uniqueIndikator =
-    new Set(
-      answeredIndikatorIds
-    )
-
-  if (
-    uniqueIndikator.size !==
-    answeredIndikatorIds.length
-  ) {
-    throw new Error(
-      'Terdapat jawaban indikator yang duplikat'
-    )
-  }
-
-  // ----------------------------------------------------------
-  // Jumlah jawaban harus sama dengan indikator aktif
-  // ----------------------------------------------------------
-
-  if (
-    jawaban.length !==
-    indikator.length
-  ) {
-    throw new Error(
-      `Jumlah jawaban tidak sesuai. Kuesioner harus berisi ${indikator.length} jawaban.`
-    )
-  }
-
-  // ----------------------------------------------------------
-  // Pastikan setiap indikatorId valid
-  // ----------------------------------------------------------
-
-  const invalidIndikatorIds =
-    answeredIndikatorIds.filter(
-      (id) =>
-        !indikatorIds.includes(
-          id
-        )
-    )
-
-  if (
-    invalidIndikatorIds.length > 0
-  ) {
-    throw new Error(
-      'Terdapat indikator yang tidak valid'
-    )
-  }
-
-  // ----------------------------------------------------------
-  // Validasi nilai
-  //
-  // Saat ini menggunakan skala 1-5.
-  // ----------------------------------------------------------
-
-  for (
-    const item of jawaban
-  ) {
-    const nilai =
-      Number(item.nilai)
-
-    if (
-      !Number.isFinite(
-        nilai
-      )
-    ) {
-      throw new Error(
-        'Nilai jawaban harus berupa angka'
-      )
-    }
-
-    if (
-      nilai < 1 ||
-      nilai > 5
-    ) {
-      throw new Error(
-        'Nilai jawaban harus berada pada rentang 1 sampai 5'
-      )
-    }
-  }
-
-  return {
-    indikator,
-  }
-}
 
 // ============================================================
-// SIMPAN JAWABAN
+// SUBMIT JAWABAN KUESIONER
 // ============================================================
 //
-// Kuesioner hanya dapat dikirim SATU KALI.
+// Request:
 //
-// Setelah berhasil:
-// DRAFT
-//   ↓
-// MENUNGGU_VERIFIKASI
+// {
+//   pengajuanId: "...",
+//   statusRumah: "...",
+//   jawaban: [
+//     {
+//       indikatorId: "...",
+//       nilai: 4
+//     }
+//   ]
+// }
 //
-// Setelah status bukan DRAFT,
-// user tidak dapat mengirim ulang.
+// Semua 15 indikator wajib dijawab.
 // ============================================================
 
-async function saveAnswers(
+export async function submitJawabanKuesioner(
   req: Request,
-  res: Response,
-  message: string
+  res: Response
 ) {
   try {
+
+    const userId =
+      getUserId(req)
+
+    if (
+      !userId
+    ) {
+      return fail(
+        res,
+        'User belum terautentikasi',
+        401
+      )
+    }
+
+
+    // ========================================================
+    // REQUEST BODY
+    // ========================================================
+
     const {
       pengajuanId,
       jawaban,
       statusRumah,
     } =
-      req.body as {
-        pengajuanId?: string
+      req.body
 
-        jawaban?: JawabanInput[]
-
-        statusRumah?:
-          | 'milik_sendiri'
-          | 'sewa'
-          | 'menumpang'
-      }
 
     // ========================================================
-    // VALIDASI INPUT
+    // VALIDASI PENGAJUAN ID
     // ========================================================
 
     if (
-      !pengajuanId
+      !pengajuanId ||
+      typeof pengajuanId !==
+        'string'
     ) {
       return fail(
         res,
-        'pengajuanId wajib diisi',
+        'ID pengajuan wajib diisi',
         422
       )
     }
 
+
+    // ========================================================
+    // VALIDASI STATUS RUMAH
+    // ========================================================
+
+    const allowedStatusRumah = [
+      'milik_sendiri',
+      'sewa',
+      'menumpang',
+    ]
+
+
+    if (
+      !statusRumah ||
+      typeof statusRumah !==
+        'string'
+    ) {
+      return fail(
+        res,
+        'Status rumah wajib dipilih',
+        422
+      )
+    }
+
+
+    if (
+      !allowedStatusRumah.includes(
+        statusRumah
+      )
+    ) {
+      return fail(
+        res,
+        'Status rumah tidak valid',
+        422
+      )
+    }
+
+
+    // ========================================================
+    // VALIDASI JAWABAN
+    // ========================================================
+
     if (
       !Array.isArray(
         jawaban
-      ) ||
+      )
+    ) {
+      return fail(
+        res,
+        'Data jawaban tidak valid',
+        422
+      )
+    }
+
+
+    if (
       jawaban.length === 0
     ) {
       return fail(
@@ -365,28 +308,6 @@ async function saveAnswers(
       )
     }
 
-    // ========================================================
-    // VALIDASI STATUS RUMAH
-    // ========================================================
-
-    const validStatusRumah = [
-      'milik_sendiri',
-      'sewa',
-      'menumpang',
-    ] as const
-
-    if (
-      !statusRumah ||
-      !validStatusRumah.includes(
-        statusRumah
-      )
-    ) {
-      return fail(
-        res,
-        'Status rumah wajib dipilih',
-        422
-      )
-    }
 
     // ========================================================
     // AMBIL PENGAJUAN
@@ -395,17 +316,17 @@ async function saveAnswers(
     const pengajuan =
       await prisma.pengajuan.findUnique({
         where: {
-          id: pengajuanId,
+          id:
+            pengajuanId,
         },
 
         include: {
-          jawaban: {
-            select: {
-              id: true,
-            },
-          },
+          mustahik: true,
+
+          jawaban: true,
         },
       })
+
 
     if (
       !pengajuan
@@ -417,27 +338,14 @@ async function saveAnswers(
       )
     }
 
-    // ========================================================
-    // CEK AUTH
-    // ========================================================
-
-    if (
-      !req.auth
-    ) {
-      return fail(
-        res,
-        'Token autentikasi diperlukan',
-        401
-      )
-    }
 
     // ========================================================
-    // CEK KEPEMILIKAN PENGAJUAN
+    // CEK KEPEMILIKAN
     // ========================================================
 
     if (
       pengajuan.userId !==
-      req.auth.userId
+      userId
     ) {
       return fail(
         res,
@@ -446,10 +354,9 @@ async function saveAnswers(
       )
     }
 
+
     // ========================================================
     // CEK STATUS
-    //
-    // Kuesioner hanya dapat dikirim ketika DRAFT.
     // ========================================================
 
     if (
@@ -458,13 +365,14 @@ async function saveAnswers(
     ) {
       return fail(
         res,
-        'Kuesioner sudah pernah dikirim dan tidak dapat diisi atau dikirim ulang.',
+        'Kuesioner sudah dikirim dan tidak dapat diubah kembali',
         409
       )
     }
 
+
     // ========================================================
-    // CEK JAWABAN YANG SUDAH ADA
+    // CEK JAWABAN LAMA
     // ========================================================
 
     if (
@@ -472,103 +380,321 @@ async function saveAnswers(
     ) {
       return fail(
         res,
-        'Kuesioner untuk pengajuan ini sudah pernah diisi.',
+        'Kuesioner sudah pernah dikirim',
         409
       )
     }
 
+
     // ========================================================
-    // VALIDASI SELURUH JAWABAN
+    // AMBIL SEMUA INDIKATOR AKTIF
     // ========================================================
 
-    try {
-      await validateAnswers(
-        jawaban
-      )
-    } catch (
-      validationError
+    const indikatorAktif =
+      await prisma.indikator.findMany({
+        where: {
+          aktif: true,
+
+          kriteria: {
+            aktif: true,
+          },
+        },
+
+        select: {
+          id: true,
+          kode: true,
+        },
+
+        orderBy: {
+          urutan: 'asc',
+        },
+      })
+
+
+    if (
+      indikatorAktif.length === 0
     ) {
       return fail(
         res,
-        validationError instanceof
-          Error
-          ? validationError.message
-          : 'Jawaban kuesioner tidak valid',
+        'Data indikator belum tersedia',
+        500
+      )
+    }
+
+
+    // ========================================================
+    // VALIDASI JUMLAH JAWABAN
+    // ========================================================
+
+    if (
+      jawaban.length !==
+      indikatorAktif.length
+    ) {
+      return fail(
+        res,
+        `Semua ${indikatorAktif.length} indikator wajib dijawab`,
         422
       )
     }
 
+
     // ========================================================
-    // SIMPAN DALAM SATU TRANSACTION
+    // VALIDASI FORMAT JAWABAN
     // ========================================================
 
-    await prisma.$transaction(
-      async (
-        tx
-      ) => {
+    const indikatorIds =
+      new Set(
+        indikatorAktif.map(
+          (
+            indikator
+          ) =>
+            indikator.id
+        )
+      )
 
-        // ----------------------------------------------------
-        // Simpan 15 jawaban indikator
-        // ----------------------------------------------------
 
-        await tx.jawabanKuesioner.createMany({
-          data:
-            jawaban.map(
-              (item) => ({
+    const submittedIds =
+      new Set<string>()
+
+
+    for (
+      const item of
+        jawaban
+    ) {
+
+      const indikatorId =
+        item?.indikatorId
+
+      const nilai =
+        Number(
+          item?.nilai
+        )
+
+
+      // ------------------------------------------------------
+      // VALIDASI ID
+      // ------------------------------------------------------
+
+      if (
+        !indikatorId ||
+        typeof indikatorId !==
+          'string'
+      ) {
+        return fail(
+          res,
+          'ID indikator tidak valid',
+          422
+        )
+      }
+
+
+      if (
+        !indikatorIds.has(
+          indikatorId
+        )
+      ) {
+        return fail(
+          res,
+          'Terdapat indikator yang tidak valid',
+          422
+        )
+      }
+
+
+      // ------------------------------------------------------
+      // CEK DUPLIKAT
+      // ------------------------------------------------------
+
+      if (
+        submittedIds.has(
+          indikatorId
+        )
+      ) {
+        return fail(
+          res,
+          'Terdapat jawaban indikator yang duplikat',
+          422
+        )
+      }
+
+
+      submittedIds.add(
+        indikatorId
+      )
+
+
+      // ------------------------------------------------------
+      // VALIDASI NILAI
+      // ------------------------------------------------------
+
+      if (
+        !Number.isFinite(
+          nilai
+        )
+      ) {
+        return fail(
+          res,
+          'Nilai jawaban tidak valid',
+          422
+        )
+      }
+
+
+      if (
+        nilai < 1 ||
+        nilai > 5
+      ) {
+        return fail(
+          res,
+          'Nilai jawaban harus antara 1 sampai 5',
+          422
+        )
+      }
+    }
+
+
+    // ========================================================
+    // PASTIKAN SEMUA INDIKATOR ADA
+    // ========================================================
+
+    if (
+      submittedIds.size !==
+      indikatorAktif.length
+    ) {
+      return fail(
+        res,
+        'Masih ada indikator yang belum dijawab',
+        422
+      )
+    }
+
+
+    // ========================================================
+    // SIMPAN TRANSAKSI
+    // ========================================================
+
+    const updatedPengajuan =
+      await prisma.$transaction(
+        async (
+          tx
+        ) => {
+
+          // --------------------------------------------------
+          // UPDATE STATUS RUMAH
+          // --------------------------------------------------
+
+          await tx.mustahik.update({
+            where: {
+              id:
+                pengajuan.mustahikId,
+            },
+
+            data: {
+              statusRumah,
+            },
+          })
+
+
+          // --------------------------------------------------
+          // SIMPAN JAWABAN
+          // --------------------------------------------------
+
+          await tx.jawabanKuesioner.createMany({
+            data:
+              jawaban.map(
+                (
+                  item: {
+                    indikatorId: string
+                    nilai: number
+                  }
+                ) => ({
+                  pengajuanId,
+
+                  indikatorId:
+                    item.indikatorId,
+
+                  nilai:
+                    new Prisma.Decimal(
+                      item.nilai
+                    ),
+                })
+              ),
+          })
+
+
+          // --------------------------------------------------
+          // UPDATE STATUS PENGAJUAN
+          // --------------------------------------------------
+
+          const updated =
+            await tx.pengajuan.update({
+              where: {
+                id:
+                  pengajuanId,
+              },
+
+              data: {
+                status:
+                  PengajuanStatus.MENUNGGU_VERIFIKASI,
+              },
+
+              include: {
+                mustahik: true,
+
+                jawaban: {
+                  include: {
+                    indikator: {
+                      include: {
+                        kriteria: true,
+                      },
+                    },
+                  },
+
+                  orderBy: {
+                    createdAt: 'asc',
+                  },
+                },
+              },
+            })
+
+
+          // --------------------------------------------------
+          // AUDIT LOG
+          // --------------------------------------------------
+
+          await tx.auditLog.create({
+            data: {
+              userId,
+
+              action:
+                'SUBMIT_KUESIONER',
+
+              entity:
+                'Pengajuan',
+
+              entityId:
                 pengajuanId,
 
-                indikatorId:
-                  item.indikatorId,
+              metadata: {
+                totalJawaban:
+                  jawaban.length,
 
-                nilai:
-                  Number(
-                    item.nilai
-                  ),
-              })
-            ),
-        })
+                statusRumah,
 
-        // ----------------------------------------------------
-        // Simpan status rumah.
-        //
-        // Status rumah bukan bagian dari
-        // perhitungan TOPSIS baru.
-        // ----------------------------------------------------
+                statusSebelum:
+                  PengajuanStatus.DRAFT,
 
-        await tx.mustahik.update({
-          where: {
-            id:
-              pengajuan.mustahikId,
-          },
+                statusSesudah:
+                  PengajuanStatus.MENUNGGU_VERIFIKASI,
+              },
+            },
+          })
 
-          data: {
-            statusRumah,
-          },
-        })
 
-        // ----------------------------------------------------
-        // Ubah status pengajuan
-        //
-        // DRAFT
-        //   ↓
-        // MENUNGGU_VERIFIKASI
-        // ----------------------------------------------------
+          return updated
+        }
+      )
 
-        await tx.pengajuan.update({
-          where: {
-            id: pengajuanId,
-          },
-
-          data: {
-            status:
-              PengajuanStatus.MENUNGGU_VERIFIKASI,
-
-            catatan:
-              null,
-          },
-        })
-      }
-    )
 
     // ========================================================
     // RESPONSE
@@ -576,21 +702,50 @@ async function saveAnswers(
 
     return success(
       res,
-      message,
+      'Jawaban kuesioner berhasil dikirim',
       {
-        pengajuanId,
-
-        status:
-          PengajuanStatus.MENUNGGU_VERIFIKASI,
-
-        locked: true,
+        pengajuan:
+          updatedPengajuan,
       }
     )
-  } catch (error) {
+
+  } catch (
+    error: any
+  ) {
+
     console.error(
-      'SAVE KUESIONER ERROR:',
+      'SUBMIT JAWABAN KUESIONER ERROR:',
       error
     )
+
+
+    // ========================================================
+    // PRISMA ERROR
+    // ========================================================
+
+    if (
+      error?.code ===
+      'P2002'
+    ) {
+      return fail(
+        res,
+        'Jawaban kuesioner sudah pernah disimpan',
+        409
+      )
+    }
+
+
+    if (
+      error?.code ===
+      'P2003'
+    ) {
+      return fail(
+        res,
+        'Relasi data jawaban tidak valid',
+        422
+      )
+    }
+
 
     return fail(
       res,
@@ -599,44 +754,3 @@ async function saveAnswers(
     )
   }
 }
-
-// ============================================================
-// CREATE JAWABAN
-// ============================================================
-//
-// POST /kuesioner/jawaban
-//
-// Hanya untuk pengiriman pertama.
-// ============================================================
-
-export const createJawaban = (
-  req: Request,
-  res: Response
-) =>
-  saveAnswers(
-    req,
-    res,
-    'Jawaban kuesioner berhasil dikirim'
-  )
-
-// ============================================================
-// UPDATE JAWABAN
-// ============================================================
-//
-// Endpoint dipertahankan agar route lama tidak rusak.
-//
-// Namun karena saveAnswers hanya menerima
-// pengajuan dengan status DRAFT, setelah submit
-// endpoint ini otomatis tidak dapat digunakan
-// untuk mengubah jawaban.
-// ============================================================
-
-export const updateJawaban = (
-  req: Request,
-  res: Response
-) =>
-  saveAnswers(
-    req,
-    res,
-    'Jawaban kuesioner berhasil diperbarui'
-  )
