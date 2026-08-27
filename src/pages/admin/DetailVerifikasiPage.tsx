@@ -35,46 +35,47 @@ type VerificationStatus =
   | 'PERLU_PERBAIKAN'
   | 'DITOLAK'
 
-interface AnswerItem {
+type AnswerItem = {
   id: string
-
   pengajuanId?: string
+  indikatorId?: string | null
+  kriteriaId?: string | null
+  subKriteriaId?: string | null
+  nilai: number | string
 
-  kriteriaId: string
+  indikator?: {
+    id: string
+    kode: string
+    nama: string
+    deskripsi?: string | null
+    tipe?: string
+    urutan?: number
 
-  subKriteriaId: string
+    kriteria?: {
+      id: string
+      kode: string
+      nama: string
+      bobot?: number | string
+      tipe?: string
+    } | null
+  } | null
 
-  nilai:
-    | number
-    | string
-
+  // Fallback struktur lama
   kriteria?: {
     id: string
-
     kode: string
-
     nama: string
+    bobot?: number | string
+    tipe?: string
+  } | null
 
-    bobot:
-      | number
-      | string
-
-    tipe:
-      | 'BENEFIT'
-      | 'COST'
-  }
-
+  // Fallback struktur lama
   subKriteria?: {
     id: string
-
     nama: string
-
-    nilai:
-      | number
-      | string
-
+    nilai?: number | string
     keterangan?: string | null
-  }
+  } | null
 }
 
 // ============================================================
@@ -88,8 +89,7 @@ function formatDate(
     return '-'
   }
 
-  const date =
-    new Date(value)
+  const date = new Date(value)
 
   if (
     Number.isNaN(
@@ -124,8 +124,7 @@ function formatNumber(
     return '-'
   }
 
-  const number =
-    Number(value)
+  const number = Number(value)
 
   if (
     Number.isNaN(number)
@@ -227,11 +226,6 @@ export default function DetailVerifikasiPage() {
             result
           )
 
-          // ==================================================
-          // Jika sebelumnya sudah pernah diverifikasi,
-          // tampilkan status dan catatan terakhir.
-          // ==================================================
-
           const latestVerification =
             result.verifications?.[0]
 
@@ -269,11 +263,6 @@ export default function DetailVerifikasiPage() {
                 ''
             )
           } else {
-            // =================================================
-            // Kalau belum diverifikasi, gunakan catatan
-            // dari pengajuan kalau tersedia.
-            // =================================================
-
             setCatatan(
               result.catatan ||
                 ''
@@ -330,10 +319,6 @@ export default function DetailVerifikasiPage() {
               undefined,
           }
         )
-
-        // ====================================================
-        // Setelah berhasil, kembali ke daftar verifikasi.
-        // ====================================================
 
         navigate(
           '/admin/verifikasi',
@@ -768,8 +753,7 @@ export default function DetailVerifikasiPage() {
 
           <div className="overflow-x-auto">
 
-            {answers.length ===
-            0 ? (
+            {answers.length === 0 ? (
               <div className="p-8 text-center text-sm text-slate-400">
                 Belum ada jawaban kuesioner.
               </div>
@@ -778,72 +762,112 @@ export default function DetailVerifikasiPage() {
 
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50">
+
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Kriteria
                     </th>
 
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Subkriteria
+                      Indikator
                     </th>
 
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Nilai
                     </th>
+
                   </tr>
                 </thead>
 
                 <tbody>
+
                   {answers.map(
                     (
                       answer: AnswerItem
-                    ) => (
-                      <tr
-                        key={
-                          answer.id
-                        }
-                        className="border-b border-slate-100 last:border-b-0"
-                      >
-                        <td className="px-5 py-4">
-                          <p className="font-medium text-slate-900">
-                            {answer.kriteria?.kode
-                              ? `${answer.kriteria.kode} - `
-                              : ''}
+                    ) => {
+                      const kriteria =
+                        answer.indikator?.kriteria ||
+                        answer.kriteria
 
-                            {answer.kriteria?.nama ||
-                              '-'}
-                          </p>
-                        </td>
+                      const indikator =
+                        answer.indikator
 
-                        <td className="px-5 py-4">
-                          <p className="text-sm text-slate-700">
-                            {answer.subKriteria?.nama ||
-                              '-'}
-                          </p>
+                      return (
+                        <tr
+                          key={
+                            answer.id
+                          }
+                          className="border-b border-slate-100 last:border-b-0"
+                        >
 
-                          {answer.subKriteria?.keterangan && (
-                            <p className="mt-1 text-xs text-slate-400">
-                              {
-                                answer.subKriteria
-                                  .keterangan
-                              }
+                          {/* KRITERIA */}
+
+                          <td className="px-5 py-4">
+
+                            <p className="font-medium text-slate-900">
+
+                              {kriteria?.kode
+                                ? `${kriteria.kode} - `
+                                : ''}
+
+                              {kriteria?.nama ||
+                                '-'}
+
                             </p>
-                          )}
-                        </td>
 
-                        <td className="px-5 py-4">
-                          <span className="font-semibold text-slate-900">
-                            {formatNumber(
-                              answer.nilai
+                          </td>
+
+                          {/* INDIKATOR */}
+
+                          <td className="px-5 py-4">
+
+                            <p className="text-sm text-slate-700">
+
+                              {indikator?.kode
+                                ? `${indikator.kode} - `
+                                : ''}
+
+                              {indikator?.nama ||
+                                answer.subKriteria?.nama ||
+                                '-'}
+
+                            </p>
+
+                            {(indikator?.deskripsi ||
+                              answer.subKriteria?.keterangan) && (
+                              <p className="mt-1 text-xs text-slate-400">
+
+                                {indikator?.deskripsi ||
+                                  answer.subKriteria?.keterangan}
+
+                              </p>
                             )}
-                          </span>
-                        </td>
-                      </tr>
-                    )
+
+                          </td>
+
+                          {/* NILAI */}
+
+                          <td className="px-5 py-4">
+
+                            <span className="font-semibold text-slate-900">
+
+                              {formatNumber(
+                                answer.nilai
+                              )}
+
+                            </span>
+
+                          </td>
+
+                        </tr>
+                      )
+                    }
                   )}
+
                 </tbody>
 
               </table>
             )}
+
           </div>
         </section>
 
@@ -854,6 +878,7 @@ export default function DetailVerifikasiPage() {
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
 
           <div className="border-b border-slate-100 px-5 py-4">
+
             <h2 className="font-semibold text-slate-900">
               Keputusan Verifikasi
             </h2>
@@ -861,6 +886,7 @@ export default function DetailVerifikasiPage() {
             <p className="mt-1 text-xs text-slate-500">
               Tentukan hasil verifikasi pengajuan ini.
             </p>
+
           </div>
 
           <div className="space-y-5 p-5">
@@ -868,6 +894,7 @@ export default function DetailVerifikasiPage() {
             {/* STATUS */}
 
             <div>
+
               <label className="mb-3 block text-sm font-medium text-slate-700">
                 Status Verifikasi
               </label>
@@ -884,16 +911,18 @@ export default function DetailVerifikasiPage() {
                     )
                   }
                   className={`rounded-xl border p-4 text-left transition ${
-                    status ===
-                    'LOLOS'
+                    status === 'LOLOS'
                       ? 'border-green-500 bg-green-50 ring-2 ring-green-100'
                       : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
+
                   <div className="flex items-center gap-3">
+
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
 
                     <div>
+
                       <p className="font-semibold text-slate-900">
                         Lolos
                       </p>
@@ -901,11 +930,14 @@ export default function DetailVerifikasiPage() {
                       <p className="mt-0.5 text-xs text-slate-500">
                         Lanjut ke proses TOPSIS
                       </p>
+
                     </div>
+
                   </div>
+
                 </button>
 
-                {/* PERBAIKAN */}
+                {/* PERLU PERBAIKAN */}
 
                 <button
                   type="button"
@@ -915,16 +947,18 @@ export default function DetailVerifikasiPage() {
                     )
                   }
                   className={`rounded-xl border p-4 text-left transition ${
-                    status ===
-                    'PERLU_PERBAIKAN'
+                    status === 'PERLU_PERBAIKAN'
                       ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-100'
                       : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
+
                   <div className="flex items-center gap-3">
+
                     <AlertCircle className="h-5 w-5 text-orange-600" />
 
                     <div>
+
                       <p className="font-semibold text-slate-900">
                         Perlu Perbaikan
                       </p>
@@ -932,8 +966,11 @@ export default function DetailVerifikasiPage() {
                       <p className="mt-0.5 text-xs text-slate-500">
                         User perlu memperbaiki data
                       </p>
+
                     </div>
+
                   </div>
+
                 </button>
 
                 {/* DITOLAK */}
@@ -946,16 +983,18 @@ export default function DetailVerifikasiPage() {
                     )
                   }
                   className={`rounded-xl border p-4 text-left transition ${
-                    status ===
-                    'DITOLAK'
+                    status === 'DITOLAK'
                       ? 'border-red-500 bg-red-50 ring-2 ring-red-100'
                       : 'border-slate-200 bg-white hover:bg-slate-50'
                   }`}
                 >
+
                   <div className="flex items-center gap-3">
+
                     <XCircle className="h-5 w-5 text-red-600" />
 
                     <div>
+
                       <p className="font-semibold text-slate-900">
                         Ditolak
                       </p>
@@ -963,16 +1002,21 @@ export default function DetailVerifikasiPage() {
                       <p className="mt-0.5 text-xs text-slate-500">
                         Pengajuan tidak dilanjutkan
                       </p>
+
                     </div>
+
                   </div>
+
                 </button>
 
               </div>
+
             </div>
 
             {/* CATATAN */}
 
             <div>
+
               <label
                 htmlFor="catatan"
                 className="mb-2 block text-sm font-medium text-slate-700"
@@ -996,6 +1040,7 @@ export default function DetailVerifikasiPage() {
                 placeholder="Masukkan catatan verifikasi..."
                 className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
               />
+
             </div>
 
             {/* ACTION */}
@@ -1027,6 +1072,7 @@ export default function DetailVerifikasiPage() {
                 }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
+
                 {submitting ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" />
@@ -1040,6 +1086,7 @@ export default function DetailVerifikasiPage() {
                     Simpan Verifikasi
                   </>
                 )}
+
               </button>
 
             </div>
