@@ -151,15 +151,17 @@ model Indikator {
   id String @id @default(cuid())
 
   kriteriaId String
-  kode       String        @unique
-  nama       String
-  deskripsi  String?
-  tipe       IndikatorTipe @default(POSITIF)
-  urutan     Int
-  aktif      Boolean       @default(true)
 
-  kriteria Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
-  jawaban  JawabanKuesioner[]
+  kode      String        @unique
+  nama      String
+  deskripsi String?
+  tipe      IndikatorTipe @default(POSITIF)
+  urutan    Int
+  aktif     Boolean       @default(true)
+
+  kriteria     Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
+  jawaban      JawabanKuesioner[]
+  topsisDetail TopsisDetail[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -253,17 +255,22 @@ model TopsisDetail {
   id String @id @default(cuid())
 
   topsisResultId String
-  kriteriaId     String
+  indikatorId    String
 
   nilaiAwal        Decimal @db.Decimal(10, 6)
   nilaiNormalisasi Decimal @db.Decimal(12, 8)
   nilaiTerbobot    Decimal @db.Decimal(12, 8)
 
   topsisResult TopsisResult @relation(fields: [topsisResultId], references: [id], onDelete: Cascade)
-  kriteria     Kriteria     @relation(fields: [kriteriaId], references: [id], onDelete: Restrict)
+  indikator    Indikator    @relation(fields: [indikatorId], references: [id], onDelete: Restrict)
 
-  @@unique([topsisResultId, kriteriaId])
-  @@index([kriteriaId])
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  Kriteria   Kriteria? @relation(fields: [kriteriaId], references: [id])
+  kriteriaId String?
+
+  @@unique([topsisResultId, indikatorId])
+  @@index([indikatorId])
   @@map("topsisdetail")
 }
 
