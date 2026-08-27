@@ -776,15 +776,15 @@ export async function updateMustahikData(
       )
     }
 
-    const lockedStatuses = [
-      PengajuanStatus.MENUNGGU_VERIFIKASI,
-      PengajuanStatus.SEDANG_DIVERIFIKASI,
-      PengajuanStatus.LOLOS_VERIFIKASI,
-      PengajuanStatus.DIPROSES_TOPSIS,
-      PengajuanStatus.LAYAK_DIDANAI,
-      PengajuanStatus.TIDAK_DIDANAI,
-      PengajuanStatus.DITOLAK,
-    ]
+    const lockedStatuses: PengajuanStatus[] = [
+    PengajuanStatus.MENUNGGU_VERIFIKASI,
+    PengajuanStatus.SEDANG_DIVERIFIKASI,
+    PengajuanStatus.LOLOS_VERIFIKASI,
+    PengajuanStatus.DIPROSES_TOPSIS,
+    PengajuanStatus.LAYAK_DIDANAI,
+    PengajuanStatus.TIDAK_DIDANAI,
+    PengajuanStatus.DITOLAK,
+  ]
 
     if (
       lockedStatuses.includes(

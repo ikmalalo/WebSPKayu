@@ -15,18 +15,18 @@ import {
 // ============================================================
 
 import {
-  getDashboard,
+  getAdminDashboard,
 
   // Mustahik
-  listMustahik,
   getMustahik,
+  getMustahikById,
   updateMustahik,
   deleteMustahik,
 
   // Verifikasi
-  listVerifikasi,
   getVerifikasi,
-  submitVerifikasi,
+  getVerifikasiById,
+  createVerifikasi,
 } from '../controllers/admin.controller'
 
 // ============================================================
@@ -50,28 +50,19 @@ import {
 // ============================================================
 
 import {
-  getTopsisCandidates,
   processTopsis,
   getTopsisResults,
-  getTopsisResult,
+  getTopsisResultById,
 } from '../controllers/topsis.controller'
 
 // ============================================================
 // ROUTER
 // ============================================================
 
-export const adminRouter =
-  Router()
+export const adminRouter = Router()
 
 // ============================================================
 // AUTHENTICATION
-// ============================================================
-//
-// Semua route /api/admin/*:
-//
-// 1. Wajib login
-// 2. Wajib mempunyai role ADMIN
-//
 // ============================================================
 
 adminRouter.use(
@@ -79,70 +70,44 @@ adminRouter.use(
 )
 
 adminRouter.use(
-  authorize(
-    Role.ADMIN
-  )
+  authorize(Role.ADMIN)
 )
 
 // ============================================================
 // DASHBOARD
 // ============================================================
-//
-// GET /api/admin/dashboard
-//
-// ============================================================
 
 adminRouter.get(
   '/dashboard',
   asyncHandler(
-    getDashboard
+    getAdminDashboard
   )
 )
 
 // ============================================================
 // DATA MUSTAHIK
 // ============================================================
-//
-// GET
-// /api/admin/mustahik
-//
-// Query:
-//
-// ?q=nama
-// ?status=LAYAK_DIDANAI
-//
-// ============================================================
 
 adminRouter.get(
   '/mustahik',
-  asyncHandler(
-    listMustahik
-  )
-)
-
-// ============================================================
-// DETAIL MUSTAHIK
-// ============================================================
-//
-// GET
-// /api/admin/mustahik/:id
-//
-// ============================================================
-
-adminRouter.get(
-  '/mustahik/:id',
   asyncHandler(
     getMustahik
   )
 )
 
 // ============================================================
-// UPDATE MUSTAHIK
+// DETAIL MUSTAHIK
 // ============================================================
-//
-// PUT
-// /api/admin/mustahik/:id
-//
+
+adminRouter.get(
+  '/mustahik/:id',
+  asyncHandler(
+    getMustahikById
+  )
+)
+
+// ============================================================
+// UPDATE MUSTAHIK
 // ============================================================
 
 adminRouter.put(
@@ -155,11 +120,6 @@ adminRouter.put(
 // ============================================================
 // DELETE MUSTAHIK
 // ============================================================
-//
-// DELETE
-// /api/admin/mustahik/:id
-//
-// ============================================================
 
 adminRouter.delete(
   '/mustahik/:id',
@@ -169,89 +129,40 @@ adminRouter.delete(
 )
 
 // ============================================================
-// VERIFIKASI
-// ============================================================
-//
-// GET
-// /api/admin/verifikasi
-//
-// Query:
-//
-// ?status=semua
-// ?status=perlu_verifikasi
-// ?status=sudah_diverifikasi
-//
+// VERIFIKASI LIST
 // ============================================================
 
 adminRouter.get(
   '/verifikasi',
-  asyncHandler(
-    listVerifikasi
-  )
-)
-
-// ============================================================
-// DETAIL VERIFIKASI
-// ============================================================
-//
-// GET
-// /api/admin/verifikasi/:id
-//
-// :id = ID PENGAJUAN
-//
-// ============================================================
-
-adminRouter.get(
-  '/verifikasi/:id',
   asyncHandler(
     getVerifikasi
   )
 )
 
 // ============================================================
-// SUBMIT VERIFIKASI
+// DETAIL VERIFIKASI
 // ============================================================
-//
-// POST
-// /api/admin/verifikasi/:id
-//
-// Body:
-//
-// {
-//   "status": "LOLOS",
-//   "catatan": "Data sudah sesuai"
-// }
-//
-// atau:
-//
-// {
-//   "status": "PERLU_PERBAIKAN",
-//   "catatan": "Mohon lengkapi data"
-// }
-//
-// atau:
-//
-// {
-//   "status": "DITOLAK",
-//   "catatan": "Data tidak memenuhi syarat"
-// }
-//
+
+adminRouter.get(
+  '/verifikasi/:id',
+  asyncHandler(
+    getVerifikasiById
+  )
+)
+
+// ============================================================
+// SUBMIT VERIFIKASI
 // ============================================================
 
 adminRouter.post(
   '/verifikasi/:id',
   asyncHandler(
-    submitVerifikasi
+    createVerifikasi
   )
 )
 
 // ============================================================
 // KRITERIA
-// ============================================================
-//
-// GET
-// /api/admin/kriteria
-//
 // ============================================================
 
 adminRouter.get(
@@ -261,15 +172,6 @@ adminRouter.get(
   )
 )
 
-// ============================================================
-// CREATE KRITERIA
-// ============================================================
-//
-// POST
-// /api/admin/kriteria
-//
-// ============================================================
-
 adminRouter.post(
   '/kriteria',
   asyncHandler(
@@ -277,30 +179,12 @@ adminRouter.post(
   )
 )
 
-// ============================================================
-// UPDATE KRITERIA
-// ============================================================
-//
-// PUT
-// /api/admin/kriteria/:id
-//
-// ============================================================
-
 adminRouter.put(
   '/kriteria/:id',
   asyncHandler(
     updateKriteria
   )
 )
-
-// ============================================================
-// DELETE KRITERIA
-// ============================================================
-//
-// DELETE
-// /api/admin/kriteria/:id
-//
-// ============================================================
 
 adminRouter.delete(
   '/kriteria/:id',
@@ -312,15 +196,6 @@ adminRouter.delete(
 // ============================================================
 // SUBKRITERIA
 // ============================================================
-//
-// GET
-// /api/admin/subkriteria
-//
-// Optional:
-//
-// ?kriteriaId=...
-//
-// ============================================================
 
 adminRouter.get(
   '/subkriteria',
@@ -329,15 +204,6 @@ adminRouter.get(
   )
 )
 
-// ============================================================
-// CREATE SUBKRITERIA
-// ============================================================
-//
-// POST
-// /api/admin/subkriteria
-//
-// ============================================================
-
 adminRouter.post(
   '/subkriteria',
   asyncHandler(
@@ -345,30 +211,12 @@ adminRouter.post(
   )
 )
 
-// ============================================================
-// UPDATE SUBKRITERIA
-// ============================================================
-//
-// PUT
-// /api/admin/subkriteria/:id
-//
-// ============================================================
-
 adminRouter.put(
   '/subkriteria/:id',
   asyncHandler(
     updateSubKriteria
   )
 )
-
-// ============================================================
-// DELETE SUBKRITERIA
-// ============================================================
-//
-// DELETE
-// /api/admin/subkriteria/:id
-//
-// ============================================================
 
 adminRouter.delete(
   '/subkriteria/:id',
@@ -378,43 +226,7 @@ adminRouter.delete(
 )
 
 // ============================================================
-// TOPSIS - CANDIDATES
-// ============================================================
-//
-// GET
-// /api/admin/topsis/candidates
-//
-// Ini mengambil pengajuan yang:
-//
-// LOLOS_VERIFIKASI
-// DIPROSES_TOPSIS
-// LAYAK_DIDANAI
-// TIDAK_DIDANAI
-//
-// dengan jawaban kuesioner lengkap.
-//
-// ============================================================
-
-adminRouter.get(
-  '/topsis/candidates',
-  asyncHandler(
-    getTopsisCandidates
-  )
-)
-
-// ============================================================
 // TOPSIS - PROCESS
-// ============================================================
-//
-// POST
-// /api/admin/topsis/process
-//
-// Body:
-//
-// {
-//   "layakThreshold": 0.6
-// }
-//
 // ============================================================
 
 adminRouter.post(
@@ -427,11 +239,6 @@ adminRouter.post(
 // ============================================================
 // TOPSIS - RESULTS
 // ============================================================
-//
-// GET
-// /api/admin/topsis/results
-//
-// ============================================================
 
 adminRouter.get(
   '/topsis/results',
@@ -443,15 +250,10 @@ adminRouter.get(
 // ============================================================
 // TOPSIS - DETAIL RESULT
 // ============================================================
-//
-// GET
-// /api/admin/topsis/results/:id
-//
-// ============================================================
 
 adminRouter.get(
   '/topsis/results/:id',
   asyncHandler(
-    getTopsisResult
+    getTopsisResultById
   )
 )
