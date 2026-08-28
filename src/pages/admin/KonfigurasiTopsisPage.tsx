@@ -7,20 +7,20 @@ import {
   Loader2,
   Save,
   RefreshCw,
+  RotateCcw,
   Sparkles,
   Scale,
   ArrowRight,
-  TrendingUp,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
   getAdminTopsisConfig,
   updateAdminTopsisConfig,
   type AdminTopsisConfigKriteria,
-  type AdminTopsisConfigIndikator,
 } from '@/lib/adminApi'
 
 interface FormIndicatorState {
@@ -38,6 +38,7 @@ export function KonfigurasiTopsisPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [openResetConfirm, setOpenResetConfirm] = useState(false)
 
   const [metode, setMetode] = useState<'OTOMATIS' | 'MANUAL'>('OTOMATIS')
   const [kriteriaList, setKriteriaList] = useState<AdminTopsisConfigKriteria[]>([])
@@ -109,6 +110,43 @@ export function KonfigurasiTopsisPage() {
         tipe,
       },
     }))
+  }
+
+  // Reset ALL to Default Baseline (Otomatis & Default Types)
+  const handleResetToDefault = () => {
+    setMetode('OTOMATIS')
+
+    setIndicatorState((prev) => {
+      const next = { ...prev }
+      for (const key of Object.keys(next)) {
+        const item = next[key]
+        next[key] = {
+          ...item,
+          bobotPercent: item.bobotOtomatisPercent,
+          tipe: item.kode === 'ID6' ? 'NEGATIF' : 'POSITIF',
+        }
+      }
+      return next
+    })
+
+    setError('')
+    setSuccessMessage('Konfigurasi telah di-reset ke nilai default (Otomatis / Bagi Rata). Klik "Simpan Konfigurasi" untuk menyimpan ke database.')
+  }
+
+  // Reset a Single Criteria to Even Split
+  const handleResetSingleCriteria = (kriteriaId: string) => {
+    setIndicatorState((prev) => {
+      const next = { ...prev }
+      for (const key of Object.keys(next)) {
+        if (next[key].kriteriaId === kriteriaId) {
+          next[key] = {
+            ...next[key],
+            bobotPercent: next[key].bobotOtomatisPercent,
+          }
+        }
+      }
+      return next
+    })
   }
 
   // Calculation & Validation per Criteria
@@ -211,7 +249,19 @@ export function KonfigurasiTopsisPage() {
         title="Konfigurasi TOPSIS"
         description="Atur metode pembobotan dan tipe indikator penilaian untuk proses SPK TOPSIS."
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* BUTTON RESET KE DEFAULT */}
+          <Button
+            variant="outline"
+            onClick={() => setOpenResetConfirm(true)}
+            disabled={loading || saving}
+            className="border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+            title="Kembalikan semua bobot dan metode ke hitungan default awal (Bagi Rata)"
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Reset ke Default
+          </Button>
+
           <Button
             variant="outline"
             onClick={() => void loadConfig()}
@@ -401,8 +451,22 @@ export function KonfigurasiTopsisPage() {
                     </p>
                   </div>
 
-                  {/* STATUS BADGE PER KRITERIA */}
-                  <div className="flex items-center gap-3">
+                  {/* STATUS BADGE & QUICK RESET PER KRITERIA */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {metode === 'MANUAL' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleResetSingleCriteria(kriteria.id)}
+                        className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 h-7 px-2"
+                        title="Bagi rata bobot untuk kriteria ini"
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Bagi Rata {kriteria.kode}
+                      </Button>
+                    )}
+
                     {metode === 'OTOMATIS' ? (
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
                         <CheckCircle2 className="w-3.5 h-3.5" />
@@ -562,6 +626,18 @@ export function KonfigurasiTopsisPage() {
           </div>
         </div>
       </div>
+
+      {/* CONFIRM RESET DIALOG */}
+      <ConfirmDialog
+        open={openResetConfirm}
+        onOpenChange={setOpenResetConfirm}
+        title="Reset Konfigurasi ke Default"
+        description="Apakah Anda yakin ingin mereset seluruh metode pembobotan kembali ke Otomatis (Bagi Rata) dan mengembalikan tipe indikator ke bawaan awal?"
+        confirmLabel="Ya, Reset ke Default"
+        cancelLabel="Batal"
+        onConfirm={handleResetToDefault}
+        variant="warning"
+      />
     </div>
   )
 }
