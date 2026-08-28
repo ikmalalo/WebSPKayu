@@ -18,6 +18,7 @@ const routeLabels: Record<string, string> = {
   '/admin/verifikasi': 'Verifikasi',
   '/admin/kriteria': 'Kriteria TOPSIS',
   '/admin/subkriteria': 'Subkriteria',
+  '/admin/konfigurasi-topsis': 'Konfigurasi TOPSIS',
   '/admin/topsis': 'Proses TOPSIS',
   '/admin/ranking': 'Hasil Ranking',
   '/admin/laporan': 'Laporan',

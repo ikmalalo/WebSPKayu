@@ -1513,6 +1513,77 @@ export async function getAdminTopsisResultById(
 }
 
 // ============================================================
+// TOPSIS CONFIG TYPES & APIS
+// ============================================================
+
+export interface AdminTopsisConfigIndikator {
+  id: string
+  kriteriaId: string
+  kode: string
+  nama: string
+  tipe: 'POSITIF' | 'NEGATIF'
+  bobotManual: number | null
+  bobotOtomatis: number
+  bobot: number
+  urutan: number
+}
+
+export interface AdminTopsisConfigKriteria {
+  id: string
+  kode: string
+  nama: string
+  bobot: number
+  tipe: 'BENEFIT' | 'COST'
+  urutan: number
+  indikator: AdminTopsisConfigIndikator[]
+}
+
+export interface AdminTopsisConfigResponse {
+  metodePembobotan: 'OTOMATIS' | 'MANUAL'
+  kriteria: AdminTopsisConfigKriteria[]
+}
+
+export interface UpdateTopsisConfigPayload {
+  metodePembobotan: 'OTOMATIS' | 'MANUAL'
+  indikator?: Array<{
+    id: string
+    bobot?: number
+    tipe?: 'POSITIF' | 'NEGATIF'
+  }>
+}
+
+export async function getAdminTopsisConfig(): Promise<AdminTopsisConfigResponse> {
+  try {
+    const response = await api.get('/admin/topsis/config')
+    const data = getData<any>(response)
+    return {
+      metodePembobotan: data?.metodePembobotan === 'MANUAL' ? 'MANUAL' : 'OTOMATIS',
+      kriteria: Array.isArray(data?.kriteria) ? data.kriteria : [],
+    }
+  } catch (error) {
+    throw new Error(
+      getErrorMessage(error, 'Gagal mengambil konfigurasi TOPSIS.')
+    )
+  }
+}
+
+export async function updateAdminTopsisConfig(
+  payload: UpdateTopsisConfigPayload
+): Promise<{ metodePembobotan: 'OTOMATIS' | 'MANUAL' }> {
+  try {
+    const response = await api.put('/admin/topsis/config', payload)
+    const data = getData<any>(response)
+    return {
+      metodePembobotan: data?.metodePembobotan === 'MANUAL' ? 'MANUAL' : 'OTOMATIS',
+    }
+  } catch (error) {
+    throw new Error(
+      getErrorMessage(error, 'Gagal menyimpan konfigurasi TOPSIS.')
+    )
+  }
+}
+
+// ============================================================
 // EXPORT AXIOS INSTANCE
 // ============================================================
 

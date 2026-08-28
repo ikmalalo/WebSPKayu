@@ -27,6 +27,7 @@ import { VerifikasiPage } from '@/pages/admin/VerifikasiPage'
 import DetailVerifikasiPage from '@/pages/admin/DetailVerifikasiPage'
 import { KriteriaPage } from '@/pages/admin/KriteriaPage'
 import { SubkriteriaPage } from '@/pages/admin/SubkriteriaPage'
+import { KonfigurasiTopsisPage } from '@/pages/admin/KonfigurasiTopsisPage'
 import { ProcessTopsisPage } from '@/pages/admin/ProcessTopsisPage'
 import { HasilRankingPage } from '@/pages/admin/HasilRankingPage'
 import { LaporanPage } from '@/pages/admin/LaporanPage'
@@ -168,6 +169,13 @@ export default function App() {
                   path="/admin/subkriteria"
                   element={
                     <SubkriteriaPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/konfigurasi-topsis"
+                  element={
+                    <KonfigurasiTopsisPage />
                   }
                 />
 

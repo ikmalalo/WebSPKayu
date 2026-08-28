@@ -54,6 +54,8 @@ import {
   getTopsisCandidates,
   getTopsisResults,
   getTopsisResultById,
+  getTopsisConfig,
+  updateTopsisConfig,
 } from '../controllers/topsis.controller'
 
 // ============================================================
@@ -256,6 +258,24 @@ adminRouter.get(
   '/topsis/results',
   asyncHandler(
     getTopsisResults
+  )
+)
+
+// ============================================================
+// TOPSIS - CONFIG
+// ============================================================
+
+adminRouter.get(
+  '/topsis/config',
+  asyncHandler(
+    getTopsisConfig
+  )
+)
+
+adminRouter.put(
+  '/topsis/config',
+  asyncHandler(
+    updateTopsisConfig
   )
 )
 

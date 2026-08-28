@@ -146,6 +146,16 @@ export async function processTopsis(
     const adminId =
       getAdminId(req)
 
+    const config =
+      await (prisma as any).pengaturan.findUnique({
+        where: {
+          kunci: 'metode_pembobotan_topsis',
+        },
+      })
+
+    const metodePembobotan =
+      (config?.nilai || 'OTOMATIS').toUpperCase()
+
     const kriteria =
       await prisma.kriteria.findMany({
         where: {
@@ -201,7 +211,7 @@ export async function processTopsis(
           item.bobot
         )
 
-      const bobotIndikator =
+      const autoWeight =
         bobotKriteria /
         jumlahIndikator
 
@@ -209,6 +219,16 @@ export async function processTopsis(
         const indikator of
         item.indikator
       ) {
+        let bobotIndikator = autoWeight
+
+        if (
+          metodePembobotan === 'MANUAL' &&
+          (indikator as any).bobot !== null &&
+          (indikator as any).bobot !== undefined
+        ) {
+          bobotIndikator = toNumber((indikator as any).bobot)
+        }
+
         indikatorMeta.push({
           id:
             indikator.id,
@@ -1264,6 +1284,260 @@ export async function getTopsisCandidates(
   } catch (error) {
     console.error('GET TOPSIS CANDIDATES ERROR:', error)
     return fail(res, 'Gagal mengambil kandidat TOPSIS', 500)
+  }
+}
+
+
+// ============================================================
+// GET TOPSIS CONFIG
+// ============================================================
+
+export async function getTopsisConfig(
+  req: Request,
+  res: Response
+) {
+  try {
+    const config =
+      await (prisma as any).pengaturan.findUnique({
+        where: {
+          kunci: 'metode_pembobotan_topsis',
+        },
+      })
+
+    const metodePembobotan =
+      (config?.nilai || 'OTOMATIS').toUpperCase()
+
+    const kriteria =
+      await prisma.kriteria.findMany({
+        where: {
+          aktif: true,
+        },
+        include: {
+          indikator: {
+            where: {
+              aktif: true,
+            },
+            orderBy: {
+              urutan: 'asc',
+            },
+          },
+        },
+        orderBy: {
+          urutan: 'asc',
+        },
+      })
+
+    const data = kriteria.map((k) => {
+      const activeCount = k.indikator.length
+      const autoWeight =
+        activeCount > 0
+          ? Number(k.bobot) / activeCount
+          : 0
+
+      return {
+        id: k.id,
+        kode: k.kode,
+        nama: k.nama,
+        bobot: Number(k.bobot),
+        tipe: k.tipe,
+        urutan: k.urutan,
+        indikator: k.indikator.map((ind) => ({
+          id: ind.id,
+          kriteriaId: ind.kriteriaId,
+          kode: ind.kode,
+          nama: ind.nama,
+          tipe: ind.tipe,
+          bobotManual:
+            (ind as any).bobot !== null && (ind as any).bobot !== undefined
+              ? Number((ind as any).bobot)
+              : null,
+          bobotOtomatis: autoWeight,
+          bobot:
+            metodePembobotan === 'MANUAL' &&
+            (ind as any).bobot !== null &&
+            (ind as any).bobot !== undefined
+              ? Number((ind as any).bobot)
+              : autoWeight,
+          urutan: ind.urutan,
+        })),
+      }
+    })
+
+    return success(
+      res,
+      'Konfigurasi TOPSIS berhasil diambil',
+      {
+        metodePembobotan,
+        kriteria: data,
+      }
+    )
+  } catch (error) {
+    console.error('GET TOPSIS CONFIG ERROR:', error)
+    return fail(res, 'Gagal mengambil konfigurasi TOPSIS', 500)
+  }
+}
+
+
+// ============================================================
+// UPDATE TOPSIS CONFIG
+// ============================================================
+
+export async function updateTopsisConfig(
+  req: Request,
+  res: Response
+) {
+  try {
+    const {
+      metodePembobotan,
+      indikator: indikatorInput,
+    } = req.body
+
+    const method = String(
+      metodePembobotan || 'OTOMATIS'
+    ).toUpperCase()
+
+    if (
+      !['OTOMATIS', 'MANUAL'].includes(method)
+    ) {
+      return fail(
+        res,
+        'Metode pembobotan tidak valid. Pilih OTOMATIS atau MANUAL',
+        422
+      )
+    }
+
+    const kriteriaDb =
+      await prisma.kriteria.findMany({
+        where: {
+          aktif: true,
+        },
+        include: {
+          indikator: {
+            where: {
+              aktif: true,
+            },
+            orderBy: {
+              urutan: 'asc',
+            },
+          },
+        },
+      })
+
+    // If manual, validate indicator weights per kriteria
+    if (
+      method === 'MANUAL' &&
+      Array.isArray(indikatorInput)
+    ) {
+      const inputMap = new Map<
+        string,
+        { bobot: number; tipe?: IndikatorTipe }
+      >()
+
+      for (const item of indikatorInput) {
+        if (item && item.id) {
+          inputMap.set(item.id, {
+            bobot: Number(item.bobot ?? 0),
+            tipe:
+              item.tipe === 'NEGATIF'
+                ? IndikatorTipe.NEGATIF
+                : IndikatorTipe.POSITIF,
+          })
+        }
+      }
+
+      for (const k of kriteriaDb) {
+        const kriteriaWeight = Number(k.bobot)
+        let totalIndicatorWeight = 0
+
+        for (const ind of k.indikator) {
+          const custom = inputMap.get(ind.id)
+          const w =
+            custom !== undefined
+              ? custom.bobot
+              : (ind as any).bobot !== null &&
+                (ind as any).bobot !== undefined
+              ? Number((ind as any).bobot)
+              : kriteriaWeight / k.indikator.length
+
+          totalIndicatorWeight += w
+        }
+
+        // Check if sum equals kriteria weight (tolerance 0.0015)
+        if (
+          Math.abs(
+            totalIndicatorWeight - kriteriaWeight
+          ) > 0.0015
+        ) {
+          return fail(
+            res,
+            `Total bobot indikator untuk kriteria ${
+              k.kode
+            } (${(totalIndicatorWeight * 100).toFixed(
+              1
+            )}%) tidak sama dengan bobot kriteria (${(
+              kriteriaWeight * 100
+            ).toFixed(1)}%)`,
+            422
+          )
+        }
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Save config method in Pengaturan
+      await (tx as any).pengaturan.upsert({
+        where: {
+          kunci: 'metode_pembobotan_topsis',
+        },
+        update: {
+          nilai: method,
+        },
+        create: {
+          kunci: 'metode_pembobotan_topsis',
+          nilai: method,
+        },
+      })
+
+      // 2. Update each indicator's bobot and tipe if provided
+      if (Array.isArray(indikatorInput)) {
+        for (const item of indikatorInput) {
+          if (!item || !item.id) continue
+
+          const updateData: Record<string, any> = {}
+
+          if (item.bobot !== undefined && item.bobot !== null) {
+            updateData.bobot = Number(item.bobot)
+          }
+
+          if (item.tipe) {
+            updateData.tipe =
+              item.tipe === 'NEGATIF'
+                ? IndikatorTipe.NEGATIF
+                : IndikatorTipe.POSITIF
+          }
+
+          if (Object.keys(updateData).length > 0) {
+            await tx.indikator.update({
+              where: {
+                id: item.id,
+              },
+              data: updateData,
+            })
+          }
+        }
+      }
+    })
+
+    return success(
+      res,
+      'Konfigurasi TOPSIS berhasil disimpan',
+      {
+        metodePembobotan: method,
+      }
+    )
+  } catch (error) {
+    console.error('UPDATE TOPSIS CONFIG ERROR:', error)
+    return fail(res, 'Gagal menyimpan konfigurasi TOPSIS', 500)
   }
 }
 

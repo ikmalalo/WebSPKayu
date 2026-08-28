@@ -4,6 +4,7 @@ import {
   useMemo,
   useState,
 } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import {
   RefreshCw,
@@ -15,6 +16,7 @@ import {
   TrendingUp,
   Award,
   Layers,
+  Sliders,
   ArrowRight,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,8 +38,9 @@ export interface ApiIndikatorItem {
   nama: string
   deskripsi?: string | null
   tipe: 'POSITIF' | 'NEGATIF'
+  bobot?: number | string | null
   urutan: number
-  aktif: boolean
+  aktif?: boolean
   kriteria?: {
     id: string
     kode: string
@@ -56,7 +59,7 @@ export interface ApiKriteriaItem {
   deskripsi?: string | null
   dimensi?: string | null
   urutan: number
-  aktif: boolean
+  aktif?: boolean
   indikator: ApiIndikatorItem[]
 }
 
@@ -165,6 +168,7 @@ function formatPercent(value: unknown): string {
 
 export function ProcessTopsisPage() {
   const { token } = useAuth()
+  const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
@@ -172,6 +176,7 @@ export function ProcessTopsisPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const [activeStep, setActiveStep] = useState(1)
 
+  const [metodePembobotan, setMetodePembobotan] = useState<'OTOMATIS' | 'MANUAL'>('OTOMATIS')
   const [kriteriaList, setKriteriaList] = useState<ApiKriteriaItem[]>([])
   const [resultsList, setResultsList] = useState<ApiTopsisResultItem[]>([])
   const [candidatesList, setCandidatesList] = useState<ApiCandidateItem[]>([])
@@ -195,9 +200,14 @@ export function ProcessTopsisPage() {
 
       const kriteriaWeight = toNumber(k.bobot)
       const count = activeIndikators.length
-      const indicatorWeight = count > 0 ? kriteriaWeight / count : 0
+      const autoIndicatorWeight = count > 0 ? kriteriaWeight / count : 0
 
       for (const ind of activeIndikators) {
+        const customWeight =
+          ind.bobot !== undefined && ind.bobot !== null
+            ? toNumber(ind.bobot)
+            : autoIndicatorWeight
+
         list.push({
           id: ind.id,
           kriteriaId: k.id,
@@ -206,7 +216,7 @@ export function ProcessTopsisPage() {
           kode: ind.kode,
           nama: ind.nama,
           tipe: ind.tipe === 'NEGATIF' ? 'NEGATIF' : 'POSITIF',
-          bobot: indicatorWeight,
+          bobot: customWeight,
           urutan: ind.urutan,
         })
       }
@@ -227,16 +237,20 @@ export function ProcessTopsisPage() {
       setLoading(true)
       setError('')
 
-      const [criteriaRes, candidatesRes, resultsRes] = await Promise.all([
-        axios.get(`${API_URL}/admin/kriteria`, { headers: authHeaders }),
+      const [configRes, candidatesRes, resultsRes] = await Promise.all([
+        axios.get(`${API_URL}/admin/topsis/config`, { headers: authHeaders }),
         axios.get(`${API_URL}/admin/topsis/candidates`, { headers: authHeaders }),
         axios.get(`${API_URL}/admin/topsis/results`, { headers: authHeaders }),
       ])
 
-      const rawCriteria = criteriaRes.data?.data?.kriteria || criteriaRes.data?.data || criteriaRes.data || []
+      const configData = configRes.data?.data || configRes.data || {}
+      const rawCriteria = configData.kriteria || []
+      const rawMethod = configData.metodePembobotan || 'OTOMATIS'
+
       const rawCandidates = candidatesRes.data?.data?.candidates || candidatesRes.data?.candidates || []
       const rawResults = resultsRes.data?.data?.results || resultsRes.data?.results || []
 
+      setMetodePembobotan(rawMethod === 'MANUAL' ? 'MANUAL' : 'OTOMATIS')
       setKriteriaList(Array.isArray(rawCriteria) ? rawCriteria : [])
       setCandidatesList(Array.isArray(rawCandidates) ? rawCandidates : [])
       setResultsList(Array.isArray(rawResults) ? rawResults : [])
@@ -503,6 +517,16 @@ export function ProcessTopsisPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate('/admin/konfigurasi-topsis')}
+            className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+          >
+            <Sliders className="mr-2 h-4 w-4 text-green-600" />
+            Konfigurasi Bobot
+          </Button>
+
           <Button
             type="button"
             variant="outline"
