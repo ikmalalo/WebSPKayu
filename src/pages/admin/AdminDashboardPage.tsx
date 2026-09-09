@@ -142,10 +142,10 @@ function getStatusLabel(
       return 'Diproses TOPSIS'
 
     case 'LAYAK_DIDANAI':
-      return 'Layak Didanai'
+      return 'Direkomendasikan untuk Didanai'
 
     case 'TIDAK_DIDANAI':
-      return 'Tidak Didanai'
+      return 'Belum Direkomendasikan untuk Didanai'
 
     default:
       return status
@@ -576,7 +576,7 @@ export function AdminDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-500">
-                  Layak Didanai
+                  Direkomendasikan untuk Didanai
                 </p>
 
                 <p className="mt-2 text-3xl font-bold text-green-600">
@@ -594,7 +594,7 @@ export function AdminDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-500">
-                  Tidak Didanai
+                  Belum Direkomendasikan untuk Didanai
                 </p>
 
                 <p className="mt-2 text-3xl font-bold text-red-600">
@@ -611,14 +611,17 @@ export function AdminDashboardPage() {
       {/* DISTRIBUSI STATUS */}
 
       <Card>
-        <CardHeader>
-          <CardTitle>
-            Distribusi Status Pengajuan
-          </CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle>Distribusi Status Pengajuan</CardTitle>
+            <span className="text-xs text-slate-500 font-medium">
+              {Object.values(statusDistribution).reduce((a, b) => a + b, 0)} Total Berdasarkan Status
+            </span>
+          </div>
         </CardHeader>
 
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {(
               Object.entries(
                 statusDistribution
@@ -635,22 +638,22 @@ export function AdminDashboardPage() {
                 ([status, total]) => (
                   <div
                     key={status}
-                    className="flex items-center justify-between rounded-lg border p-4"
+                    className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40 p-3.5 transition-all shadow-xs"
                   >
-                    <div>
-                      <p className="font-medium">
+                    <div className="min-w-0 pr-3">
+                      <p className="font-medium text-sm text-slate-800 dark:text-slate-200 truncate leading-snug">
                         {getStatusLabel(
                           status
                         )}
                       </p>
 
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="mt-0.5 text-xs text-slate-500">
                         Jumlah pengajuan
                       </p>
                     </div>
 
                     <span
-                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${getStatusClass(
+                      className={`inline-flex shrink-0 items-center justify-center min-w-[28px] h-7 rounded-full border px-2.5 text-xs font-semibold ${getStatusClass(
                         status
                       )}`}
                     >
@@ -798,7 +801,7 @@ export function AdminDashboardPage() {
               </p>
 
               <p className="mt-1 text-sm text-slate-500">
-                Mustahik layak didanai:
+                Mustahik direkomendasikan:
                 {' '}
                 {layakDidanai}
               </p>

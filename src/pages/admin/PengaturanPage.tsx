@@ -33,7 +33,7 @@ export function PengaturanPage() {
           </FormField>
           <FormField label="Threshold Cutoff TOPSIS (Nilai Minimum Layak)">
             <Input type="number" step="0.05" defaultValue="0.60" />
-            <p className="text-xs text-slate-400 mt-1">Calon mustahik dengan nilai preferensi ≥ 0.60 dianggap Layak Didanai.</p>
+            <p className="text-xs text-slate-400 mt-1">Calon mustahik dengan nilai preferensi ≥ 0.60 dianggap Direkomendasikan untuk Didanai.</p>
           </FormField>
           <FormField label="Kuota Penerima Zakat per Periode">
             <Input type="number" defaultValue="50" />

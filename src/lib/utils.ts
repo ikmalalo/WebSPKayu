@@ -78,8 +78,8 @@ export function getStatusLabel(status: StatusPengajuan): string {
     LOLOS_VERIFIKASI: 'Lolos Verifikasi',
     DITOLAK: 'Ditolak',
     DIPROSES_TOPSIS: 'Diproses TOPSIS',
-    LAYAK_DIDANAI: 'Layak Didanai',
-    TIDAK_DIDANAI: 'Tidak Didanai',
+    LAYAK_DIDANAI: 'Direkomendasikan untuk Didanai',
+    TIDAK_DIDANAI: 'Belum Direkomendasikan untuk Didanai',
   }
 
   return labels[status] || status

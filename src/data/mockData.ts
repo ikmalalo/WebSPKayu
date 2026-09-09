@@ -1349,13 +1349,13 @@ export const mockChartData = [
 
 export const mockStatusDistribution = [
   {
-    name: 'Layak Didanai',
+    name: 'Direkomendasikan untuk Didanai',
     value: 3,
     color: '#16a34a',
   },
 
   {
-    name: 'Tidak Didanai',
+    name: 'Belum Direkomendasikan untuk Didanai',
     value: 2,
     color: '#ef4444',
   },

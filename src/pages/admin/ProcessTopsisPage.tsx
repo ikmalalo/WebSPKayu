@@ -982,8 +982,8 @@ export function ProcessTopsisPage() {
                             }`}
                           >
                             {row.status === 'LAYAK_DIDANAI' || (row.preferensi ?? 0) >= 0.5
-                              ? 'LAYAK DIDANAI'
-                              : 'TIDAK DIDANAI'}
+                              ? 'DIREKOMENDASIKAN UNTUK DIDANAI'
+                              : 'BELUM DIREKOMENDASIKAN UNTUK DIDANAI'}
                           </span>
                         </td>
                       </tr>

@@ -110,10 +110,10 @@ function getStatusLabel(
 ): string {
   switch (status) {
     case 'LAYAK_DIDANAI':
-      return 'Layak Didanai'
+      return 'Direkomendasikan untuk Didanai'
 
     case 'TIDAK_DIDANAI':
-      return 'Tidak Didanai'
+      return 'Belum Direkomendasikan untuk Didanai'
 
     case 'DIPROSES_TOPSIS':
       return 'Diproses TOPSIS'
@@ -432,7 +432,7 @@ export function HasilRankingPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-slate-500">
-              Layak Didanai
+              Direkomendasikan untuk Didanai
             </p>
 
             <p className="text-3xl font-bold text-green-600 mt-2">
@@ -446,7 +446,7 @@ export function HasilRankingPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-slate-500">
-              Tidak Didanai
+              Belum Direkomendasikan untuk Didanai
             </p>
 
             <p className="text-3xl font-bold text-red-600 mt-2">

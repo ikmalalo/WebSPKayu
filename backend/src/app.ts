@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
 
 import {
   env,
@@ -30,12 +31,23 @@ import {
   notFound,
 } from './middleware/error.middleware'
 
+import {
+  globalLimiter,
+} from './middleware/rate-limiter.middleware'
+
 // ============================================================
 // APP
 // ============================================================
 
 export const app =
   express()
+
+// ============================================================
+// SECURITY HEADERS & GLOBAL RATE LIMITING
+// ============================================================
+
+app.use(helmet())
+app.use(globalLimiter)
 
 // ============================================================
 // CORS

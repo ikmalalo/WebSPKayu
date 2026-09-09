@@ -105,10 +105,10 @@ function getStatusLabel(
       return 'Diproses TOPSIS'
 
     case 'LAYAK_DIDANAI':
-      return 'Layak Didanai'
+      return 'Direkomendasikan untuk Didanai'
 
     case 'TIDAK_DIDANAI':
-      return 'Tidak Didanai'
+      return 'Belum Direkomendasikan untuk Didanai'
 
     default:
       return status || 'Belum Ada Pengajuan'
@@ -694,11 +694,11 @@ export default function DataMustahikPage() {
             </option>
 
             <option value="LAYAK_DIDANAI">
-              Layak Didanai
+              Direkomendasikan untuk Didanai
             </option>
 
             <option value="TIDAK_DIDANAI">
-              Tidak Didanai
+              Belum Direkomendasikan untuk Didanai
             </option>
           </select>
         </div>
