@@ -7,6 +7,7 @@ import {
   PengajuanStatus,
   VerifikasiStatus,
   Role,
+  StatusPenugasan,
 } from '@prisma/client'
 
 import bcrypt from 'bcryptjs'
@@ -149,6 +150,22 @@ const mustahikInclude = {
         'desc' as const,
     },
   },
+
+  penugasanSurvei: {
+    include: {
+      pelaksana: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc' as const,
+    },
+  },
 }
 
 
@@ -233,6 +250,148 @@ export async function getAdminDashboard(
       'Gagal mengambil dashboard admin',
       500
     )
+  }
+}
+
+
+// ============================================================
+// CREATE MUSTAHIK (OLEH ADMIN)
+// ============================================================
+
+export async function createMustahik(
+  req: Request,
+  res: Response
+) {
+  try {
+    const adminId = getAdminId(req)
+
+    const body = (req.body || {}) as Record<string, unknown>
+
+    const nik = String(body.nik || '').trim()
+    const namaLengkap = String(body.namaLengkap || '').trim()
+
+    if (!nik || !namaLengkap) {
+      return fail(res, 'NIK dan nama lengkap wajib diisi', 422)
+    }
+
+    if (!/^\d{16}$/.test(nik)) {
+      return fail(res, 'NIK harus terdiri dari 16 digit angka', 422)
+    }
+
+    if (namaLengkap.length < 3) {
+      return fail(res, 'Nama lengkap minimal 3 karakter', 422)
+    }
+
+    const existingNik = await prisma.mustahik.findUnique({
+      where: { nik },
+    })
+
+    if (existingNik) {
+      return fail(res, 'NIK sudah terdaftar dalam sistem', 409)
+    }
+
+    const pelaksanaId = body.pelaksanaId ? String(body.pelaksanaId).trim() : null
+    if (pelaksanaId) {
+      const pelaksanaUser = await prisma.user.findUnique({
+        where: { id: pelaksanaId },
+      })
+      if (!pelaksanaUser || pelaksanaUser.role !== Role.PELAKSANA) {
+        return fail(res, 'Pelaksana yang dipilih tidak valid atau bukan role pelaksana', 422)
+      }
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const createdMustahik = await tx.mustahik.create({
+        data: {
+          nik,
+          namaLengkap,
+          tempatLahir: body.tempatLahir ? String(body.tempatLahir).trim() : null,
+          tanggalLahir: body.tanggalLahir ? new Date(String(body.tanggalLahir)) : null,
+          jenisKelamin: body.jenisKelamin ? String(body.jenisKelamin).trim() : null,
+          alamat: body.alamat ? String(body.alamat).trim() : null,
+          kelurahan: body.kelurahan ? String(body.kelurahan).trim() : null,
+          kecamatan: body.kecamatan ? String(body.kecamatan).trim() : null,
+          kota: body.kota ? String(body.kota).trim() : null,
+          provinsi: body.provinsi ? String(body.provinsi).trim() : null,
+          noHp: body.noHp ? String(body.noHp).trim() : null,
+          statusPernikahan: body.statusPernikahan ? String(body.statusPernikahan).trim() : null,
+          pekerjaan: body.pekerjaan ? String(body.pekerjaan).trim() : null,
+          penghasilan:
+            body.penghasilan !== undefined && body.penghasilan !== null && body.penghasilan !== ''
+              ? Number(body.penghasilan)
+              : null,
+          jumlahTanggungan:
+            body.jumlahTanggungan !== undefined && body.jumlahTanggungan !== null && body.jumlahTanggungan !== ''
+              ? Number(body.jumlahTanggungan)
+              : null,
+          statusRumah: body.statusRumah ? String(body.statusRumah).trim() : null,
+          kondisiRumah: body.kondisiRumah ? String(body.kondisiRumah).trim() : null,
+          kepemilikanAset: body.kepemilikanAset ? String(body.kepemilikanAset).trim() : null,
+        },
+      })
+
+      const createdPengajuan = await tx.pengajuan.create({
+        data: {
+          mustahikId: createdMustahik.id,
+          status: PengajuanStatus.DRAFT,
+          catatan: 'Didaftarkan oleh admin untuk survei lapangan',
+        },
+      })
+
+      let penugasan = null
+      if (pelaksanaId) {
+        penugasan = await tx.penugasanSurvei.create({
+          data: {
+            mustahikId: createdMustahik.id,
+            pelaksanaId,
+            status: StatusPenugasan.DITUGASKAN,
+            catatan: body.catatanPenugasan ? String(body.catatanPenugasan).trim() : null,
+            tanggalDitugaskan: new Date(),
+          },
+          include: {
+            pelaksana: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+              },
+            },
+          },
+        })
+      }
+
+      if (adminId) {
+        await tx.auditLog.create({
+          data: {
+            userId: adminId,
+            action: 'CREATE_MUSTAHIK',
+            entity: 'Mustahik',
+            entityId: createdMustahik.id,
+            metadata: {
+              nik: createdMustahik.nik,
+              namaLengkap: createdMustahik.namaLengkap,
+              pengajuanId: createdPengajuan.id,
+              pelaksanaId,
+            },
+          },
+        })
+      }
+
+      return {
+        mustahik: createdMustahik,
+        pengajuan: createdPengajuan,
+        penugasan,
+      }
+    })
+
+    return success(res, 'Calon mustahik berhasil didaftarkan', result, 201)
+  } catch (error: any) {
+    console.error('CREATE MUSTAHIK ERROR:', error)
+    if (error?.code === 'P2002') {
+      return fail(res, 'NIK sudah terdaftar', 409)
+    }
+    return fail(res, 'Gagal mendaftarkan calon mustahik', 500)
   }
 }
 
@@ -1501,6 +1660,428 @@ export async function deletePelaksana(
       'Gagal menghapus akun pelaksana',
       500
     );
+  }
+}
+
+// ============================================================
+// MANAJEMEN PENUGASAN SURVEI (ADMIN)
+// ============================================================
+
+// 1. GET ALL PENUGASAN
+export async function getPenugasan(req: Request, res: Response) {
+  try {
+    const statusQuery = req.query.status ? String(req.query.status).toUpperCase() : undefined
+    const pelaksanaIdQuery = req.query.pelaksanaId ? String(req.query.pelaksanaId) : undefined
+    const search = req.query.search ? String(req.query.search).trim() : ''
+
+    const where: any = {}
+
+    if (statusQuery && Object.values(StatusPenugasan).includes(statusQuery as StatusPenugasan)) {
+      where.status = statusQuery as StatusPenugasan
+    }
+
+    if (pelaksanaIdQuery) {
+      where.pelaksanaId = pelaksanaIdQuery
+    }
+
+    if (search) {
+      where.OR = [
+        {
+          mustahik: {
+            namaLengkap: { contains: search },
+          },
+        },
+        {
+          mustahik: {
+            nik: { contains: search },
+          },
+        },
+        {
+          pelaksana: {
+            name: { contains: search },
+          },
+        },
+      ]
+    }
+
+    const penugasan = await prisma.penugasanSurvei.findMany({
+      where,
+      include: {
+        mustahik: {
+          select: {
+            id: true,
+            nik: true,
+            namaLengkap: true,
+            noHp: true,
+            alamat: true,
+            kelurahan: true,
+            kecamatan: true,
+            kota: true,
+            provinsi: true,
+            pekerjaan: true,
+            pengajuan: {
+              select: {
+                id: true,
+                status: true,
+                _count: {
+                  select: { jawaban: true },
+                },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+        pelaksana: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
+
+    const stats = {
+      total: penugasan.length,
+      ditugaskan: penugasan.filter((p) => p.status === StatusPenugasan.DITUGASKAN).length,
+      sedangSurvei: penugasan.filter((p) => p.status === StatusPenugasan.SEDANG_SURVEI).length,
+      selesai: penugasan.filter((p) => p.status === StatusPenugasan.SELESAI).length,
+      dibatalkan: penugasan.filter((p) => p.status === StatusPenugasan.DIBATALKAN).length,
+    }
+
+    return success(res, 'Daftar penugasan survei berhasil diambil', {
+      penugasan,
+      stats,
+      total: penugasan.length,
+    })
+  } catch (error) {
+    console.error('GET PENUGASAN ERROR:', error)
+    return fail(res, 'Gagal mengambil data penugasan survei', 500)
+  }
+}
+
+// 2. GET PENUGASAN BY ID
+export async function getPenugasanById(req: Request, res: Response) {
+  try {
+    const { id } = req.params
+
+    const penugasan = await prisma.penugasanSurvei.findUnique({
+      where: { id },
+      include: {
+        mustahik: {
+          include: {
+            pengajuan: {
+              include: {
+                jawaban: {
+                  include: {
+                    indikator: {
+                      include: {
+                        kriteria: true,
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+        pelaksana: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    })
+
+    if (!penugasan) {
+      return fail(res, 'Data penugasan survei tidak ditemukan', 404)
+    }
+
+    return success(res, 'Detail penugasan survei berhasil diambil', { penugasan })
+  } catch (error) {
+    console.error('GET PENUGASAN BY ID ERROR:', error)
+    return fail(res, 'Gagal mengambil detail penugasan survei', 500)
+  }
+}
+
+// 3. CREATE PENUGASAN
+export async function createPenugasan(req: Request, res: Response) {
+  try {
+    const adminId = getAdminId(req)
+    const { mustahikId, pelaksanaId, catatan } = req.body || {}
+
+    if (!mustahikId || !pelaksanaId) {
+      return fail(res, 'Mustahik ID dan Pelaksana ID wajib diisi', 422)
+    }
+
+    const mustahik = await prisma.mustahik.findUnique({
+      where: { id: String(mustahikId) },
+      include: {
+        pengajuan: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    })
+
+    if (!mustahik) {
+      return fail(res, 'Data calon mustahik tidak ditemukan', 404)
+    }
+
+    const pelaksana = await prisma.user.findUnique({
+      where: { id: String(pelaksanaId) },
+    })
+
+    if (!pelaksana || pelaksana.role !== Role.PELAKSANA) {
+      return fail(res, 'Akun pelaksana tidak valid atau bukan role pelaksana', 422)
+    }
+
+    const existingActive = await prisma.penugasanSurvei.findFirst({
+      where: {
+        mustahikId: String(mustahikId),
+        status: {
+          in: [StatusPenugasan.DITUGASKAN, StatusPenugasan.SEDANG_SURVEI],
+        },
+      },
+      include: {
+        pelaksana: {
+          select: { name: true },
+        },
+      },
+    })
+
+    if (existingActive) {
+      return fail(
+        res,
+        `Calon mustahik ini sudah memiliki penugasan aktif kepada pelaksana ${existingActive.pelaksana.name} dengan status ${existingActive.status}. Batalkan atau selesaikan penugasan lama terlebih dahulu.`,
+        409
+      )
+    }
+
+    // Pastikan calon mustahik memiliki minimal 1 pengajuan
+    let pengajuanId = mustahik.pengajuan[0]?.id
+    if (!pengajuanId) {
+      const newPengajuan = await prisma.pengajuan.create({
+        data: {
+          mustahikId: mustahik.id,
+          status: PengajuanStatus.DRAFT,
+          catatan: 'Dibuat otomatis untuk penugasan survei',
+        },
+      })
+      pengajuanId = newPengajuan.id
+    }
+
+    const penugasan = await prisma.penugasanSurvei.create({
+      data: {
+        mustahikId: String(mustahikId),
+        pelaksanaId: String(pelaksanaId),
+        catatan: catatan ? String(catatan).trim() : null,
+        status: StatusPenugasan.DITUGASKAN,
+        tanggalDitugaskan: new Date(),
+      },
+      include: {
+        mustahik: {
+          select: {
+            id: true,
+            nik: true,
+            namaLengkap: true,
+            noHp: true,
+            alamat: true,
+          },
+        },
+        pelaksana: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    })
+
+    if (adminId) {
+      await prisma.auditLog.create({
+        data: {
+          userId: adminId,
+          action: 'CREATE_PENUGASAN',
+          entity: 'PenugasanSurvei',
+          entityId: penugasan.id,
+          metadata: {
+            mustahikId: penugasan.mustahikId,
+            pelaksanaId: penugasan.pelaksanaId,
+            status: penugasan.status,
+          },
+        },
+      })
+    }
+
+    return success(res, 'Penugasan survei berhasil dibuat', { penugasan }, 201)
+  } catch (error) {
+    console.error('CREATE PENUGASAN ERROR:', error)
+    return fail(res, 'Gagal membuat penugasan survei', 500)
+  }
+}
+
+// 4. UPDATE PENUGASAN
+export async function updatePenugasan(req: Request, res: Response) {
+  try {
+    const adminId = getAdminId(req)
+    const { id } = req.params
+    const { pelaksanaId, catatan, status } = req.body || {}
+
+    const existing = await prisma.penugasanSurvei.findUnique({
+      where: { id },
+    })
+
+    if (!existing) {
+      return fail(res, 'Data penugasan survei tidak ditemukan', 404)
+    }
+
+    const dataToUpdate: any = {}
+
+    if (pelaksanaId !== undefined) {
+      const pelaksana = await prisma.user.findUnique({
+        where: { id: String(pelaksanaId) },
+      })
+      if (!pelaksana || pelaksana.role !== Role.PELAKSANA) {
+        return fail(res, 'Akun pelaksana tidak valid', 422)
+      }
+      dataToUpdate.pelaksanaId = String(pelaksanaId)
+    }
+
+    if (catatan !== undefined) {
+      dataToUpdate.catatan = catatan ? String(catatan).trim() : null
+    }
+
+    if (status !== undefined) {
+      const upperStatus = String(status).toUpperCase()
+      if (!Object.values(StatusPenugasan).includes(upperStatus as StatusPenugasan)) {
+        return fail(res, 'Status penugasan tidak valid', 422)
+      }
+      dataToUpdate.status = upperStatus as StatusPenugasan
+
+      if (upperStatus === StatusPenugasan.SEDANG_SURVEI && !existing.tanggalMulai) {
+        dataToUpdate.tanggalMulai = new Date()
+      }
+      if (upperStatus === StatusPenugasan.SELESAI && !existing.tanggalSelesai) {
+        dataToUpdate.tanggalSelesai = new Date()
+      }
+    }
+
+    const updated = await prisma.penugasanSurvei.update({
+      where: { id },
+      data: dataToUpdate,
+      include: {
+        mustahik: {
+          select: {
+            id: true,
+            nik: true,
+            namaLengkap: true,
+          },
+        },
+        pelaksana: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    if (adminId) {
+      await prisma.auditLog.create({
+        data: {
+          userId: adminId,
+          action: 'UPDATE_PENUGASAN',
+          entity: 'PenugasanSurvei',
+          entityId: updated.id,
+          metadata: {
+            changes: dataToUpdate,
+          },
+        },
+      })
+    }
+
+    return success(res, 'Penugasan survei berhasil diperbarui', { penugasan: updated })
+  } catch (error) {
+    console.error('UPDATE PENUGASAN ERROR:', error)
+    return fail(res, 'Gagal memperbarui penugasan survei', 500)
+  }
+}
+
+// 5. BATALKAN PENUGASAN
+export async function batalPenugasan(req: Request, res: Response) {
+  try {
+    const adminId = getAdminId(req)
+    const { id } = req.params
+    const { catatan } = req.body || {}
+
+    const existing = await prisma.penugasanSurvei.findUnique({
+      where: { id },
+    })
+
+    if (!existing) {
+      return fail(res, 'Data penugasan survei tidak ditemukan', 404)
+    }
+
+    if (existing.status === StatusPenugasan.SELESAI) {
+      return fail(res, 'Penugasan yang sudah selesai tidak dapat dibatalkan', 422)
+    }
+
+    const updated = await prisma.penugasanSurvei.update({
+      where: { id },
+      data: {
+        status: StatusPenugasan.DIBATALKAN,
+        catatan: catatan
+          ? `${existing.catatan ? existing.catatan + ' | ' : ''}Alasan pembatalan: ${String(catatan).trim()}`
+          : existing.catatan,
+      },
+      include: {
+        mustahik: {
+          select: {
+            id: true,
+            namaLengkap: true,
+          },
+        },
+        pelaksana: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    })
+
+    if (adminId) {
+      await prisma.auditLog.create({
+        data: {
+          userId: adminId,
+          action: 'CANCEL_PENUGASAN',
+          entity: 'PenugasanSurvei',
+          entityId: updated.id,
+          metadata: {
+            alasan: catatan || null,
+          },
+        },
+      })
+    }
+
+    return success(res, 'Penugasan survei berhasil dibatalkan', { penugasan: updated })
+  } catch (error) {
+    console.error('BATAL PENUGASAN ERROR:', error)
+    return fail(res, 'Gagal membatalkan penugasan survei', 500)
   }
 }
 

@@ -20,6 +20,7 @@ import {
   // Mustahik
   getMustahik,
   getMustahikById,
+  createMustahik,
   updateMustahik,
   deleteMustahik,
 
@@ -33,6 +34,13 @@ import {
   createPelaksana,
   updatePelaksana,
   deletePelaksana,
+
+  // Penugasan Survei
+  getPenugasan,
+  getPenugasanById,
+  createPenugasan,
+  updatePenugasan,
+  batalPenugasan,
 } from '../controllers/admin.controller'
 
 // ============================================================
@@ -104,6 +112,14 @@ adminRouter.get(
   )
 )
 
+// CREATE MUSTAHIK
+adminRouter.post(
+  '/mustahik',
+  asyncHandler(
+    createMustahik
+  )
+)
+
 // ============================================================
 // DETAIL MUSTAHIK
 // ============================================================
@@ -170,6 +186,50 @@ adminRouter.delete(
   '/pelaksana/:id',
   asyncHandler(
     deletePelaksana
+  )
+)
+
+// ============================================================
+// MANAJEMEN PENUGASAN SURVEI
+// ============================================================
+
+// GET SEMUA PENUGASAN
+adminRouter.get(
+  '/penugasan',
+  asyncHandler(
+    getPenugasan
+  )
+)
+
+// GET DETAIL PENUGASAN
+adminRouter.get(
+  '/penugasan/:id',
+  asyncHandler(
+    getPenugasanById
+  )
+)
+
+// CREATE PENUGASAN
+adminRouter.post(
+  '/penugasan',
+  asyncHandler(
+    createPenugasan
+  )
+)
+
+// UPDATE PENUGASAN
+adminRouter.put(
+  '/penugasan/:id',
+  asyncHandler(
+    updatePenugasan
+  )
+)
+
+// BATALKAN PENUGASAN
+adminRouter.patch(
+  '/penugasan/:id/batal',
+  asyncHandler(
+    batalPenugasan
   )
 )
 

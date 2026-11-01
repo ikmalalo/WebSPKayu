@@ -27,6 +27,10 @@ import {
 } from './routes/admin.routes'
 
 import {
+  pelaksanaRouter,
+} from './routes/pelaksana.routes'
+
+import {
   errorHandler,
   notFound,
 } from './middleware/error.middleware'
@@ -154,6 +158,11 @@ app.use(
 app.use(
   '/api/admin',
   adminRouter
+)
+
+app.use(
+  '/api/pelaksana',
+  pelaksanaRouter
 )
 
 // ============================================================
