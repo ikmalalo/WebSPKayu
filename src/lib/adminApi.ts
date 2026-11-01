@@ -1584,6 +1584,155 @@ export async function updateAdminTopsisConfig(
 }
 
 // ============================================================
+// MANAJEMEN AKUN PELAKSANA (ADMIN)
+// ============================================================
+
+export interface PelaksanaInput {
+  name: string
+  email: string
+  phone?: string | null
+  password?: string
+}
+
+export async function getAdminPelaksana(): Promise<{
+  pelaksana: any[]
+  total: number
+}> {
+  try {
+    const response = await api.get('/admin/pelaksana')
+    const data = getData<{ pelaksana: any[]; total: number }>(response)
+    return {
+      pelaksana: Array.isArray(data?.pelaksana) ? data.pelaksana : [],
+      total: Number(data?.total || 0),
+    }
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal mengambil data pelaksana.'))
+  }
+}
+
+export async function createAdminPelaksana(payload: PelaksanaInput): Promise<any> {
+  try {
+    const response = await api.post('/admin/pelaksana', payload)
+    return getData(response)
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal membuat akun pelaksana.'))
+  }
+}
+
+export async function updateAdminPelaksana(id: string, payload: Partial<PelaksanaInput>): Promise<any> {
+  try {
+    const response = await api.put(`/admin/pelaksana/${id}`, payload)
+    return getData(response)
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal memperbarui akun pelaksana.'))
+  }
+}
+
+export async function deleteAdminPelaksana(id: string): Promise<any> {
+  try {
+    const response = await api.delete(`/admin/pelaksana/${id}`)
+    return getData(response)
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal menghapus akun pelaksana.'))
+  }
+}
+
+// ============================================================
+// PENUGASAN SURVEI (ADMIN)
+// ============================================================
+
+export interface PenugasanFilter {
+  status?: string
+  pelaksanaId?: string
+  search?: string
+}
+
+export interface PenugasanInput {
+  mustahikId: string
+  pelaksanaId: string
+  catatan?: string | null
+}
+
+export async function getAdminPenugasan(params?: PenugasanFilter): Promise<{
+  penugasan: any[]
+  stats: {
+    total: number
+    ditugaskan: number
+    sedangSurvei: number
+    selesai: number
+    dibatalkan: number
+  }
+  total: number
+}> {
+  try {
+    const response = await api.get('/admin/penugasan', { params })
+    const data = getData<any>(response)
+    return {
+      penugasan: Array.isArray(data?.penugasan) ? data.penugasan : [],
+      stats: data?.stats || {
+        total: 0,
+        ditugaskan: 0,
+        sedangSurvei: 0,
+        selesai: 0,
+        dibatalkan: 0,
+      },
+      total: Number(data?.total || 0),
+    }
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal mengambil data penugasan survei.'))
+  }
+}
+
+export async function getAdminPenugasanById(id: string): Promise<any> {
+  try {
+    const response = await api.get(`/admin/penugasan/${id}`)
+    return getData(response)
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal mengambil detail penugasan.'))
+  }
+}
+
+export async function createAdminPenugasan(payload: PenugasanInput): Promise<any> {
+  try {
+    const response = await api.post('/admin/penugasan', payload)
+    return getData(response)
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal membuat penugasan survei.'))
+  }
+}
+
+export async function updateAdminPenugasan(
+  id: string,
+  payload: { pelaksanaId?: string; catatan?: string | null; status?: string }
+): Promise<any> {
+  try {
+    const response = await api.put(`/admin/penugasan/${id}`, payload)
+    return getData(response)
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal memperbarui penugasan survei.'))
+  }
+}
+
+export async function batalAdminPenugasan(id: string, catatan?: string): Promise<any> {
+  try {
+    const response = await api.patch(`/admin/penugasan/${id}/batal`, { catatan })
+    return getData(response)
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal membatalkan penugasan survei.'))
+  }
+}
+
+// CREATE CALON MUSTAHIK (ADMIN)
+export async function createAdminMustahik(payload: any): Promise<any> {
+  try {
+    const response = await api.post('/admin/mustahik', payload)
+    return getData(response)
+  } catch (error) {
+    throw new Error(getErrorMessage(error, 'Gagal menambahkan data calon mustahik.'))
+  }
+}
+
+// ============================================================
 // EXPORT AXIOS INSTANCE
 // ============================================================
 

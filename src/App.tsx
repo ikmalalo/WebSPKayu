@@ -32,6 +32,13 @@ import { ProcessTopsisPage } from '@/pages/admin/ProcessTopsisPage'
 import { HasilRankingPage } from '@/pages/admin/HasilRankingPage'
 import { LaporanPage } from '@/pages/admin/LaporanPage'
 import { PengaturanPage } from '@/pages/admin/PengaturanPage'
+import { ManajemenPelaksanaPage } from '@/pages/admin/ManajemenPelaksanaPage'
+import { PenugasanSurveiPage } from '@/pages/admin/PenugasanSurveiPage'
+
+import { PelaksanaLayout } from '@/layouts/PelaksanaLayout'
+import { PelaksanaDashboardPage } from '@/pages/pelaksana/PelaksanaDashboardPage'
+import { DaftarTugasPage } from '@/pages/pelaksana/DaftarTugasPage'
+import { FormSurveiPage } from '@/pages/pelaksana/FormSurveiPage'
 
 import { PengajuanProvider } from '@/context/PengajuanContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -159,6 +166,20 @@ export default function App() {
                 />
 
                 <Route
+                  path="/admin/pelaksana"
+                  element={
+                    <ManajemenPelaksanaPage />
+                  }
+                />
+
+                <Route
+                  path="/admin/penugasan"
+                  element={
+                    <PenugasanSurveiPage />
+                  }
+                />
+
+                <Route
                   path="/admin/kriteria"
                   element={
                     <KriteriaPage />
@@ -204,6 +225,31 @@ export default function App() {
                   path="/admin/pengaturan"
                   element={
                     <PengaturanPage />
+                  }
+                />
+              </Route>
+
+              {/* ==================== PELAKSANA ==================== */}
+
+              <Route element={<PelaksanaLayout />}>
+                <Route
+                  path="/pelaksana/dashboard"
+                  element={
+                    <PelaksanaDashboardPage />
+                  }
+                />
+
+                <Route
+                  path="/pelaksana/tugas"
+                  element={
+                    <DaftarTugasPage />
+                  }
+                />
+
+                <Route
+                  path="/pelaksana/survei/:id"
+                  element={
+                    <FormSurveiPage />
                   }
                 />
               </Route>

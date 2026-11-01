@@ -4,9 +4,94 @@ export interface User {
   name: string
   email: string
   phone: string | null
-  role: 'USER' | 'ADMIN'
+  role: 'USER' | 'ADMIN' | 'PELAKSANA'
   createdAt: string
   updatedAt?: string
+}
+
+// ===== STATUS PENUGASAN =====
+export type StatusPenugasan =
+  | 'DITUGASKAN'
+  | 'SEDANG_SURVEI'
+  | 'SELESAI'
+  | 'DIBATALKAN'
+
+export interface PelaksanaUser {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  role: 'PELAKSANA'
+  createdAt: string
+  updatedAt?: string
+  penugasanSurvei?: Array<{
+    id: string
+    status: StatusPenugasan
+    mustahik: {
+      id: string
+      namaLengkap: string
+      nik: string
+    }
+  }>
+}
+
+export interface PenugasanSurvei {
+  id: string
+  mustahikId: string
+  pelaksanaId: string
+  status: StatusPenugasan
+  catatan: string | null
+  tanggalDitugaskan: string
+  tanggalMulai: string | null
+  tanggalSelesai: string | null
+  createdAt: string
+  updatedAt: string
+  mustahik: {
+    id: string
+    nik: string
+    namaLengkap: string
+    noHp?: string | null
+    alamat?: string | null
+    kelurahan?: string | null
+    kecamatan?: string | null
+    kota?: string | null
+    provinsi?: string | null
+    pekerjaan?: string | null
+    statusRumah?: string | null
+    kondisiRumah?: string | null
+    penghasilan?: number | null
+    jumlahTanggungan?: number | null
+    kepemilikanAset?: string | null
+    pengajuan?: Array<{
+      id: string
+      status: StatusPengajuan
+      jawaban?: Array<{
+        id: string
+        indikatorId: string
+        nilai: number
+        indikator?: {
+          id: string
+          kode: string
+          nama: string
+          tipe: string
+          kriteria?: {
+            id: string
+            kode: string
+            nama: string
+          }
+        }
+      }>
+      _count?: {
+        jawaban: number
+      }
+    }>
+  }
+  pelaksana: {
+    id: string
+    name: string
+    email: string
+    phone?: string | null
+  }
 }
 
 // ===== STATUS TYPES =====

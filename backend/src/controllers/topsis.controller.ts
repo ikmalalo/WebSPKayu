@@ -1541,6 +1541,81 @@ export async function updateTopsisConfig(
   }
 }
 
+// ============================================================
+// VALIDASI STATUS PENDANAAN OLEH ADMIN
+//
+// PUT /api/admin/topsis/results/:id/status
+// Body: { status: 'LAYAK_DIDANAI' | 'TIDAK_DIDANAI', catatan?: string }
+// ============================================================
+export async function updateStatusPendanaan(req: Request, res: Response) {
+  try {
+    const adminId = getAdminId(req)
+    if (!adminId) {
+      return fail(res, 'Admin belum terautentikasi', 401)
+    }
+
+    const { id } = req.params // topsisResultId
+    const { status, catatan } = req.body || {}
+
+    const targetStatus = String(status || '').toUpperCase()
+    const allowedStatuses: PengajuanStatus[] = [PengajuanStatus.LAYAK_DIDANAI, PengajuanStatus.TIDAK_DIDANAI]
+    if (!allowedStatuses.includes(targetStatus as PengajuanStatus)) {
+      return fail(res, 'Status tidak valid. Hanya menerima LAYAK_DIDANAI atau TIDAK_DIDANAI', 422)
+    }
+
+    const topsisResult = await prisma.topsisResult.findUnique({
+      where: { id },
+      include: { pengajuan: true },
+    })
+
+    if (!topsisResult) {
+      return fail(res, 'Hasil TOPSIS tidak ditemukan', 404)
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // 1. Update status pada TopsisResult
+      const resUpdated = await tx.topsisResult.update({
+        where: { id },
+        data: {
+          status: targetStatus as PengajuanStatus,
+        },
+      })
+
+      // 2. Update status pada Pengajuan
+      await tx.pengajuan.update({
+        where: { id: topsisResult.pengajuanId },
+        data: {
+          status: targetStatus as PengajuanStatus,
+          catatan: catatan !== undefined ? (catatan ? String(catatan).trim() : null) : undefined,
+        },
+      })
+
+      // 3. Catat ke Audit Log
+      await tx.auditLog.create({
+        data: {
+          userId: adminId,
+          action: 'VALIDASI_STATUS_PENDANAAN',
+          entity: 'TopsisResult',
+          entityId: id,
+          metadata: {
+            pengajuanId: topsisResult.pengajuanId,
+            previousStatus: topsisResult.status,
+            newStatus: targetStatus,
+            catatan,
+          },
+        },
+      })
+
+      return resUpdated
+    })
+
+    return success(res, 'Status pendanaan mustahik berhasil diperbarui', { topsisResult: updated })
+  } catch (error) {
+    console.error('UPDATE STATUS PENDANAAN ERROR:', error)
+    return fail(res, 'Gagal memperbarui status pendanaan', 500)
+  }
+}
+
 
 // ============================================================
 // ALIAS

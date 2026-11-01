@@ -2,6 +2,8 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Users,
+  UserCheck,
+  ClipboardList,
   ClipboardCheck,
   SlidersHorizontal,
   ListChecks,
@@ -27,7 +29,9 @@ interface AdminSidebarProps {
 const navItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/mustahik', icon: Users, label: 'Data Mustahik' },
-  { to: '/admin/verifikasi', icon: ClipboardCheck, label: 'Verifikasi' },
+  { to: '/admin/pelaksana', icon: UserCheck, label: 'Manajemen Pelaksana' },
+  { to: '/admin/penugasan', icon: ClipboardList, label: 'Penugasan Survei' },
+  { to: '/admin/verifikasi', icon: ClipboardCheck, label: 'Monitoring Survei' },
   { to: '/admin/kriteria', icon: SlidersHorizontal, label: 'Kriteria TOPSIS' },
   { to: '/admin/subkriteria', icon: ListChecks, label: 'Subkriteria' },
   { to: '/admin/konfigurasi-topsis', icon: Sliders, label: 'Konfigurasi TOPSIS' },

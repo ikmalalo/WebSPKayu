@@ -11,6 +11,7 @@ import {
   getTugasPelaksana,
   getDetailTugasPelaksana,
   updateStatusTugas,
+  submitHasilSurveiPelaksana,
 } from '../controllers/pelaksana.controller'
 
 export const pelaksanaRouter = Router()
@@ -35,5 +36,11 @@ pelaksanaRouter.get(
 pelaksanaRouter.patch(
   '/tugas/:id/status',
   asyncHandler(updateStatusTugas)
+)
+
+// INPUT / UPDATE HASIL SURVEI LAPANGAN (DRAF / SELESAI)
+pelaksanaRouter.post(
+  '/tugas/:id/survei',
+  asyncHandler(submitHasilSurveiPelaksana)
 )
 

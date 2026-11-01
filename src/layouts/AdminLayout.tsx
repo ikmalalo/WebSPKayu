@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, Navigate } from 'react-router-dom'
 import { AdminSidebar } from '../components/shared/AdminSidebar'
 import { Topbar } from '../components/shared/Topbar'
+import { useAuth } from '@/context/AuthContext'
 
 interface AdminLayoutProps {
   children?: ReactNode
@@ -9,6 +10,19 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { currentUser, loading, isAuthenticated } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-slate-500 font-medium">Memeriksa autentikasi...</div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated || currentUser?.role !== 'ADMIN') {
+    return <Navigate to="/login" replace />
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">

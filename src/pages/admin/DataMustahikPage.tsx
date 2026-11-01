@@ -13,6 +13,11 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  UserPlus,
+  Loader2,
+  CheckCircle2,
+  MapPin,
+  Phone,
 } from 'lucide-react'
 
 import {
@@ -21,8 +26,30 @@ import {
 
 import {
   getAdminMustahik,
+  createAdminMustahik,
+  getAdminPelaksana,
   type AdminMustahik,
 } from '@/lib/adminApi'
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 
 // ============================================================
 // TYPES
@@ -326,13 +353,29 @@ export default function DataMustahikPage() {
   ] =
     useState('')
 
-  const [
-    page,
-    setPage,
-  ] =
-    useState(1)
-
+  const [page, setPage] = useState(1)
   const pageSize = 10
+
+  // Tambah Mustahik State
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [createSuccess, setCreateSuccess] = useState('')
+  const [pelaksanaOptions, setPelaksanaOptions] = useState<any[]>([])
+
+  const [formMustahik, setFormMustahik] = useState({
+    nik: '',
+    namaLengkap: '',
+    noHp: '',
+    alamat: '',
+    kelurahan: '',
+    kecamatan: '',
+    kota: 'Depok',
+    provinsi: 'Jawa Barat',
+    pekerjaan: '',
+    statusPernikahan: 'menikah',
+    pelaksanaId: '',
+    catatanPenugasan: '',
+  })
 
   // ==========================================================
   // LOAD DATA
@@ -505,6 +548,52 @@ export default function DataMustahikPage() {
   const totalMustahik =
     rows.length
 
+  const handleOpenCreate = async () => {
+    setFormMustahik({
+      nik: '',
+      namaLengkap: '',
+      noHp: '',
+      alamat: '',
+      kelurahan: '',
+      kecamatan: '',
+      kota: 'Depok',
+      provinsi: 'Jawa Barat',
+      pekerjaan: '',
+      statusPernikahan: 'menikah',
+      pelaksanaId: '',
+      catatanPenugasan: '',
+    })
+    setCreateSuccess('')
+    try {
+      const pRes = await getAdminPelaksana()
+      setPelaksanaOptions(pRes.pelaksana || [])
+    } catch {
+      // Ignore if failed
+    }
+    setCreateDialogOpen(true)
+  }
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreateSubmitting(true)
+    setError('')
+    setCreateSuccess('')
+
+    try {
+      await createAdminMustahik({
+        ...formMustahik,
+        pelaksanaId: formMustahik.pelaksanaId || undefined,
+      })
+      setCreateSuccess('Data calon mustahik berhasil didaftarkan.')
+      setCreateDialogOpen(false)
+      await loadData()
+    } catch (err: any) {
+      setError(err.message || 'Gagal mendaftarkan calon mustahik.')
+    } finally {
+      setCreateSubmitting(false)
+    }
+  }
+
   // ==========================================================
   // DETAIL
   // ==========================================================
@@ -569,25 +658,42 @@ export default function DataMustahikPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              void loadData()
-            }}
-            disabled={loading}
-            className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${
-                loading
-                  ? 'animate-spin'
-                  : ''
-              }`}
-            />
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                void loadData()
+              }}
+              disabled={loading}
+              className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  loading
+                    ? 'animate-spin'
+                    : ''
+                }`}
+              />
 
-            Refresh
-          </button>
+              Refresh
+            </button>
+
+            <Button
+              onClick={handleOpenCreate}
+              className="bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-sm"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Tambah Mustahik
+            </Button>
+          </div>
         </div>
+
+        {createSuccess && (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex items-center gap-3 text-sm text-green-700">
+            <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+            <span>{createSuccess}</span>
+          </div>
+        )}
 
         {/* ====================================================
             ERROR
@@ -1023,6 +1129,221 @@ export default function DataMustahikPage() {
 
         </div>
       </div>
+
+      {/* DIALOG TAMBAH CALON MUSTAHIK */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-slate-800">
+              <UserPlus className="h-5 w-5 text-emerald-600" />
+              Input Calon Mustahik Baru
+            </DialogTitle>
+            <DialogDescription>
+              Daftarkan data calon mustahik ke dalam sistem untuk kemudian dilakukan survei lapangan oleh Pelaksana.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateSubmit} className="space-y-4 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="nik" className="text-xs font-semibold text-slate-700">
+                  Nomor Induk Kependudukan (NIK) <span className="text-rose-500">*</span>
+                </Label>
+                <Input
+                  id="nik"
+                  required
+                  maxLength={16}
+                  placeholder="16 digit NIK"
+                  value={formMustahik.nik}
+                  onChange={(e) => setFormMustahik({ ...formMustahik, nik: e.target.value })}
+                  className="font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="namaLengkap" className="text-xs font-semibold text-slate-700">
+                  Nama Lengkap <span className="text-rose-500">*</span>
+                </Label>
+                <Input
+                  id="namaLengkap"
+                  required
+                  placeholder="Nama lengkap calon mustahik"
+                  value={formMustahik.namaLengkap}
+                  onChange={(e) => setFormMustahik({ ...formMustahik, namaLengkap: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="noHp" className="text-xs font-semibold text-slate-700">
+                  Nomor HP / WhatsApp
+                </Label>
+                <Input
+                  id="noHp"
+                  placeholder="08xxxxxxxxxx"
+                  value={formMustahik.noHp}
+                  onChange={(e) => setFormMustahik({ ...formMustahik, noHp: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="pekerjaan" className="text-xs font-semibold text-slate-700">
+                  Pekerjaan
+                </Label>
+                <Input
+                  id="pekerjaan"
+                  placeholder="Contoh: Buruh Harian / Pedagang"
+                  value={formMustahik.pekerjaan}
+                  onChange={(e) => setFormMustahik({ ...formMustahik, pekerjaan: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="alamat" className="text-xs font-semibold text-slate-700">
+                Alamat Lengkap <span className="text-rose-500">*</span>
+              </Label>
+              <Textarea
+                id="alamat"
+                required
+                rows={2}
+                placeholder="Jalan, No. Rumah, RT/RW..."
+                value={formMustahik.alamat}
+                onChange={(e) => setFormMustahik({ ...formMustahik, alamat: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="kelurahan" className="text-xs font-semibold text-slate-700">
+                  Kelurahan / Desa <span className="text-rose-500">*</span>
+                </Label>
+                <Input
+                  id="kelurahan"
+                  required
+                  placeholder="Kelurahan"
+                  value={formMustahik.kelurahan}
+                  onChange={(e) => setFormMustahik({ ...formMustahik, kelurahan: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="kecamatan" className="text-xs font-semibold text-slate-700">
+                  Kecamatan <span className="text-rose-500">*</span>
+                </Label>
+                <Input
+                  id="kecamatan"
+                  required
+                  placeholder="Kecamatan"
+                  value={formMustahik.kecamatan}
+                  onChange={(e) => setFormMustahik({ ...formMustahik, kecamatan: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="kota" className="text-xs font-semibold text-slate-700">
+                  Kota / Kabupaten
+                </Label>
+                <Input
+                  id="kota"
+                  value={formMustahik.kota}
+                  onChange={(e) => setFormMustahik({ ...formMustahik, kota: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="statusPernikahan" className="text-xs font-semibold text-slate-700">
+                  Status Pernikahan
+                </Label>
+                <Select
+                  value={formMustahik.statusPernikahan}
+                  onValueChange={(val) => setFormMustahik({ ...formMustahik, statusPernikahan: val })}
+                >
+                  <SelectTrigger id="statusPernikahan">
+                    <SelectValue placeholder="Pilih status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="belum_menikah">Belum Menikah</SelectItem>
+                    <SelectItem value="menikah">Menikah</SelectItem>
+                    <SelectItem value="cerai_hidup">Cerai Hidup</SelectItem>
+                    <SelectItem value="cerai_mati">Cerai Mati</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 space-y-3">
+              <p className="text-xs font-semibold text-emerald-800">
+                Opsi Penugasan Langsung ke Pelaksana (Opsional)
+              </p>
+              <div className="space-y-1.5">
+                <Label htmlFor="pelaksanaId" className="text-xs text-slate-700">
+                  Pilih Pelaksana Survei
+                </Label>
+                <Select
+                  value={formMustahik.pelaksanaId}
+                  onValueChange={(val) => setFormMustahik({ ...formMustahik, pelaksanaId: val === 'NONE' ? '' : val })}
+                >
+                  <SelectTrigger id="pelaksanaId" className="bg-white">
+                    <SelectValue placeholder="Tugaskan nanti (kosongkan)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">-- Tugaskan Nanti --</SelectItem>
+                    {pelaksanaOptions.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} ({p.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formMustahik.pelaksanaId && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="catatanPenugasan" className="text-xs text-slate-700">
+                    Catatan untuk Pelaksana
+                  </Label>
+                  <Input
+                    id="catatanPenugasan"
+                    placeholder="Contoh: Survei diutamakan sore hari..."
+                    value={formMustahik.catatanPenugasan}
+                    onChange={(e) => setFormMustahik({ ...formMustahik, catatanPenugasan: e.target.value })}
+                    className="bg-white"
+                  />
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateDialogOpen(false)}
+                disabled={createSubmitting}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={createSubmitting}
+              >
+                {createSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  'Simpan Data'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

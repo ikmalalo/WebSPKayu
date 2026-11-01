@@ -210,6 +210,17 @@ export function LoginPage() {
         return
       }
 
+      if (role === 'PELAKSANA') {
+        navigate(
+          '/pelaksana/dashboard',
+          {
+            replace: true,
+          }
+        )
+
+        return
+      }
+
       navigate(
         '/dashboard',
         {

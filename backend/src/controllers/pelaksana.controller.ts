@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express'
-import { StatusPenugasan } from '@prisma/client'
+import { StatusPenugasan, PengajuanStatus, Prisma } from '@prisma/client'
 import { prisma } from '../config/prisma'
 
 function success(res: Response, message: string, data: unknown = null, statusCode = 200) {
@@ -266,5 +266,175 @@ export async function updateStatusTugas(req: Request, res: Response) {
   } catch (error) {
     console.error('UPDATE STATUS TUGAS ERROR:', error)
     return fail(res, 'Gagal memperbarui status tugas survei', 500)
+  }
+}
+
+// ============================================================
+// SUBMIT / UPDATE HASIL SURVEI OLEH PELAKSANA
+// ============================================================
+export async function submitHasilSurveiPelaksana(req: Request, res: Response) {
+  try {
+    const pelaksanaId = getPelaksanaId(req)
+    if (!pelaksanaId) {
+      return fail(res, 'Pelaksana belum terautentikasi', 401)
+    }
+
+    const { id } = req.params // penugasanId
+    const { jawaban, statusRumah, statusPenugasan, catatan } = req.body || {}
+
+    // 1. Verifikasi penugasan milik pelaksana yang login
+    const penugasan = await prisma.penugasanSurvei.findUnique({
+      where: { id },
+      include: {
+        mustahik: {
+          include: {
+            pengajuan: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    })
+
+    if (!penugasan) {
+      return fail(res, 'Data penugasan survei tidak ditemukan', 404)
+    }
+
+    if (penugasan.pelaksanaId !== pelaksanaId) {
+      return fail(res, 'Anda tidak memiliki hak akses untuk menginput survei pada tugas ini', 403)
+    }
+
+    if (penugasan.status === StatusPenugasan.DIBATALKAN) {
+      return fail(res, 'Tugas survei ini sudah dibatalkan dan tidak dapat diisi', 422)
+    }
+
+    // 2. Pastikan atau buat record Pengajuan untuk mustahik
+    let currentPengajuan = penugasan.mustahik.pengajuan?.[0]
+    if (!currentPengajuan) {
+      currentPengajuan = await prisma.pengajuan.create({
+        data: {
+          mustahikId: penugasan.mustahikId,
+          status: PengajuanStatus.DRAFT,
+          catatan: 'Dibuat otomatis untuk survei lapangan',
+        },
+      })
+    }
+
+    // 3. Validasi daftar jawaban jika disertakan
+    if (!Array.isArray(jawaban) || jawaban.length === 0) {
+      return fail(res, 'Daftar jawaban indikator survei wajib diisi', 422)
+    }
+
+    // Ambil indikator aktif
+    const indikatorAktif = await prisma.indikator.findMany({
+      where: { aktif: true, kriteria: { aktif: true } },
+      select: { id: true, kode: true },
+      orderBy: { urutan: 'asc' },
+    })
+
+    const isFinalizing = statusPenugasan === StatusPenugasan.SELESAI
+
+    // Jika difinalisasi, semua indikator wajib lengkap
+    if (isFinalizing && jawaban.length !== indikatorAktif.length) {
+      return fail(res, `Semua ${indikatorAktif.length} indikator kriteria survei wajib diisi untuk menyelesaikan survei`, 422)
+    }
+
+    // Validasi nilai jawaban (skala 1 - 5)
+    for (const item of jawaban) {
+      const val = Number(item.nilai)
+      if (isNaN(val) || val < 1 || val > 5) {
+        return fail(res, `Nilai jawaban untuk indikator ${item.indikatorId} harus antara 1 sampai 5`, 422)
+      }
+    }
+
+    // 4. Jalankan transaksi database: Simpan/update jawaban & update status
+    const result = await prisma.$transaction(async (tx) => {
+      // Simpan status rumah mustahik jika ada
+      if (statusRumah) {
+        await tx.mustahik.update({
+          where: { id: penugasan.mustahikId },
+          data: { statusRumah },
+        })
+      }
+
+      // Upsert tiap jawaban kuesioner
+      for (const item of jawaban) {
+        const existingJawaban = await tx.jawabanKuesioner.findFirst({
+          where: {
+            pengajuanId: currentPengajuan.id,
+            indikatorId: item.indikatorId,
+          },
+        })
+
+        if (existingJawaban) {
+          await tx.jawabanKuesioner.update({
+            where: { id: existingJawaban.id },
+            data: { nilai: new Prisma.Decimal(item.nilai) },
+          })
+        } else {
+          await tx.jawabanKuesioner.create({
+            data: {
+              pengajuanId: currentPengajuan.id,
+              indikatorId: item.indikatorId,
+              nilai: new Prisma.Decimal(item.nilai),
+            },
+          })
+        }
+      }
+
+      // Update status penugasan
+      const nextPenugasanStatus = isFinalizing ? StatusPenugasan.SELESAI : StatusPenugasan.SEDANG_SURVEI
+      const penugasanUpdateData: any = {
+        status: nextPenugasanStatus,
+      }
+      if (catatan !== undefined) {
+        penugasanUpdateData.catatan = catatan ? String(catatan).trim() : null
+      }
+      if (!penugasan.tanggalMulai) {
+        penugasanUpdateData.tanggalMulai = new Date()
+      }
+      if (isFinalizing && !penugasan.tanggalSelesai) {
+        penugasanUpdateData.tanggalSelesai = new Date()
+      }
+
+      const updatedPenugasan = await tx.penugasanSurvei.update({
+        where: { id },
+        data: penugasanUpdateData,
+      })
+
+      // Jika selesai, update status pengajuan agar siap masuk verifikasi/TOPSIS
+      const nextPengajuanStatus = isFinalizing ? PengajuanStatus.LOLOS_VERIFIKASI : PengajuanStatus.SEDANG_DIVERIFIKASI
+      await tx.pengajuan.update({
+        where: { id: currentPengajuan.id },
+        data: { status: nextPengajuanStatus },
+      })
+
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          userId: pelaksanaId,
+          action: isFinalizing ? 'PELAKSANA_SELESAIKAN_SURVEI' : 'PELAKSANA_SIMPAN_DRAF_SURVEI',
+          entity: 'PenugasanSurvei',
+          entityId: id,
+          metadata: {
+            pengajuanId: currentPengajuan.id,
+            totalJawaban: jawaban.length,
+            statusPenugasan: updatedPenugasan.status,
+            statusPengajuan: nextPengajuanStatus,
+          },
+        },
+      })
+
+      return updatedPenugasan
+    })
+
+    return success(res, isFinalizing ? 'Survei lapangan berhasil diselesaikan' : 'Progres survei berhasil disimpan', {
+      penugasan: result,
+      pengajuanId: currentPengajuan.id,
+    })
+  } catch (error) {
+    console.error('SUBMIT HASIL SURVEI PELAKSANA ERROR:', error)
+    return fail(res, 'Gagal menyimpan hasil survei lapangan', 500)
   }
 }
