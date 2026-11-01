@@ -27,6 +27,12 @@ import {
   getVerifikasi,
   getVerifikasiById,
   createVerifikasi,
+
+  // Pelaksana
+  getPelaksana,
+  createPelaksana,
+  updatePelaksana,
+  deletePelaksana,
 } from '../controllers/admin.controller'
 
 // ============================================================
@@ -128,6 +134,42 @@ adminRouter.delete(
   '/mustahik/:id',
   asyncHandler(
     deleteMustahik
+  )
+)
+
+// ============================================================
+// MANAJEMEN PELAKSANA
+// ============================================================
+
+// GET SEMUA PELAKSANA
+adminRouter.get(
+  '/pelaksana',
+  asyncHandler(
+    getPelaksana
+  )
+)
+
+// CREATE AKUN PELAKSANA
+adminRouter.post(
+  '/pelaksana',
+  asyncHandler(
+    createPelaksana
+  )
+)
+
+// UPDATE AKUN PELAKSANA
+adminRouter.put(
+  '/pelaksana/:id',
+  asyncHandler(
+    updatePelaksana
+  )
+)
+
+// DELETE AKUN PELAKSANA
+adminRouter.delete(
+  '/pelaksana/:id',
+  asyncHandler(
+    deletePelaksana
   )
 )
 

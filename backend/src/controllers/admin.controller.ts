@@ -6,11 +6,15 @@ import type {
 import {
   PengajuanStatus,
   VerifikasiStatus,
+  Role,
 } from '@prisma/client'
+
+import bcrypt from 'bcryptjs'
 
 import {
   prisma,
 } from '../config/prisma'
+
 
 
 // ============================================================
@@ -1052,6 +1056,453 @@ export async function createVerifikasi(
   }
 }
 
+// ============================================================
+// MANAJEMEN AKUN PELAKSANA
+// ============================================================
+
+// GET SEMUA PELAKSANA
+export async function getPelaksana(
+  req: Request,
+  res: Response
+) {
+  try {
+    const pelaksana = await prisma.user.findMany({
+      where: {
+        role: Role.PELAKSANA,
+      },
+
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+
+        penugasanSurvei: {
+          select: {
+            id: true,
+            status: true,
+            mustahik: {
+              select: {
+                id: true,
+                namaLengkap: true,
+                nik: true,
+              },
+            },
+          },
+        },
+      },
+
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return success(
+      res,
+      'Data pelaksana berhasil diambil',
+      {
+        pelaksana,
+        total: pelaksana.length,
+      }
+    );
+  } catch (error) {
+    console.error('GET PELAKSANA ERROR:', error);
+
+    return fail(
+      res,
+      'Gagal mengambil data pelaksana',
+      500
+    );
+  }
+}
+
+
+// CREATE AKUN PELAKSANA
+export async function createPelaksana(
+  req: Request,
+  res: Response
+) {
+  try {
+    const adminId = getAdminId(req);
+
+    const body = req.body || {};
+
+    const name = String(body.name || '').trim();
+    const email = String(body.email || '')
+      .trim()
+      .toLowerCase();
+    const phone = body.phone
+      ? String(body.phone).trim()
+      : null;
+    const password = String(body.password || '');
+
+    if (!name || !email || !password) {
+      return fail(
+        res,
+        'Nama, email, dan password wajib diisi',
+        422
+      );
+    }
+
+    if (password.length < 8) {
+      return fail(
+        res,
+        'Password minimal 8 karakter',
+        422
+      );
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+
+    if (existingUser) {
+      return fail(
+        res,
+        'Email sudah terdaftar',
+        409
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(
+      password,
+      12
+    );
+
+    const pelaksana = await prisma.user.create({
+      data: {
+        name,
+        email,
+        phone,
+        passwordHash,
+        role: Role.PELAKSANA,
+      },
+
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+
+    if (adminId) {
+      await prisma.auditLog.create({
+        data: {
+          userId: adminId,
+          action: 'CREATE_PELAKSANA',
+          entity: 'User',
+          entityId: pelaksana.id,
+          metadata: {
+            name: pelaksana.name,
+            email: pelaksana.email,
+            role: pelaksana.role,
+          },
+        },
+      });
+    }
+
+    return success(
+      res,
+      'Akun pelaksana berhasil dibuat',
+      {
+        pelaksana,
+      },
+      201
+    );
+  } catch (error: any) {
+    console.error('CREATE PELAKSANA ERROR:', error);
+
+    if (error?.code === 'P2002') {
+      return fail(
+        res,
+        'Email sudah digunakan',
+        409
+      );
+    }
+
+    return fail(
+      res,
+      'Gagal membuat akun pelaksana',
+      500
+    );
+  }
+}
+
+
+// UPDATE AKUN PELAKSANA
+export async function updatePelaksana(
+  req: Request,
+  res: Response
+) {
+  try {
+    const adminId = getAdminId(req);
+    const { id } = req.params;
+    const body = req.body || {};
+
+    const existingUser = await prisma.user.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    if (!existingUser) {
+      return fail(
+        res,
+        'Akun pelaksana tidak ditemukan',
+        404
+      );
+    }
+
+    if (existingUser.role !== Role.PELAKSANA) {
+      return fail(
+        res,
+        'Akun ini bukan akun pelaksana',
+        400
+      );
+    }
+
+    const name =
+      body.name !== undefined
+        ? String(body.name).trim()
+        : undefined;
+
+    const email =
+      body.email !== undefined
+        ? String(body.email).trim().toLowerCase()
+        : undefined;
+
+    const phone =
+      body.phone !== undefined
+        ? body.phone
+          ? String(body.phone).trim()
+          : null
+        : undefined;
+
+    if (name !== undefined && !name) {
+      return fail(
+        res,
+        'Nama tidak boleh kosong',
+        422
+      );
+    }
+
+    if (email !== undefined && !email) {
+      return fail(
+        res,
+        'Email tidak boleh kosong',
+        422
+      );
+    }
+
+    if (email && email !== existingUser.email) {
+      const emailUsed = await prisma.user.findUnique({
+        where: {
+          email,
+        },
+      });
+
+      if (emailUsed) {
+        return fail(
+          res,
+          'Email sudah digunakan akun lain',
+          409
+        );
+      }
+    }
+
+    const data: {
+      name?: string;
+      email?: string;
+      phone?: string | null;
+      passwordHash?: string;
+    } = {
+      name,
+      email,
+      phone,
+    };
+
+    // Password hanya diubah jika admin mengisi password baru.
+    if (body.password) {
+      const password = String(body.password);
+
+      if (password.length < 8) {
+        return fail(
+          res,
+          'Password baru minimal 8 karakter',
+          422
+        );
+      }
+
+      data.passwordHash = await bcrypt.hash(
+        password,
+        12
+      );
+    }
+
+    const pelaksana = await prisma.user.update({
+      where: {
+        id,
+      },
+
+      data,
+
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (adminId) {
+      await prisma.auditLog.create({
+        data: {
+          userId: adminId,
+          action: 'UPDATE_PELAKSANA',
+          entity: 'User',
+          entityId: id,
+          metadata: {
+            name: pelaksana.name,
+            email: pelaksana.email,
+          },
+        },
+      });
+    }
+
+    return success(
+      res,
+      'Akun pelaksana berhasil diperbarui',
+      {
+        pelaksana,
+      }
+    );
+  } catch (error: any) {
+    console.error('UPDATE PELAKSANA ERROR:', error);
+
+    if (error?.code === 'P2002') {
+      return fail(
+        res,
+        'Email sudah digunakan',
+        409
+      );
+    }
+
+    return fail(
+      res,
+      'Gagal memperbarui akun pelaksana',
+      500
+    );
+  }
+}
+
+
+// DELETE AKUN PELAKSANA
+export async function deletePelaksana(
+  req: Request,
+  res: Response
+) {
+  try {
+    const adminId = getAdminId(req);
+    const { id } = req.params;
+
+    const existingUser = await prisma.user.findUnique({
+      where: {
+        id,
+      },
+
+      include: {
+        penugasanSurvei: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!existingUser) {
+      return fail(
+        res,
+        'Akun pelaksana tidak ditemukan',
+        404
+      );
+    }
+
+    if (existingUser.role !== Role.PELAKSANA) {
+      return fail(
+        res,
+        'Akun ini bukan akun pelaksana',
+        400
+      );
+    }
+
+    // Jangan hapus akun yang masih memiliki riwayat penugasan.
+    // Ini menjaga relasi dan riwayat survei tetap aman.
+    if (existingUser.penugasanSurvei.length > 0) {
+      return fail(
+        res,
+        'Pelaksana masih memiliki riwayat penugasan. Pindahkan penugasan terlebih dahulu.',
+        409,
+        {
+          jumlahPenugasan:
+            existingUser.penugasanSurvei.length,
+        }
+      );
+    }
+
+    await prisma.user.delete({
+      where: {
+        id,
+      },
+    });
+
+    if (adminId) {
+      await prisma.auditLog.create({
+        data: {
+          userId: adminId,
+          action: 'DELETE_PELAKSANA',
+          entity: 'User',
+          entityId: id,
+          metadata: {
+            name: existingUser.name,
+            email: existingUser.email,
+          },
+        },
+      });
+    }
+
+    return success(
+      res,
+      'Akun pelaksana berhasil dihapus'
+    );
+  } catch (error: any) {
+    console.error('DELETE PELAKSANA ERROR:', error);
+
+    if (error?.code === 'P2003') {
+      return fail(
+        res,
+        'Akun pelaksana masih terhubung dengan data lain',
+        409
+      );
+    }
+
+    return fail(
+      res,
+      'Gagal menghapus akun pelaksana',
+      500
+    );
+  }
+}
 
 // ============================================================
 // ALIAS
