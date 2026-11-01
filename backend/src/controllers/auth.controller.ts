@@ -196,9 +196,10 @@ export async function me(
   res: Response
 ) {
   try {
+    const authReq = req as Request & { auth?: { userId?: string } }
     const user = await prisma.user.findUnique({
       where: {
-        id: req.auth!.userId,
+        id: authReq.auth?.userId,
       },
       select: userSelect,
     })

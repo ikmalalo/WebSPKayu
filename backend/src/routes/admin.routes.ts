@@ -70,6 +70,7 @@ import {
   getTopsisResultById,
   getTopsisConfig,
   updateTopsisConfig,
+  updateStatusPendanaan,
 } from '../controllers/topsis.controller'
 
 // ============================================================
@@ -389,5 +390,16 @@ adminRouter.get(
   '/topsis/results/:id',
   asyncHandler(
     getTopsisResultById
+  )
+)
+
+// ============================================================
+// TOPSIS - VALIDASI STATUS PENDANAAN OLEH ADMIN
+// ============================================================
+
+adminRouter.put(
+  '/topsis/results/:id/status',
+  asyncHandler(
+    updateStatusPendanaan
   )
 )

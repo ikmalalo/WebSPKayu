@@ -300,70 +300,38 @@ export async function processTopsis(
       )
     }
 
-    const alternatives:
-      Alternative[] =
-      pengajuan.map(
-        (
-          item
-        ) => {
-          const jawabanMap =
-            new Map(
-              item.jawaban.map(
-                (
-                  jawaban
-                ) => [
-                  jawaban.indikatorId,
-                  toNumber(
-                    jawaban.nilai
-                  ),
-                ]
-              )
-            )
+    // ========================================================
+    // FILTER CALON YANG MEMILIKI SURVEI LENGKAP
+    // ========================================================
+    const completePengajuan = pengajuan.filter((item) => {
+      const answeredIndikatorIds = new Set(item.jawaban.map((j) => j.indikatorId))
+      return indikatorMeta.every((ind) => answeredIndikatorIds.has(ind.id))
+    })
 
-          return {
-            pengajuanId:
-              item.id,
-
-            indikator:
-              indikatorMeta.map(
-                (
-                  indikator
-                ) => ({
-                  indikatorId:
-                    indikator.id,
-
-                  nilai:
-                    jawabanMap.get(
-                      indikator.id
-                    ) ?? 0,
-                })
-              ),
-          }
-        }
-      )
-
-    const incomplete =
-      alternatives.find(
-        (
-          alternative
-        ) =>
-          alternative.indikator.some(
-            (
-              item
-            ) =>
-              item.nilai === 0
-          )
-      )
-
-    if (
-      incomplete
-    ) {
+    if (completePengajuan.length === 0) {
       return fail(
         res,
-        'Masih terdapat pengajuan dengan jawaban kuesioner yang belum lengkap',
+        'Belum ada calon mustahik dengan hasil survei lapangan yang lengkap (15 indikator) untuk diproses TOPSIS',
         422
       )
     }
+
+    const alternatives: Alternative[] = completePengajuan.map((item) => {
+      const jawabanMap = new Map(
+        item.jawaban.map((jawaban) => [
+          jawaban.indikatorId,
+          toNumber(jawaban.nilai),
+        ])
+      )
+
+      return {
+        pengajuanId: item.id,
+        indikator: indikatorMeta.map((indikator) => ({
+          indikatorId: indikator.id,
+          nilai: jawabanMap.get(indikator.id) ?? 0,
+        })),
+      }
+    })
 
     // ========================================================
     // X MATRIX
