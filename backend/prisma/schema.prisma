@@ -7,9 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================
+// ENUM
+// ============================================================
+
 enum Role {
   USER
   ADMIN
+  PELAKSANA
 }
 
 enum PengajuanStatus {
@@ -40,6 +45,17 @@ enum IndikatorTipe {
   NEGATIF
 }
 
+enum StatusPenugasan {
+  DITUGASKAN
+  SEDANG_SURVEI
+  SELESAI
+  DIBATALKAN
+}
+
+// ============================================================
+// USER
+// ============================================================
+
 model User {
   id           String  @id @default(cuid())
   name         String
@@ -48,21 +64,41 @@ model User {
   phone        String?
   role         Role    @default(USER)
 
-  mustahik      Mustahik?
-  pengajuan     Pengajuan[]
+  // Relasi untuk akun USER lama.
+  // Mustahik baru yang dimasukkan admin tidak wajib memiliki akun.
+  mustahik Mustahik?
+
+  // Relasi pengajuan lama tetap dipertahankan.
+  pengajuan Pengajuan[]
+
+  // Admin yang melakukan verifikasi.
   verifications Verifikasi[] @relation("Verifier")
-  auditLogs     AuditLog[]
+
+  // Pelaksana yang menerima penugasan survei.
+  penugasanSurvei PenugasanSurvei[] @relation("PelaksanaPenugasan")
+
+  // Audit log.
+  auditLogs AuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([role])
   @@map("user")
 }
 
+// ============================================================
+// MUSTAHIK
+// ============================================================
+
 model Mustahik {
-  id     String @id @default(cuid())
-  userId String @unique
-  nik    String @unique
+  id String @id @default(cuid())
+
+  // Opsional agar admin dapat memasukkan calon mustahik
+  // tanpa membuat akun USER.
+  userId String? @unique
+
+  nik String @unique
 
   namaLengkap  String
   tempatLahir  String?
@@ -85,20 +121,34 @@ model Mustahik {
   kondisiRumah     String?
   kepemilikanAset  String?
 
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Relasi akun bersifat opsional.
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Satu calon mustahik dapat memiliki riwayat pengajuan.
   pengajuan Pengajuan[]
+
+  // Riwayat penugasan survei.
+  penugasanSurvei PenugasanSurvei[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([namaLengkap])
+  @@index([kelurahan, kecamatan])
   @@map("mustahik")
 }
+
+// ============================================================
+// PENGAJUAN
+// ============================================================
 
 model Pengajuan {
   id String @id @default(cuid())
 
-  userId     String
+  // Opsional untuk mendukung data yang dimasukkan admin,
+  // bukan diajukan sendiri oleh akun USER.
+  userId String?
+
   mustahikId String
 
   status  PengajuanStatus @default(DRAFT)
@@ -107,7 +157,10 @@ model Pengajuan {
   tanggalPengajuan  DateTime  @default(now())
   tanggalVerifikasi DateTime?
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Relasi akun USER lama tetap tersedia.
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Pengajuan tetap terhubung dengan data mustahik.
   mustahik Mustahik @relation(fields: [mustahikId], references: [id], onDelete: Restrict)
 
   jawaban       JawabanKuesioner[]
@@ -119,8 +172,42 @@ model Pengajuan {
 
   @@index([userId, status])
   @@index([mustahikId])
+  @@index([status])
   @@map("pengajuan")
 }
+
+// ============================================================
+// PENUGASAN SURVEI
+// ============================================================
+
+model PenugasanSurvei {
+  id String @id @default(cuid())
+
+  mustahikId  String
+  pelaksanaId String
+
+  status  StatusPenugasan @default(DITUGASKAN)
+  catatan String?         @db.Text
+
+  tanggalDitugaskan DateTime  @default(now())
+  tanggalMulai      DateTime?
+  tanggalSelesai    DateTime?
+
+  mustahik  Mustahik @relation(fields: [mustahikId], references: [id], onDelete: Cascade)
+  pelaksana User     @relation("PelaksanaPenugasan", fields: [pelaksanaId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([mustahikId])
+  @@index([pelaksanaId, status])
+  @@index([status])
+  @@map("penugasansurvei")
+}
+
+// ============================================================
+// KRITERIA
+// ============================================================
 
 model Kriteria {
   id String @id @default(cuid())
@@ -147,6 +234,10 @@ model Kriteria {
   @@map("kriteria")
 }
 
+// ============================================================
+// INDIKATOR
+// ============================================================
+
 model Indikator {
   id String @id @default(cuid())
 
@@ -159,9 +250,10 @@ model Indikator {
   urutan     Int
   aktif      Boolean       @default(true)
 
-  kriteria Kriteria           @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
-  jawaban  JawabanKuesioner[]
-  details  TopsisDetail[]
+  kriteria Kriteria @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
+
+  jawaban JawabanKuesioner[]
+  details TopsisDetail[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -170,6 +262,10 @@ model Indikator {
   @@index([aktif])
   @@map("indikator")
 }
+
+// ============================================================
+// JAWABAN KUESIONER / HASIL SURVEI
+// ============================================================
 
 model JawabanKuesioner {
   id String @id @default(cuid())
@@ -191,6 +287,10 @@ model JawabanKuesioner {
   @@map("jawabankuesioner")
 }
 
+// ============================================================
+// SUB KRITERIA
+// ============================================================
+
 model SubKriteria {
   id String @id @default(cuid())
 
@@ -210,6 +310,10 @@ model SubKriteria {
   @@map("subkriteria")
 }
 
+// ============================================================
+// VERIFIKASI ADMIN
+// ============================================================
+
 model Verifikasi {
   id String @id @default(cuid())
 
@@ -226,8 +330,13 @@ model Verifikasi {
   updatedAt DateTime @updatedAt
 
   @@index([pengajuanId])
+  @@index([adminId])
   @@map("verifikasi")
 }
+
+// ============================================================
+// HASIL TOPSIS
+// ============================================================
 
 model TopsisResult {
   id String @id @default(cuid())
@@ -251,6 +360,10 @@ model TopsisResult {
   @@map("topsisresult")
 }
 
+// ============================================================
+// DETAIL PERHITUNGAN TOPSIS
+// ============================================================
+
 model TopsisDetail {
   id String @id @default(cuid())
 
@@ -263,13 +376,19 @@ model TopsisDetail {
 
   topsisResult TopsisResult @relation(fields: [topsisResultId], references: [id], onDelete: Cascade)
   indikator    Indikator    @relation(fields: [indikatorId], references: [id], onDelete: Restrict)
-  Kriteria     Kriteria?    @relation(fields: [kriteriaId], references: [id])
-  kriteriaId   String?
+
+  Kriteria   Kriteria? @relation(fields: [kriteriaId], references: [id])
+  kriteriaId String?
 
   @@unique([topsisResultId, indikatorId])
   @@index([indikatorId])
+  @@index([kriteriaId])
   @@map("topsisdetail")
 }
+
+// ============================================================
+// PENGATURAN
+// ============================================================
 
 model Pengaturan {
   id    String @id @default(cuid())
@@ -281,6 +400,10 @@ model Pengaturan {
 
   @@map("pengaturan")
 }
+
+// ============================================================
+// AUDIT LOG
+// ============================================================
 
 model AuditLog {
   id String @id @default(cuid())

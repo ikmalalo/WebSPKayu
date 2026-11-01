@@ -2,10 +2,15 @@ import type { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt, { type SignOptions } from 'jsonwebtoken'
 import { Role } from '@prisma/client'
+
 import { prisma } from '../config/prisma'
 import { env } from '../config/env'
 import { fail, success } from '../utils/api-response'
-import { isEmail, requireFields } from '../validators/common'
+import { isEmail } from '../validators/common'
+
+// ============================================================
+// USER SELECT
+// ============================================================
 
 const userSelect = {
   id: true,
@@ -16,6 +21,10 @@ const userSelect = {
   createdAt: true,
   updatedAt: true,
 } as const
+
+// ============================================================
+// JWT
+// ============================================================
 
 const tokenFor = (id: string, role: Role) => {
   return jwt.sign(
@@ -30,114 +39,46 @@ const tokenFor = (id: string, role: Role) => {
   )
 }
 
-export async function register(req: Request, res: Response) {
-  try {
-    const name = String(req.body?.name ?? '').trim()
-    const email = String(req.body?.email ?? '').trim().toLowerCase()
-    const phone = String(req.body?.phone ?? '').trim()
-    const password = String(req.body?.password ?? '')
+// ============================================================
+// REGISTER
+// ============================================================
+//
+// Registrasi USER publik dinonaktifkan.
+// Akun ADMIN dan PELAKSANA dibuat melalui pengelolaan akun
+// oleh admin, bukan melalui halaman register publik.
+// ============================================================
 
-    const missing = requireFields(req.body, [
-      'name',
-      'email',
-      'password',
-    ])
-
-    if (missing.length > 0) {
-      return fail(
-        res,
-        'Nama, email, dan password wajib diisi',
-        422,
-        [
-          {
-            fields: missing,
-            rules: 'Semua field wajib diisi',
-          },
-        ]
-      )
-    }
-
-    if (!isEmail(email)) {
-      return fail(res, 'Format email tidak valid', 422)
-    }
-
-    if (password.length < 8) {
-      return fail(
-        res,
-        'Password minimal 8 karakter',
-        422
-      )
-    }
-
-    if (name.length < 3) {
-      return fail(
-        res,
-        'Nama minimal 3 karakter',
-        422
-      )
-    }
-
-    const existingUser = await prisma.user.findUnique({
-      where: {
-        email,
-      },
-    })
-
-    if (existingUser) {
-      return fail(
-        res,
-        'Email sudah digunakan',
-        409
-      )
-    }
-
-    const passwordHash = await bcrypt.hash(
-      password,
-      12
-    )
-
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        phone: phone || null,
-        passwordHash,
-        role: Role.USER,
-      },
-      select: userSelect,
-    })
-
-    await prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: 'REGISTER',
-        entity: 'User',
-        entityId: user.id,
-      },
-    })
-
-    return success(
-      res,
-      'Register berhasil',
-      {
-        user,
-      },
-      201
-    )
-  } catch (error) {
-    console.error('REGISTER ERROR:', error)
-
-    return fail(
-      res,
-      'Terjadi kesalahan pada server saat registrasi',
-      500
-    )
-  }
+export async function register(
+  _req: Request,
+  res: Response
+) {
+  return fail(
+    res,
+    'Registrasi akun publik dinonaktifkan. Silakan hubungi admin untuk mendapatkan akun.',
+    403
+  )
 }
 
-export async function login(req: Request, res: Response) {
+// ============================================================
+// LOGIN
+// ============================================================
+//
+// Role yang diperbolehkan masuk:
+// - ADMIN
+// - PELAKSANA
+//
+// USER lama tidak dihapus dari database, tetapi tidak dapat
+// menggunakan login sistem baru.
+// ============================================================
+
+export async function login(
+  req: Request,
+  res: Response
+) {
   try {
-    const email = String(req.body?.email ?? '')
+    const email = String(
+      req.body?.email ?? ''
+    )
       .trim()
       .toLowerCase()
 
@@ -167,6 +108,7 @@ export async function login(req: Request, res: Response) {
       },
     })
 
+    // Jangan membedakan email tidak ditemukan dan password salah.
     if (!user) {
       return fail(
         res,
@@ -188,6 +130,18 @@ export async function login(req: Request, res: Response) {
       )
     }
 
+    // Hanya ADMIN dan PELAKSANA yang boleh login.
+    if (
+      user.role !== Role.ADMIN &&
+      user.role !== Role.PELAKSANA
+    ) {
+      return fail(
+        res,
+        'Akun ini tidak memiliki akses ke sistem. Silakan hubungi admin.',
+        403
+      )
+    }
+
     const token = tokenFor(
       user.id,
       user.role
@@ -200,6 +154,14 @@ export async function login(req: Request, res: Response) {
       select: userSelect,
     })
 
+    if (!safeUser) {
+      return fail(
+        res,
+        'Data akun tidak ditemukan',
+        404
+      )
+    }
+
     return success(
       res,
       'Login berhasil',
@@ -209,7 +171,10 @@ export async function login(req: Request, res: Response) {
       }
     )
   } catch (error) {
-    console.error('LOGIN ERROR:', error)
+    console.error(
+      'LOGIN ERROR:',
+      error
+    )
 
     return fail(
       res,
@@ -218,6 +183,13 @@ export async function login(req: Request, res: Response) {
     )
   }
 }
+
+// ============================================================
+// ME
+// ============================================================
+//
+// Mengambil data akun dari token yang sedang login.
+// ============================================================
 
 export async function me(
   req: Request,
@@ -239,6 +211,18 @@ export async function me(
       )
     }
 
+    // Validasi ulang role dari database.
+    if (
+      user.role !== Role.ADMIN &&
+      user.role !== Role.PELAKSANA
+    ) {
+      return fail(
+        res,
+        'Akun ini tidak memiliki akses ke sistem',
+        403
+      )
+    }
+
     return success(
       res,
       'Data user berhasil diambil',
@@ -247,7 +231,10 @@ export async function me(
       }
     )
   } catch (error) {
-    console.error('ME ERROR:', error)
+    console.error(
+      'ME ERROR:',
+      error
+    )
 
     return fail(
       res,
